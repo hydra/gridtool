@@ -20,6 +20,7 @@ must satisfy them.
 | [07-actions-and-history.md](07-actions-and-history.md) | Document actions, undo/redo, history panel | `HIST` |
 | [08-formatting-and-parsing.md](08-formatting-and-parsing.md) | Number display, text input rules, commit-on-blur fields | `FMT` |
 | [09-measurements.md](09-measurements.md) | Measure tool, measurement list and table | `MEAS` |
+| [10-objects-and-selection.md](10-objects-and-selection.md) | Object ids, object tree, active object, selection box and resizing | `OBJ` |
 
 ## Conventions
 
@@ -48,6 +49,8 @@ must satisfy them.
 | **Calibration points** | Points placed on the image that define two reference lines, A and B. |
 | **Scale** | The real-world length of one image pixel along the image's X axis and along its Y axis. |
 | **Measurement** | A line on the document, with a start and an end point, whose real-world length is derived from the scale. |
+| **Object** | Something the user places on the document and can select: currently measurements; later grids and area measurements. Each has a stable object id. |
+| **Active object** | The single selected object, shown with a purple selection box and resize handles. It is presentation state, not part of the document. |
 
 ## Change log
 
@@ -57,3 +60,4 @@ must satisfy them.
 | 2026-10-21 | Added distance measurements (`09`), Measure distance tool, split side panel (`SHELL-11`), measurement actions (`HIST-2`), formats `FMT-6`–`FMT-8`, and commit-on-blur fields (`FMT-9`). |
 | 2026-10-21 | Added icon verification (`SHELL-6a`) and the delete-button glyph fallback (`MEAS-11`). |
 | 2026-10-21 | Added right-drag pan in all modes (`VIEW-11a`); tool gestures are now primary-button only. |
+| 2026-10-21 | Added objects and selection (`10`): object ids, left object tree panel, active object, purple selection box with 8 resize handles, Resize measurement action, and centre-on-object (`VIEW-17`). Withdrew direct endpoint dragging (`MEAS-7`). The tree view uses egui_ltreeview 0.9.0, vendored and patched for egui 0.37 (`vendor/egui_ltreeview/PATCHES.md`). |

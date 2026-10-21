@@ -48,38 +48,30 @@ Additional rules:
 - A second click at exactly the pending start point is ignored, and the start stays
   pending.
 - Clicks outside the document are ignored.
-- The cursor is a crosshair while hovering over the canvas, except over a handle
-  (`MEAS-7`).
+- The cursor is a crosshair while hovering over the canvas, except over the active
+  object's resize handles (`OBJ-9`).
 - The pending start is discarded when the user leaves Measure mode.
+- A primary drag in Measure mode does nothing, unless it starts on a resize handle
+  (`OBJ-9`). In particular, it does not pan.
 
-**MEAS-7 — Dragging handles.**
-- In Measure mode, a primary-button drag that *starts* within 10 px of any measurement
-  handle (the start or end of any measurement) drags that handle. If several are in
-  range, the nearest is dragged.
-- While dragging, the handle follows the pointer, clamped to the document (`DOC-5`).
-  The line, its label and the table coordinates update live. The document does not
-  change until the drag ends.
-- When the drag ends, one **Move measurement point** action is committed. If the handle
-  ends where it started, no action is committed.
-- The cursor is an open hand over a handle and a grabbing hand while dragging.
-- Leaving Measure mode cancels a drag in progress without committing it. Undo and redo
-  also cancel any drag in progress.
-- A drag that starts away from every handle does nothing. In particular, it does not
-  pan.
+**MEAS-7 — Withdrawn.** Measurement endpoints used to be draggable directly in Measure
+mode. Overlapping endpoints made it hard to grab the right one, so this was replaced by
+object selection and bounding-box resizing (`OBJ-5` – `OBJ-11`).
 
 ## Drawing
 
 **MEAS-8 — Visibility.** Measurements are drawn in **every** tool mode, above the image
-and its outline. Their handles can only be dragged in Measure mode.
+and its outline. Their end markers cannot be interacted with (`OBJ-11`).
 
 **MEAS-9 — Appearance.** Everything is drawn in **blue** (`#0000FF`):
-- **Line.** A 2 px line from the start handle to the end handle.
-- **Handles.** A filled circle with a 5 px radius at each end.
+- **Line.** A 2 px line from the start marker to the end marker.
+- **End markers.** A filled circle with a 5 px radius at each end. They are purely
+  visual.
 - **Label.** Drawn in a 14 px proportional font, centred at the line's midpoint and
   offset 12 px along the perpendicular (the line direction rotated 90°). The text is
   "`<n>: <distance> <unit symbol>`", with the distance formatted by `FMT-7`, or just
   "`<n>`" when the distance is unavailable.
-- **Pending start.** Drawn as a handle. While the pointer is over the canvas, a blue
+- **Pending start.** Drawn as an end marker. While the pointer is over the canvas, a blue
   2 px dashed line (6 px dashes, 4 px gaps) runs from the pending start to the pointer.
 
 ## Measurements table
@@ -104,8 +96,8 @@ and has one header row followed by one row per measurement in list order (`MEAS-
 
 **MEAS-12 — Editing coordinates.** Each coordinate field is a commit-on-blur field
 (`FMT-9`), 55 px wide:
-- It displays the coordinate formatted by `FMT-6`, using the live position during a drag
-  (`MEAS-7`).
+- It displays the coordinate formatted by `FMT-6`, using the live position while the
+  measurement is being resized (`OBJ-9`).
 - When editing ends with changed text, the text is parsed with `FMT-8`. The edited
   coordinate replaces the stored one, and the other coordinate of that point is kept.
   If the result is a valid number, lies inside the document (`DOC-4`) and differs from
@@ -137,11 +129,8 @@ action for that row.
 - Tool behaviour:
   - Two clicks produce exactly one Add action, with the given unit.
   - Clicking the start again is ignored.
-  - Handles are listed as start then end for each measurement.
-  - A drag previews the move and ends with one Move action. A drag that returns to its
-    start produces no action.
-  - A missing measurement cannot be dragged.
-  - Cancel clears the pending start and any drag.
+  - Cancel clears the pending start.
+  - Endpoints cannot be dragged directly (see `10`).
 - Coordinate edit:
   - Editing y keeps x.
   - Non-numeric, out-of-bounds or unchanged values produce no action.

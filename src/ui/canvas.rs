@@ -8,16 +8,17 @@ use eframe::egui::{
 use gridtool::action::Action;
 use gridtool::calibration::{CalibrationMethod, Line};
 use gridtool::document::Document;
-use gridtool::geometry::Point;
+use gridtool::geometry::{Bounds, BoundsHandle, Point};
 use gridtool::imaging::DecodedImage;
 use gridtool::measurement::Endpoint;
 
 use super::document_view::DocumentView;
 use super::format::format_length;
 use super::hit_test::nearest_within;
-use super::measure_tool::{Handle, MeasureTool};
+use super::measure_tool::MeasureTool;
 use super::rotate_handle;
 use super::scale_tool::ScaleTool;
+use super::selection::Selection;
 use super::tool_mode::ToolMode;
 use super::viewport::{DocumentTransform, Viewport};
 
@@ -37,6 +38,17 @@ const MEASUREMENT_STROKE: Stroke = Stroke {
     width: 2.0,
     color: Color32::BLUE,
 };
+const SELECTION_COLOR: Color32 = Color32::from_rgb(128, 0, 128);
+const SELECTION_STROKE: Stroke = Stroke {
+    width: 1.5,
+    color: SELECTION_COLOR,
+};
+/// Gap (screen points) between an object and its selection box, so that even a
+/// perfectly level or upright line gets a box with distinct handles.
+const SELECTION_PADDING: f32 = 8.0;
+const RESIZE_HANDLE_SIZE: f32 = 10.0;
+/// How close (in screen points) the pointer must be to a resize handle to grab it.
+const RESIZE_HANDLE_GRAB_RADIUS: f32 = 8.0;
 const SCALE_MARKER_RADIUS: f32 = 6.0;
 const MEASUREMENT_HANDLE_RADIUS: f32 = 5.0;
 const CROSSHAIR_HALF_LENGTH: f32 = 11.0;
@@ -74,26 +86,38 @@ pub fn show(
         view.measure_tool.cancel();
     }
     let transform = view.viewport.transform(view_center, document_size);
-    let action = match mode {
-        ToolMode::Pan => {
-            handle_pan(ui, &response, &mut view.viewport);
-            None
-        }
-        ToolMode::Rotate => {
-            handle_rotate(ui, &response, transform.center(), view);
-            None
-        }
-        ToolMode::Scale => handle_scale(ui, &response, transform, document, &mut view.scale_tool),
-        ToolMode::Measure => {
-            handle_measure(ui, &response, transform, document, &mut view.measure_tool)
-        }
+    // The active object's resize handles take priority over every tool.
+    let selection_input = handle_selection(ui, &response, transform, document, &mut view.selection);
+    let action = match selection_input {
+        SelectionInput::Resizing(action) => action,
+        SelectionInput::NotResizing => match mode {
+            ToolMode::Pan => {
+                handle_pan(ui, &response, &mut view.viewport);
+                None
+            }
+            ToolMode::Rotate => {
+                handle_rotate(ui, &response, transform.center(), view);
+                None
+            }
+            ToolMode::Scale => {
+                handle_scale(ui, &response, transform, document, &mut view.scale_tool)
+            }
+            ToolMode::Measure => {
+                handle_measure(ui, &response, transform, document, &mut view.measure_tool)
+            }
+        },
     };
+    if !view.selection.is_resizing()
+        && hovered_resize_handle(&response, transform, document, &view.selection).is_some()
+    {
+        ui.set_cursor_icon(CursorIcon::Grab);
+    }
     // In every mode the secondary button pans. Done after the tool so its cursor wins.
     drag_pan(ui, &response, &mut view.viewport, PointerButton::Secondary);
 
     let transform = view.viewport.transform(view_center, document_size);
     paint_document(&painter, transform, &view.texture);
-    paint_measurements(&painter, transform, document, &view.measure_tool);
+    paint_measurements(&painter, transform, document, &view.selection);
     match mode {
         ToolMode::Pan => {}
         ToolMode::Rotate => {
@@ -113,7 +137,121 @@ pub fn show(
             }
         }
     }
+    if let Some(bounds) = view.selection.active_bounds(document) {
+        paint_selection(&painter, transform, bounds);
+    }
     action
+}
+
+/// Whether the active object's resize handles are handling the primary button.
+enum SelectionInput {
+    /// A resize is in progress (or just ended, with its action); tools must ignore input.
+    Resizing(Option<Action>),
+    NotResizing,
+}
+
+/// Resizing via the active object's handles, and clearing the selection when the user
+/// clicks outside its bounding box. Runs in every tool mode.
+fn handle_selection(
+    ui: &egui::Ui,
+    response: &Response,
+    transform: DocumentTransform,
+    document: &Document,
+    selection: &mut Selection,
+) -> SelectionInput {
+    let Some(bounds) = selection.active_bounds(document) else {
+        return SelectionInput::NotResizing;
+    };
+
+    if response.drag_started_by(PointerButton::Primary)
+        && let Some(origin) = press_origin(ui)
+        && let Some(handle) = resize_handle_at(transform, bounds, origin)
+    {
+        selection.begin_resize(document, handle, transform.screen_to_image(origin));
+    }
+
+    if selection.is_resizing() {
+        if response.dragged_by(PointerButton::Primary)
+            && let Some(pointer) = response.interact_pointer_pos()
+        {
+            selection.resize_to(document, transform.screen_to_image(pointer));
+        }
+        ui.set_cursor_icon(CursorIcon::Grabbing);
+        let action = response
+            .drag_stopped_by(PointerButton::Primary)
+            .then(|| selection.end_resize(document))
+            .flatten();
+        return SelectionInput::Resizing(action);
+    }
+
+    if response.clicked()
+        && let Some(position) = response.interact_pointer_pos()
+    {
+        let margin = transform.screen_to_image_length(SELECTION_PADDING + RESIZE_HANDLE_SIZE / 2.0);
+        if !bounds
+            .expanded(margin)
+            .contains(transform.screen_to_image(position))
+        {
+            selection.select(None);
+        }
+    }
+    SelectionInput::NotResizing
+}
+
+fn hovered_resize_handle(
+    response: &Response,
+    transform: DocumentTransform,
+    document: &Document,
+    selection: &Selection,
+) -> Option<BoundsHandle> {
+    let bounds = selection.active_bounds(document)?;
+    resize_handle_at(transform, bounds, response.hover_pos()?)
+}
+
+/// The resize handle of `bounds` under screen `position`, if any.
+fn resize_handle_at(
+    transform: DocumentTransform,
+    bounds: Bounds,
+    position: Pos2,
+) -> Option<BoundsHandle> {
+    let handles = resize_handle_positions(transform.bounds_corners(bounds, SELECTION_PADDING));
+    let positions = handles.map(|(_, position)| position);
+    nearest_within(&positions, position, RESIZE_HANDLE_GRAB_RADIUS).map(|index| handles[index].0)
+}
+
+/// Screen positions of the eight resize handles of a selection box with the given
+/// corners (top-left, top-right, bottom-right, bottom-left).
+fn resize_handle_positions(corners: [Pos2; 4]) -> [(BoundsHandle, Pos2); 8] {
+    let [top_left, top_right, bottom_right, bottom_left] = corners;
+    let mid = |a: Pos2, b: Pos2| a.lerp(b, 0.5);
+    [
+        (BoundsHandle::TopLeft, top_left),
+        (BoundsHandle::Top, mid(top_left, top_right)),
+        (BoundsHandle::TopRight, top_right),
+        (BoundsHandle::Right, mid(top_right, bottom_right)),
+        (BoundsHandle::BottomRight, bottom_right),
+        (BoundsHandle::Bottom, mid(bottom_right, bottom_left)),
+        (BoundsHandle::BottomLeft, bottom_left),
+        (BoundsHandle::Left, mid(bottom_left, top_left)),
+    ]
+}
+
+/// Dashed purple box around the active object, with a square handle at each corner and
+/// edge midpoint.
+fn paint_selection(painter: &egui::Painter, transform: DocumentTransform, bounds: Bounds) {
+    let corners = transform.bounds_corners(bounds, SELECTION_PADDING);
+    let mut outline = corners.to_vec();
+    outline.push(corners[0]);
+    painter.extend(Shape::dashed_line(
+        &outline,
+        SELECTION_STROKE,
+        DASH_LENGTH,
+        DASH_GAP,
+    ));
+    for (_, position) in resize_handle_positions(corners) {
+        let handle = Rect::from_center_size(position, Vec2::splat(RESIZE_HANDLE_SIZE));
+        painter.rect_filled(handle, 0.0, SELECTION_COLOR);
+    }
 }
 
 fn handle_zoom(ui: &egui::Ui, response: &Response, view_center: Pos2, viewport: &mut Viewport) {
@@ -277,26 +415,9 @@ fn handle_measure(
     document: &Document,
     tool: &mut MeasureTool,
 ) -> Option<Action> {
-    let handles = tool.handles(document);
-    let markers: Vec<Pos2> = handles
-        .iter()
-        .map(|&(_, point)| transform.image_to_screen(point))
-        .collect();
-    let gesture = PointGesture::read(ui, response, &markers);
+    let gesture = PointGesture::read(ui, response, &[]);
+    gesture.update_cursor(ui, response, false, false, true);
 
-    if let Some(index) = gesture.grabbed {
-        tool.begin_drag(document, handles[index].0);
-    }
-    if tool.is_dragging()
-        && let Some(position) = gesture.drag_position
-    {
-        tool.drag_to(document.clamp(transform.screen_to_image(position)));
-    }
-    gesture.update_cursor(ui, response, tool.is_dragging(), true, true);
-
-    if gesture.released {
-        return tool.end_drag();
-    }
     if let Some(position) = gesture.clicked {
         let point = transform.screen_to_image(position);
         if document.contains(point) {
@@ -367,13 +488,12 @@ fn paint_measurements(
     painter: &egui::Painter,
     transform: DocumentTransform,
     document: &Document,
-    tool: &MeasureTool,
+    selection: &Selection,
 ) {
-    for (index, measurement) in document.measurements().iter().enumerate() {
-        let [start, end] = Endpoint::ALL.map(|endpoint| {
-            let point = tool.displayed_point(Handle { index, endpoint }, measurement);
-            transform.image_to_screen(point)
-        });
+    for (index, stored) in document.measurements().iter().enumerate() {
+        let measurement = selection.displayed(stored.id(), stored);
+        let [start, end] =
+            Endpoint::ALL.map(|endpoint| transform.image_to_screen(measurement.point(endpoint)));
         let label = match measurement.distance(document.calibration()) {
             Ok(distance) => format!(
                 "{}: {} {}",
@@ -478,8 +598,12 @@ mod tests {
     use gridtool::units::LengthUnit;
 
     const SCREEN: Rect = Rect::from_min_max(Pos2::ZERO, Pos2::new(800.0, 600.0));
-    /// Where image point (50, 50) of the 200×100 test document is drawn at default view.
-    const HANDLE_ON_SCREEN: Pos2 = Pos2::new(350.0, 300.0);
+    /// Where the test measurement's start, image point (50, 50) of the 200×100 test
+    /// document, is drawn at the default view. Its end (150, 50) is at (450, 300).
+    const MEASUREMENT_START_ON_SCREEN: Pos2 = Pos2::new(350.0, 300.0);
+    const MEASUREMENT_MIDDLE_ON_SCREEN: Pos2 = Pos2::new(400.0, 300.0);
+    /// The selection box's right-edge handle: the end, pushed out by the padding.
+    const RIGHT_RESIZE_HANDLE: Pos2 = Pos2::new(450.0 + SELECTION_PADDING, 300.0);
     const EMPTY_SPOT: Pos2 = Pos2::new(600.0, 500.0);
     const DRAG_BY: Vec2 = Vec2::new(40.0, 25.0);
 
@@ -550,6 +674,24 @@ mod tests {
             self.frame(Vec::new());
         }
 
+        fn click(&mut self, at: Pos2) {
+            let press = |pressed| Event::PointerButton {
+                pos: at,
+                button: PointerButton::Primary,
+                pressed,
+                modifiers: Modifiers::NONE,
+            };
+            self.frame(vec![Event::PointerMoved(at)]);
+            self.frame(vec![press(true)]);
+            self.frame(vec![press(false)]);
+            self.frame(Vec::new());
+        }
+
+        fn select_measurement(&mut self) {
+            let id = self.document.measurements()[0].id();
+            self.view.selection.select(Some(id));
+        }
+
         /// How far the view has been panned from its default.
         fn pan(&self) -> Vec2 {
             self.view
@@ -561,7 +703,7 @@ mod tests {
     }
 
     #[test]
-    fn handle_is_where_the_tests_expect() {
+    fn measurement_is_where_the_tests_expect() {
         let harness = Harness::new(ToolMode::Measure);
         let transform = harness
             .view
@@ -570,8 +712,25 @@ mod tests {
 
         assert_eq!(
             transform.image_to_screen(Point::new(50.0, 50.0)),
-            HANDLE_ON_SCREEN
+            MEASUREMENT_START_ON_SCREEN
         );
+    }
+
+    #[test]
+    fn resize_handles_sit_at_corners_and_edge_midpoints() {
+        let corners = [
+            Pos2::new(0.0, 0.0),
+            Pos2::new(10.0, 0.0),
+            Pos2::new(10.0, 20.0),
+            Pos2::new(0.0, 20.0),
+        ];
+
+        let handles = resize_handle_positions(corners);
+
+        assert_eq!(handles.len(), BoundsHandle::ALL.len());
+        assert!(handles.contains(&(BoundsHandle::TopLeft, Pos2::new(0.0, 0.0))));
+        assert!(handles.contains(&(BoundsHandle::Right, Pos2::new(10.0, 10.0))));
+        assert!(handles.contains(&(BoundsHandle::Bottom, Pos2::new(5.0, 20.0))));
     }
 
     #[test]
@@ -587,30 +746,61 @@ mod tests {
     }
 
     #[test]
-    fn right_drag_on_a_handle_pans_instead_of_moving_it() {
-        let mut harness = Harness::new(ToolMode::Measure);
+    fn right_drag_on_a_resize_handle_pans_instead_of_resizing() {
+        let mut harness = Harness::new(ToolMode::Pan);
+        harness.select_measurement();
 
-        harness.drag(PointerButton::Secondary, HANDLE_ON_SCREEN, DRAG_BY);
+        harness.drag(PointerButton::Secondary, RIGHT_RESIZE_HANDLE, DRAG_BY);
 
         assert_eq!(harness.pan(), DRAG_BY);
         assert!(harness.actions.is_empty());
     }
 
     #[test]
-    fn left_drag_on_a_handle_moves_it_without_panning() {
-        let mut harness = Harness::new(ToolMode::Measure);
+    fn left_drag_on_a_resize_handle_resizes_in_every_mode() {
+        for mode in ToolMode::ALL {
+            let mut harness = Harness::new(mode);
+            harness.select_measurement();
 
-        harness.drag(PointerButton::Primary, HANDLE_ON_SCREEN, DRAG_BY);
+            harness.drag(PointerButton::Primary, RIGHT_RESIZE_HANDLE, DRAG_BY);
 
-        assert_eq!(harness.pan(), Vec2::ZERO);
-        assert_eq!(
-            harness.actions,
-            [Action::MoveMeasurementPoint {
-                index: 0,
-                endpoint: Endpoint::Start,
-                to: Point::new(90.0, 75.0),
-            }]
-        );
+            // The right edge only moves horizontally; it carries the line's end.
+            assert_eq!(
+                harness.actions,
+                [Action::ResizeMeasurement {
+                    index: 0,
+                    start: Point::new(50.0, 50.0),
+                    end: Point::new(190.0, 50.0),
+                }],
+                "{mode:?}"
+            );
+            assert_eq!(harness.pan(), Vec2::ZERO, "{mode:?} should not pan");
+        }
+    }
+
+    #[test]
+    fn measurement_ends_can_no_longer_be_dragged_directly() {
+        for mode in ToolMode::ALL {
+            let mut harness = Harness::new(mode);
+
+            harness.drag(PointerButton::Primary, MEASUREMENT_START_ON_SCREEN, DRAG_BY);
+
+            assert!(harness.actions.is_empty(), "{mode:?}");
+        }
+    }
+
+    #[test]
+    fn clicking_outside_the_selection_box_clears_it_in_every_mode() {
+        for mode in ToolMode::ALL {
+            let mut harness = Harness::new(mode);
+            harness.select_measurement();
+
+            harness.click(MEASUREMENT_MIDDLE_ON_SCREEN);
+            assert!(harness.view.selection.active().is_some(), "{mode:?} inside");
+
+            harness.click(EMPTY_SPOT);
+            assert_eq!(harness.view.selection.active(), None, "{mode:?} outside");
+        }
     }
 
     #[test]

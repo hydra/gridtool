@@ -9,6 +9,7 @@ use crate::open_image::{OpenedImage, pick_and_decode};
 use crate::ui::canvas;
 use crate::ui::document_view::DocumentView;
 use crate::ui::measurements_panel::MeasurementsPanel;
+use crate::ui::object_tree::{self, TreePick};
 use crate::ui::placeholder;
 use crate::ui::rotation_bar::RotationBar;
 use crate::ui::scale_bar::ScaleBar;
@@ -26,6 +27,24 @@ impl OpenDocument {
     fn perform(&mut self, action: Action) {
         if let Err(error) = self.editor.perform(action) {
             eprintln!("action rejected: {error}");
+        }
+        self.view.selection.sync_to(self.editor.document());
+    }
+
+    /// Applies what the user picked in the object tree: an object becomes the active
+    /// object and the view is centred on it.
+    fn pick(&mut self, pick: TreePick) {
+        let selection = &mut self.view.selection;
+        match pick {
+            TreePick::Object(id) => {
+                selection.select(Some(id));
+                let document = self.editor.document();
+                if let Some(bounds) = selection.active_bounds(document) {
+                    let size = egui::Vec2::new(document.width() as f32, document.height() as f32);
+                    self.view.viewport.center_on(bounds.center(), size);
+                }
+            }
+            TreePick::NoObject => selection.select(None),
         }
     }
 
@@ -45,7 +64,7 @@ impl OpenDocument {
         self.view
             .scale_tool
             .sync_to(self.editor.document().calibration());
-        self.view.measure_tool.sync_to_document();
+        self.view.selection.sync_to(self.editor.document());
     }
 
     fn history_availability(&self) -> HistoryAvailability {
@@ -162,10 +181,24 @@ impl eframe::App for GridToolApp {
 
         let mut actions: Vec<Action> = self.show_tool_options(ui).into_iter().collect();
 
+        let tree = self.content.document_mut().map(|open| {
+            let view = &mut open.view;
+            (
+                open.editor.document(),
+                &mut view.tree_state,
+                &view.selection,
+            )
+        });
+        if let Some(pick) = object_tree::show(ui, tree)
+            && let Some(open) = self.content.document_mut()
+        {
+            open.pick(pick);
+        }
+
         let open = self
             .content
             .document()
-            .map(|open| (&open.editor, &open.view.measure_tool));
+            .map(|open| (&open.editor, &open.view.selection));
         actions.extend(side_panel::show(ui, &mut self.measurements_panel, open));
 
         egui::CentralPanel::default().show(ui, |ui| match &mut self.content {

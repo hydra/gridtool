@@ -7,6 +7,8 @@
 - **calibration**: the scale calibration data (see `SCALE-20`)
 - **measurements**: an ordered list of distance measurements (see `MEAS-1`, `MEAS-2`).
   Their distances are derived from the calibration, not stored (`MEAS-3`).
+- **object id counter**: the next object id to allocate. Every object carries a stable
+  id (`OBJ-1`).
 
 View state (pan, zoom, rotation) is **not** part of the document (`ARCH-4`).
 

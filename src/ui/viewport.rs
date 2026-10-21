@@ -3,7 +3,7 @@
 
 use eframe::egui::emath::Rot2;
 use eframe::egui::{Pos2, Vec2};
-use gridtool::geometry::Point;
+use gridtool::geometry::{Bounds, Point};
 
 use super::angle::normalize_degrees;
 
@@ -50,6 +50,13 @@ impl Viewport {
     /// Moves the document by `delta` screen points.
     pub fn pan_by(&mut self, delta: Vec2) {
         self.pan += delta;
+    }
+
+    /// Pans so that image `point` is drawn at the centre of the view, keeping zoom and
+    /// rotation.
+    pub fn center_on(&mut self, point: Point, document_size: Vec2) {
+        let from_center = Vec2::new(point.x as f32, point.y as f32) - document_size * 0.5;
+        self.pan = -(Rot2::from_angle(self.rotation_radians()) * (from_center * self.zoom));
     }
 
     /// Multiplies the zoom by `factor`, keeping the document point under `anchor`
@@ -112,14 +119,31 @@ impl DocumentTransform {
 
     /// Like [`Self::corners`], but pushed outward by `outset` screen points on every side.
     pub fn corners_outset(self, outset: f32) -> [Pos2; 4] {
-        let half = self.half_size + Vec2::splat(outset / self.zoom);
+        let size = self.half_size * 2.0;
+        let document = Bounds {
+            min: Point::new(0.0, 0.0),
+            max: Point::new(f64::from(size.x), f64::from(size.y)),
+        };
+        self.bounds_corners(document, outset)
+    }
+
+    /// Screen positions of the corners of image-space `bounds`, pushed outward by `outset`
+    /// screen points on every side, in the order top-left, top-right, bottom-right,
+    /// bottom-left (in image orientation).
+    pub fn bounds_corners(self, bounds: Bounds, outset: f32) -> [Pos2; 4] {
+        let Bounds { min, max } = bounds.expanded(self.screen_to_image_length(outset));
         [
-            Vec2::new(-half.x, -half.y),
-            Vec2::new(half.x, -half.y),
-            Vec2::new(half.x, half.y),
-            Vec2::new(-half.x, half.y),
+            Point::new(min.x, min.y),
+            Point::new(max.x, min.y),
+            Point::new(max.x, max.y),
+            Point::new(min.x, max.y),
         ]
-        .map(|corner| self.center_offset_to_screen(corner))
+        .map(|corner| self.image_to_screen(corner))
+    }
+
+    /// The image-pixel length that `length` screen points cover at this zoom.
+    pub fn screen_to_image_length(self, length: f32) -> f64 {
+        f64::from(length / self.zoom)
     }
 
     fn center_offset_to_screen(self, from_center: Vec2) -> Pos2 {
@@ -143,6 +167,40 @@ mod tests {
 
     fn transform(viewport: &Viewport) -> DocumentTransform {
         viewport.transform(VIEW_CENTER, DOCUMENT_SIZE)
+    }
+
+    #[test]
+    fn center_on_puts_the_point_at_the_view_centre_at_any_zoom_and_rotation() {
+        let mut viewport = Viewport::default();
+        viewport.set_rotation_degrees(30.0);
+        viewport.zoom_about(VIEW_CENTER, Pos2::new(10.0, 20.0), 2.5);
+        viewport.pan_by(Vec2::new(123.0, -45.0));
+        let point = Point::new(80.0, 10.0);
+
+        viewport.center_on(point, DOCUMENT_SIZE);
+
+        assert_near(transform(&viewport).image_to_screen(point), VIEW_CENTER);
+        assert_eq!(viewport.zoom, 2.5);
+        assert!((viewport.rotation_degrees() - 30.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn bounds_corners_are_outset_in_screen_points() {
+        let mut viewport = Viewport::default();
+        viewport.zoom_about(VIEW_CENTER, VIEW_CENTER, 2.0);
+        let bounds = Bounds::around(Point::new(10.0, 20.0), Point::new(30.0, 20.0));
+
+        let corners = transform(&viewport).bounds_corners(bounds, 8.0);
+
+        // Image (10, 20) is 40 left of and 5 above the document centre; zoom doubles it.
+        assert_near(
+            corners[0],
+            Pos2::new(400.0 - 80.0 - 8.0, 300.0 - 10.0 - 8.0),
+        );
+        assert_near(
+            corners[2],
+            Pos2::new(400.0 - 40.0 + 8.0, 300.0 - 10.0 + 8.0),
+        );
     }
 
     #[test]

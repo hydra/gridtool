@@ -8,6 +8,7 @@ use crate::calibration::{CalibrationError, Line, ScalePoints};
 use crate::document::Document;
 use crate::geometry::Point;
 use crate::measurement::{Endpoint, Measurement};
+use crate::object::Identified;
 use crate::units::LengthUnit;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,6 +28,12 @@ pub enum Action {
         index: usize,
         endpoint: Endpoint,
         to: Point,
+    },
+    /// Replaces both ends of a measurement at once (e.g. after resizing its bounding box).
+    ResizeMeasurement {
+        index: usize,
+        start: Point,
+        end: Point,
     },
     /// Changes the unit a measurement's distance is reported in.
     SetMeasurementUnit { index: usize, unit: LengthUnit },
@@ -100,7 +107,15 @@ impl Action {
                 for endpoint in Endpoint::ALL {
                     ensure_inside(document, measurement.point(endpoint))?;
                 }
-                document.measurements_mut().push(measurement.clone());
+                let id = document.allocate_object_id();
+                document
+                    .measurements_mut()
+                    .push(Identified::new(id, measurement.clone()));
+            }
+            Action::ResizeMeasurement { index, start, end } => {
+                ensure_inside(document, *start)?;
+                ensure_inside(document, *end)?;
+                measurement_mut(document, *index)?.set_points(*start, *end);
             }
             Action::MoveMeasurementPoint {
                 index,
@@ -135,6 +150,7 @@ fn measurement_mut(document: &mut Document, index: usize) -> Result<&mut Measure
     let count = measurements.len();
     measurements
         .get_mut(index)
+        .map(|measurement| &mut **measurement)
         .ok_or(ActionError::MeasurementIndexOutOfRange { index, count })
 }
 
@@ -165,6 +181,9 @@ impl fmt::Display for Action {
                 endpoint,
                 to,
             } => write!(f, "Move measurement {} {endpoint} to {to}", index + 1),
+            Action::ResizeMeasurement { index, start, end } => {
+                write!(f, "Resize measurement {} to {start} - {end}", index + 1)
+            }
             Action::SetMeasurementUnit { index, unit } => {
                 write!(f, "Set measurement {} units to {unit}", index + 1)
             }
@@ -427,6 +446,63 @@ mod tests {
 
         assert!(result.is_err());
         assert_eq!(document, before);
+    }
+
+    #[test]
+    fn resizes_a_measurement_keeping_its_id_and_unit() {
+        let mut document = document_with_measurements(2);
+        let id = document.measurements()[1].id();
+
+        Action::ResizeMeasurement {
+            index: 1,
+            start: Point::new(5.0, 6.0),
+            end: Point::new(70.0, 40.0),
+        }
+        .apply(&mut document)
+        .unwrap();
+
+        let resized = &document.measurements()[1];
+        assert_eq!(resized.id(), id);
+        assert_eq!(resized.start(), Point::new(5.0, 6.0));
+        assert_eq!(resized.end(), Point::new(70.0, 40.0));
+        assert_eq!(resized.unit(), LengthUnit::Centimetre);
+    }
+
+    #[test]
+    fn rejects_resizing_outside_the_document_or_a_missing_measurement() {
+        let mut document = document_with_measurements(1);
+        let before = document.clone();
+        let resize = |index, end| Action::ResizeMeasurement {
+            index,
+            start: Point::new(1.0, 1.0),
+            end,
+        };
+
+        assert!(
+            resize(0, Point::new(1.0, 51.0))
+                .apply(&mut document)
+                .is_err()
+        );
+        assert!(
+            resize(1, Point::new(2.0, 2.0))
+                .apply(&mut document)
+                .is_err()
+        );
+        assert_eq!(document, before);
+    }
+
+    #[test]
+    fn describes_a_resize() {
+        let action = Action::ResizeMeasurement {
+            index: 0,
+            start: Point::new(1.0, 2.0),
+            end: Point::new(3.0, 4.0),
+        };
+
+        assert_eq!(
+            action.to_string(),
+            "Resize measurement 1 to (1.0, 2.0) - (3.0, 4.0)"
+        );
     }
 
     #[test]

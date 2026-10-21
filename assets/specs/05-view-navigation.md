@@ -94,6 +94,13 @@ pan' = (a − c) − ((a − c − pan) × zoom'/zoom)
   `VIEW-14`).
 - Together with wheel zoom (`VIEW-8`), this means the view can always be navigated
   without changing tool.
+- The active object's resize handles take priority over every tool's primary-button
+  gestures (`OBJ-9`).
+
+**VIEW-17 — Centre on a point.** The view can be panned so that a given image point is
+drawn at the centre of the canvas, keeping zoom and rotation. From `VIEW-3`:
+`pan = −R(rotation)·((p − size/2)·zoom)`. Used when an object is picked in the object
+tree (`OBJ-5`).
 
 ## Rotate view mode
 

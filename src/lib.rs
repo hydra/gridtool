@@ -11,4 +11,5 @@ pub mod editor;
 pub mod geometry;
 pub mod imaging;
 pub mod measurement;
+pub mod object;
 pub mod units;

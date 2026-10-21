@@ -2,6 +2,7 @@ use crate::calibration::Calibration;
 use crate::geometry::Point;
 use crate::imaging::DecodedImage;
 use crate::measurement::Measurement;
+use crate::object::{Identified, ObjectId};
 
 /// The thing being edited. Modified only through [`crate::action::Action`]s.
 #[derive(Debug, Clone, PartialEq)]
@@ -9,7 +10,9 @@ pub struct Document {
     width: u32,
     height: u32,
     calibration: Calibration,
-    measurements: Vec<Measurement>,
+    measurements: Vec<Identified<Measurement>>,
+    /// The id the next added object will get. Ids are never reused within a history.
+    next_object_id: u64,
 }
 
 impl Document {
@@ -20,6 +23,7 @@ impl Document {
             height,
             calibration: Calibration::default(),
             measurements: Vec::new(),
+            next_object_id: 1,
         }
     }
 
@@ -59,18 +63,36 @@ impl Document {
     }
 
     /// Distance measurements, in the order they were added.
-    pub fn measurements(&self) -> &[Measurement] {
+    pub fn measurements(&self) -> &[Identified<Measurement>] {
         &self.measurements
     }
 
-    pub(crate) fn measurements_mut(&mut self) -> &mut Vec<Measurement> {
+    /// List position of the measurement with `id`, if it exists.
+    pub fn measurement_index(&self, id: ObjectId) -> Option<usize> {
+        self.measurements.iter().position(|m| m.id() == id)
+    }
+
+    /// Whether any object with `id` exists.
+    pub fn contains_object(&self, id: ObjectId) -> bool {
+        self.measurement_index(id).is_some()
+    }
+
+    pub(crate) fn measurements_mut(&mut self) -> &mut Vec<Identified<Measurement>> {
         &mut self.measurements
+    }
+
+    pub(crate) fn allocate_object_id(&mut self) -> ObjectId {
+        let id = ObjectId::new(self.next_object_id);
+        self.next_object_id += 1;
+        id
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::action::Action;
+    use crate::units::LengthUnit;
 
     #[test]
     fn takes_its_size_from_the_image() {
@@ -108,5 +130,47 @@ mod tests {
             document.clamp(Point::new(20.0, 30.0)),
             Point::new(20.0, 30.0)
         );
+    }
+
+    fn add_measurement(document: &mut Document) {
+        Action::AddMeasurement(Measurement::new(
+            Point::new(1.0, 1.0),
+            Point::new(2.0, 2.0),
+            LengthUnit::Centimetre,
+        ))
+        .apply(document)
+        .unwrap();
+    }
+
+    #[test]
+    fn objects_get_distinct_ids_that_survive_deleting_others() {
+        let mut document = Document::new(10, 10);
+        for _ in 0..3 {
+            add_measurement(&mut document);
+        }
+        let ids: Vec<_> = document.measurements().iter().map(|m| m.id()).collect();
+        assert_ne!(ids[0], ids[1]);
+        assert_ne!(ids[1], ids[2]);
+
+        Action::DeleteMeasurement { index: 0 }
+            .apply(&mut document)
+            .unwrap();
+
+        assert_eq!(document.measurement_index(ids[2]), Some(1));
+        assert!(!document.contains_object(ids[0]));
+    }
+
+    #[test]
+    fn ids_are_not_reused_after_a_delete() {
+        let mut document = Document::new(10, 10);
+        add_measurement(&mut document);
+        let first = document.measurements()[0].id();
+        Action::DeleteMeasurement { index: 0 }
+            .apply(&mut document)
+            .unwrap();
+
+        add_measurement(&mut document);
+
+        assert_ne!(document.measurements()[0].id(), first);
     }
 }

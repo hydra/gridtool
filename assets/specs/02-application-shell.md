@@ -14,9 +14,10 @@ initial inner size of 1280 × 800.
    only when the active tool mode has options *and* a document is open. Its contents
    depend on the mode: see `VIEW-12` (Rotate) and `SCALE-3` (Scale). The Pan & zoom and
    Measure distance modes have no options row.
-3. Below the rows, side by side:
+3. Below the rows, side by side, from left to right:
+   - **Object panel.** Docked on the left-hand side (see `OBJ-3`).
    - **Canvas.** Fills the remaining space and shows the document (see `VIEW`, `SCALE`,
-     `MEAS`).
+     `MEAS`, `OBJ`).
    - **Side panel.** Docked on the right-hand side (see `SHELL-11`).
 
 **SHELL-3.** When no document is open, the canvas area shows the centred message

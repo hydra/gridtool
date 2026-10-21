@@ -10,7 +10,7 @@ use gridtool::measurement::{Endpoint, Measurement};
 use super::commit_field::CommitField;
 use super::format::{format_coordinate, format_length, parse_number};
 use super::icons;
-use super::measure_tool::{Handle, MeasureTool};
+use super::selection::Selection;
 use super::unit_picker;
 
 const COORDINATE_FIELD_WIDTH: f32 = 55.0;
@@ -52,7 +52,7 @@ impl MeasurementsPanel {
         &mut self,
         ui: &mut egui::Ui,
         document: &Document,
-        tool: &MeasureTool,
+        selection: &Selection,
     ) -> Option<Action> {
         ui.heading("Measurements");
         ui.separator();
@@ -75,8 +75,10 @@ impl MeasurementsPanel {
                         ui.end_row();
 
                         let mut action = None;
-                        for (index, measurement) in document.measurements().iter().enumerate() {
-                            let row_action = self.row(ui, document, tool, index, measurement);
+                        for (index, stored) in document.measurements().iter().enumerate() {
+                            // Show a resize in progress live.
+                            let measurement = selection.displayed(stored.id(), stored);
+                            let row_action = self.row(ui, document, index, &measurement);
                             action = action.or(row_action);
                             ui.end_row();
                         }
@@ -91,7 +93,6 @@ impl MeasurementsPanel {
         &mut self,
         ui: &mut egui::Ui,
         document: &Document,
-        tool: &MeasureTool,
         index: usize,
         measurement: &Measurement,
     ) -> Option<Action> {
@@ -101,7 +102,7 @@ impl MeasurementsPanel {
         ui.label((index + 1).to_string());
 
         for endpoint in Endpoint::ALL {
-            let displayed = tool.displayed_point(Handle { index, endpoint }, measurement);
+            let displayed = measurement.point(endpoint);
             ui.horizontal(|ui| {
                 for axis in Axis::ALL {
                     let id = egui::Id::unique(("measurement_coordinate", index, endpoint, axis));

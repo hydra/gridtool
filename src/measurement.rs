@@ -4,7 +4,7 @@
 use std::fmt;
 
 use crate::calibration::{Calibration, ScaleError};
-use crate::geometry::Point;
+use crate::geometry::{Bounds, BoundsHandle, Edge, Point};
 use crate::units::LengthUnit;
 
 /// One end of a measurement line.
@@ -66,6 +66,55 @@ impl Measurement {
         Ok(scale
             .unit
             .convert(scale.length(self.start, self.end), self.unit))
+    }
+
+    /// The smallest axis-aligned box containing the line.
+    pub fn bounds(&self) -> Bounds {
+        Bounds::around(self.start, self.end)
+    }
+
+    /// The measurement after dragging bounding-box `handle` by `(dx, dy)` image pixels.
+    ///
+    /// Along each axis, one endpoint lies on the bounding box's min edge and the other on
+    /// its max edge (the start takes the min edge when they are level). Each endpoint
+    /// follows the edge it lies on, so dragging a corner moves the endpoint at that corner
+    /// and dragging an edge moves only that coordinate. Dragging an edge past the opposite
+    /// one simply flips the line.
+    pub fn resized(&self, handle: BoundsHandle, dx: f64, dy: f64) -> Measurement {
+        let (moved_x, moved_y) = handle.edges();
+        let start_x_edge = if self.start.x <= self.end.x {
+            Edge::Min
+        } else {
+            Edge::Max
+        };
+        let start_y_edge = if self.start.y <= self.end.y {
+            Edge::Min
+        } else {
+            Edge::Max
+        };
+        let follow = |value: f64, edge: Edge, moved: Option<Edge>, delta: f64| {
+            if moved == Some(edge) {
+                value + delta
+            } else {
+                value
+            }
+        };
+        Measurement {
+            start: Point::new(
+                follow(self.start.x, start_x_edge, moved_x, dx),
+                follow(self.start.y, start_y_edge, moved_y, dy),
+            ),
+            end: Point::new(
+                follow(self.end.x, start_x_edge.opposite(), moved_x, dx),
+                follow(self.end.y, start_y_edge.opposite(), moved_y, dy),
+            ),
+            unit: self.unit,
+        }
+    }
+
+    pub(crate) fn set_points(&mut self, start: Point, end: Point) {
+        self.start = start;
+        self.end = end;
     }
 
     pub(crate) fn set_point(&mut self, endpoint: Endpoint, point: Point) {
@@ -169,5 +218,71 @@ mod tests {
             measurement.distance(&Calibration::default()),
             Err(ScaleError::MissingPoints)
         );
+    }
+
+    /// A line from bottom-left (10, 50) to top-right (40, 20).
+    fn rising_line() -> Measurement {
+        Measurement::new(
+            Point::new(10.0, 50.0),
+            Point::new(40.0, 20.0),
+            LengthUnit::Centimetre,
+        )
+    }
+
+    #[test]
+    fn bounds_enclose_the_line() {
+        let bounds = rising_line().bounds();
+
+        assert_eq!(bounds.min, Point::new(10.0, 20.0));
+        assert_eq!(bounds.max, Point::new(40.0, 50.0));
+    }
+
+    #[test]
+    fn dragging_the_corner_at_an_endpoint_moves_only_that_endpoint() {
+        let resized = rising_line().resized(BoundsHandle::TopRight, 5.0, -3.0);
+
+        assert_eq!(resized.start(), Point::new(10.0, 50.0));
+        assert_eq!(resized.end(), Point::new(45.0, 17.0));
+    }
+
+    #[test]
+    fn dragging_an_empty_corner_moves_one_coordinate_of_each_endpoint() {
+        // Top-left: the left edge holds the start's x, the top edge holds the end's y.
+        let resized = rising_line().resized(BoundsHandle::TopLeft, -4.0, -6.0);
+
+        assert_eq!(resized.start(), Point::new(6.0, 50.0));
+        assert_eq!(resized.end(), Point::new(40.0, 14.0));
+    }
+
+    #[test]
+    fn dragging_an_edge_moves_only_that_axis() {
+        let resized = rising_line().resized(BoundsHandle::Bottom, 99.0, 7.0);
+
+        assert_eq!(resized.start(), Point::new(10.0, 57.0));
+        assert_eq!(resized.end(), Point::new(40.0, 20.0));
+    }
+
+    #[test]
+    fn dragging_past_the_opposite_edge_flips_the_line() {
+        let resized = rising_line().resized(BoundsHandle::Right, -50.0, 0.0);
+
+        assert_eq!(resized.end(), Point::new(-10.0, 20.0));
+        assert_eq!(resized.bounds().min.x, -10.0);
+    }
+
+    #[test]
+    fn a_level_line_can_be_given_height_from_either_edge() {
+        let level = Measurement::new(
+            Point::new(0.0, 10.0),
+            Point::new(30.0, 10.0),
+            LengthUnit::Metre,
+        );
+
+        let lower_end = level.resized(BoundsHandle::Bottom, 0.0, 5.0);
+        let raised_start = level.resized(BoundsHandle::Top, 0.0, -5.0);
+
+        assert_eq!(lower_end.end(), Point::new(30.0, 15.0));
+        assert_eq!(raised_start.start(), Point::new(0.0, 5.0));
+        assert_eq!(lower_end.unit(), LengthUnit::Metre);
     }
 }

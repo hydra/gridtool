@@ -20,6 +20,120 @@ impl fmt::Display for Point {
     }
 }
 
+/// An axis-aligned rectangle in image coordinates.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Bounds {
+    pub min: Point,
+    pub max: Point,
+}
+
+impl Bounds {
+    /// The smallest bounds containing both points.
+    pub fn around(a: Point, b: Point) -> Self {
+        Self {
+            min: Point::new(a.x.min(b.x), a.y.min(b.y)),
+            max: Point::new(a.x.max(b.x), a.y.max(b.y)),
+        }
+    }
+
+    pub fn center(&self) -> Point {
+        Point::new(
+            (self.min.x + self.max.x) / 2.0,
+            (self.min.y + self.max.y) / 2.0,
+        )
+    }
+
+    /// These bounds grown by `margin` on every side.
+    pub fn expanded(&self, margin: f64) -> Self {
+        Self {
+            min: Point::new(self.min.x - margin, self.min.y - margin),
+            max: Point::new(self.max.x + margin, self.max.y + margin),
+        }
+    }
+
+    /// Whether `point` lies inside (edges included).
+    pub fn contains(&self, point: Point) -> bool {
+        (self.min.x..=self.max.x).contains(&point.x) && (self.min.y..=self.max.y).contains(&point.y)
+    }
+
+    /// Image position of a resize handle.
+    pub fn handle_point(&self, handle: BoundsHandle) -> Point {
+        let center = self.center();
+        let (x_edge, y_edge) = handle.edges();
+        let x = match x_edge {
+            Some(Edge::Min) => self.min.x,
+            Some(Edge::Max) => self.max.x,
+            None => center.x,
+        };
+        let y = match y_edge {
+            Some(Edge::Min) => self.min.y,
+            Some(Edge::Max) => self.max.y,
+            None => center.y,
+        };
+        Point::new(x, y)
+    }
+}
+
+/// Which edge of the bounds along one axis: the low-coordinate side (left / top) or the
+/// high-coordinate side (right / bottom).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Edge {
+    Min,
+    Max,
+}
+
+impl Edge {
+    pub fn opposite(self) -> Edge {
+        match self {
+            Edge::Min => Edge::Max,
+            Edge::Max => Edge::Min,
+        }
+    }
+}
+
+/// One of the eight resize handles of a bounding box: four corners and four edge midpoints.
+/// Directions are in image space (top = low y).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BoundsHandle {
+    TopLeft,
+    Top,
+    TopRight,
+    Right,
+    BottomRight,
+    Bottom,
+    BottomLeft,
+    Left,
+}
+
+impl BoundsHandle {
+    pub const ALL: [BoundsHandle; 8] = [
+        BoundsHandle::TopLeft,
+        BoundsHandle::Top,
+        BoundsHandle::TopRight,
+        BoundsHandle::Right,
+        BoundsHandle::BottomRight,
+        BoundsHandle::Bottom,
+        BoundsHandle::BottomLeft,
+        BoundsHandle::Left,
+    ];
+
+    /// The x and y edges this handle moves; `None` means it does not move that axis.
+    pub fn edges(self) -> (Option<Edge>, Option<Edge>) {
+        use BoundsHandle::*;
+        let x = match self {
+            TopLeft | Left | BottomLeft => Some(Edge::Min),
+            TopRight | Right | BottomRight => Some(Edge::Max),
+            Top | Bottom => None,
+        };
+        let y = match self {
+            TopLeft | Top | TopRight => Some(Edge::Min),
+            BottomLeft | Bottom | BottomRight => Some(Edge::Max),
+            Left | Right => None,
+        };
+        (x, y)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -27,5 +141,49 @@ mod tests {
     #[test]
     fn displays_with_one_decimal_place() {
         assert_eq!(Point::new(12.0, 3.456).to_string(), "(12.0, 3.5)");
+    }
+
+    #[test]
+    fn bounds_around_points_in_any_order() {
+        let bounds = Bounds::around(Point::new(10.0, 2.0), Point::new(4.0, 8.0));
+
+        assert_eq!(bounds.min, Point::new(4.0, 2.0));
+        assert_eq!(bounds.max, Point::new(10.0, 8.0));
+        assert_eq!(bounds.center(), Point::new(7.0, 5.0));
+    }
+
+    #[test]
+    fn expanded_bounds_contain_nearby_points() {
+        let bounds = Bounds::around(Point::new(0.0, 0.0), Point::new(10.0, 0.0));
+
+        assert!(!bounds.contains(Point::new(5.0, 2.0)));
+        assert!(bounds.expanded(3.0).contains(Point::new(5.0, 2.0)));
+        assert!(!bounds.expanded(3.0).contains(Point::new(5.0, 4.0)));
+    }
+
+    #[test]
+    fn handle_points_are_corners_and_edge_midpoints() {
+        let bounds = Bounds::around(Point::new(0.0, 0.0), Point::new(10.0, 20.0));
+
+        assert_eq!(
+            bounds.handle_point(BoundsHandle::TopLeft),
+            Point::new(0.0, 0.0)
+        );
+        assert_eq!(bounds.handle_point(BoundsHandle::Top), Point::new(5.0, 0.0));
+        assert_eq!(
+            bounds.handle_point(BoundsHandle::Right),
+            Point::new(10.0, 10.0)
+        );
+        assert_eq!(
+            bounds.handle_point(BoundsHandle::BottomLeft),
+            Point::new(0.0, 20.0)
+        );
+    }
+
+    #[test]
+    fn every_handle_moves_at_least_one_edge() {
+        for handle in BoundsHandle::ALL {
+            assert_ne!(handle.edges(), (None, None), "{handle:?}");
+        }
     }
 }

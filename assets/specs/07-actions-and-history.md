@@ -16,8 +16,9 @@ view change (pan, zoom, rotation).
 | **Set distance** | line (A/B), a positive distance | Sets the line's real-world length | The distance is finite and > 0 | "`Set distance <line> to <value>`". The value is written in the shortest form that converts back to the same number, e.g. `50`, `12.5` |
 | **Clear distance** | line (A/B) | Removes the line's length | — | "`Clear distance <line>`" |
 | **Set units** | unit | Changes the calibration length unit | — | "`Set units to <symbol>`" |
-| **Add measurement** | start point, end point, unit | Appends a measurement to the end of the list (`MEAS-2`) | Both points are inside the document | "`Add measurement from (<x1>, <y1>) to (<x2>, <y2>)`", with coordinates to 1 decimal place |
+| **Add measurement** | start point, end point, unit | Appends a measurement to the end of the list (`MEAS-2`) and gives it the next object id (`OBJ-1`) | Both points are inside the document | "`Add measurement from (<x1>, <y1>) to (<x2>, <y2>)`", with coordinates to 1 decimal place |
 | **Move measurement point** | index (0-based), endpoint (start/end), new position | Moves one end of one measurement | The index exists and the position is inside the document | "`Move measurement <index+1> <start\|end> to (<x>, <y>)`", e.g. "`Move measurement 2 end to (3.0, 4.0)`" |
+| **Resize measurement** | index, new start, new end | Replaces both ends of one measurement at once; its id and unit are kept (`OBJ-9`) | The index exists and both points are inside the document | "`Resize measurement <index+1> to (<x1>, <y1>) - (<x2>, <y2>)`", with coordinates to 1 decimal place |
 | **Set measurement unit** | index, unit | Changes the unit of one measurement only | The index exists | "`Set measurement <index+1> units to <symbol>`" |
 | **Delete measurement** | index | Removes one measurement; later ones move up | The index exists | "`Delete measurement <index+1>`" |
 
