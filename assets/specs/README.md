@@ -21,6 +21,7 @@ must satisfy them.
 | [08-formatting-and-parsing.md](08-formatting-and-parsing.md) | Number display, text input rules, commit-on-blur fields | `FMT` |
 | [09-measurements.md](09-measurements.md) | Measure tool, measurement list and table | `MEAS` |
 | [10-objects-and-selection.md](10-objects-and-selection.md) | Object ids, object tree, active object, selection box and resizing | `OBJ` |
+| [11-grids.md](11-grids.md) | Grid tool, grid geometry, grid properties row | `GRID` |
 
 ## Conventions
 
@@ -40,7 +41,7 @@ must satisfy them.
 
 | Term | Meaning |
 |---|---|
-| **Document** | The thing being edited: an image-sized rectangle plus its calibration data and measurements. |
+| **Document** | The thing being edited: an image-sized rectangle plus its calibration data, measurements and grids. |
 | **Image coordinates** | Pixel coordinates on the un-rotated image. The origin is at the top-left corner, x increases to the right and y increases downwards. Values may be fractional. |
 | **Screen coordinates** | Positions in the application window, in logical screen units. |
 | **View** | How the document is displayed: pan, zoom and rotation. View state is never part of the document. |
@@ -49,8 +50,10 @@ must satisfy them.
 | **Calibration points** | Points placed on the image that define two reference lines, A and B. |
 | **Scale** | The real-world length of one image pixel along the image's X axis and along its Y axis. |
 | **Measurement** | A line on the document, with a start and an end point, whose real-world length is derived from the scale. |
-| **Object** | Something the user places on the document and can select: currently measurements; later grids and area measurements. Each has a stable object id. |
-| **Active object** | The single selected object, shown with a purple selection box and resize handles. It is presentation state, not part of the document. |
+| **Object** | Something the user places on the document and can select: currently measurements and grids; later area measurements. Each has a stable object id. |
+| **Active object** | The single selected object. Measurements show a purple selection box with resize handles; grids show their properties row. It is presentation state, not part of the document. |
+| **Grid** | Regularly spaced lines over the whole document, aligned to a scale line or measurement line, with cells sized in real-world units. |
+| **Alignment source** | The scale line or measurement line a grid is aligned to. |
 
 ## Change log
 
@@ -61,3 +64,4 @@ must satisfy them.
 | 2026-10-21 | Added icon verification (`SHELL-6a`) and the delete-button glyph fallback (`MEAS-11`). |
 | 2026-10-21 | Added right-drag pan in all modes (`VIEW-11a`); tool gestures are now primary-button only. |
 | 2026-10-21 | Added objects and selection (`10`): object ids, left object tree panel, active object, purple selection box with 8 resize handles, Resize measurement action, and centre-on-object (`VIEW-17`). Withdrew direct endpoint dragging (`MEAS-7`). The tree view uses egui_ltreeview 0.9.0, vendored and patched for egui 0.37 (`vendor/egui_ltreeview/PATCHES.md`). |
+| 2026-10-21 | Added grids (`11`): Grid tool with Via scale / Via measurement, line hover and click to add, real-world grid geometry, Grids tree folder, grid properties row (shape, size, colour picker, opacity), five grid actions (`HIST-2`), object properties row (`SHELL-2`), and the drawing order (`GRID-6`). |

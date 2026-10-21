@@ -7,6 +7,8 @@
 - **calibration**: the scale calibration data (see `SCALE-20`)
 - **measurements**: an ordered list of distance measurements (see `MEAS-1`, `MEAS-2`).
   Their distances are derived from the calibration, not stored (`MEAS-3`).
+- **grids**: an ordered list of grids, with all their display properties (see `GRID-1`,
+  `GRID-2`).
 - **object id counter**: the next object id to allocate. Every object carries a stable
   id (`OBJ-1`).
 

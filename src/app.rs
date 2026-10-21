@@ -8,6 +8,7 @@ use crate::file_picker::{ImageFilePicker, RfdImagePicker};
 use crate::open_image::{OpenedImage, pick_and_decode};
 use crate::ui::canvas;
 use crate::ui::document_view::DocumentView;
+use crate::ui::grid_bar::GridBar;
 use crate::ui::measurements_panel::MeasurementsPanel;
 use crate::ui::object_tree::{self, TreePick};
 use crate::ui::placeholder;
@@ -25,10 +26,22 @@ struct OpenDocument {
 
 impl OpenDocument {
     fn perform(&mut self, action: Action) {
-        if let Err(error) = self.editor.perform(action) {
-            eprintln!("action rejected: {error}");
+        let adds_grid = matches!(action, Action::AddGrid(_));
+        let added = match self.editor.perform(action) {
+            Ok(changed) => changed,
+            Err(error) => {
+                eprintln!("action rejected: {error}");
+                false
+            }
+        };
+        let document = self.editor.document();
+        self.view.selection.sync_to(document);
+        if adds_grid && added {
+            // A newly added grid becomes the active object.
+            self.view
+                .selection
+                .select(document.grids().last().map(|grid| grid.id()));
         }
-        self.view.selection.sync_to(self.editor.document());
     }
 
     /// Applies what the user picked in the object tree: an object becomes the active
@@ -39,9 +52,9 @@ impl OpenDocument {
             TreePick::Object(id) => {
                 selection.select(Some(id));
                 let document = self.editor.document();
-                if let Some(bounds) = selection.active_bounds(document) {
+                if let Some(focus) = document.object_focus_point(id) {
                     let size = egui::Vec2::new(document.width() as f32, document.height() as f32);
-                    self.view.viewport.center_on(bounds.center(), size);
+                    self.view.viewport.center_on(focus, size);
                 }
             }
             TreePick::NoObject => selection.select(None),
@@ -104,6 +117,7 @@ pub struct GridToolApp {
     content: Content,
     rotation_bar: RotationBar,
     scale_bar: ScaleBar,
+    grid_bar: GridBar,
     measurements_panel: MeasurementsPanel,
 }
 
@@ -115,6 +129,7 @@ impl GridToolApp {
             content: Content::Empty,
             rotation_bar: RotationBar::default(),
             scale_bar: ScaleBar::default(),
+            grid_bar: GridBar::default(),
             measurements_panel: MeasurementsPanel::default(),
         }
     }
@@ -157,7 +172,18 @@ impl GridToolApp {
                 self.scale_bar
                     .show(ui, open.editor.document(), &mut open.view.scale_tool)
             }
+            ToolMode::Grid => {
+                open.view.grid_tool.show_options(ui, open.editor.document());
+                None
+            }
         }
+    }
+
+    /// Shows the properties row of the active object, if it has one (grids do).
+    fn show_object_properties(&mut self, ui: &mut egui::Ui) -> Option<Action> {
+        let open = self.content.document_mut()?;
+        self.grid_bar
+            .show(ui, open.editor.document(), &mut open.view.selection)
     }
 }
 
@@ -180,6 +206,7 @@ impl eframe::App for GridToolApp {
         }
 
         let mut actions: Vec<Action> = self.show_tool_options(ui).into_iter().collect();
+        actions.extend(self.show_object_properties(ui));
 
         let tree = self.content.document_mut().map(|open| {
             let view = &mut open.view;

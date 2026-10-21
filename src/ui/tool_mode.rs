@@ -10,17 +10,20 @@ pub enum ToolMode {
     Rotate,
     /// Place and drag calibration points to set the real-world scale.
     Scale,
-    /// Add measurement lines and drag their end handles.
+    /// Add measurement lines by clicking their two ends.
     Measure,
+    /// Add grids aligned to a scale line or a measurement line.
+    Grid,
 }
 
 impl ToolMode {
     /// Every mode, in tool bar order.
-    pub const ALL: [ToolMode; 4] = [
+    pub const ALL: [ToolMode; 5] = [
         ToolMode::Pan,
         ToolMode::Rotate,
         ToolMode::Scale,
         ToolMode::Measure,
+        ToolMode::Grid,
     ];
 
     pub fn icon(self) -> &'static str {
@@ -29,6 +32,7 @@ impl ToolMode {
             ToolMode::Rotate => icons::ROTATE,
             ToolMode::Scale => icons::SCALE,
             ToolMode::Measure => icons::MEASURE,
+            ToolMode::Grid => icons::GRID,
         }
     }
 
@@ -38,6 +42,7 @@ impl ToolMode {
             ToolMode::Rotate => "Rotate view",
             ToolMode::Scale => "Scale",
             ToolMode::Measure => "Measure distance",
+            ToolMode::Grid => "Grid",
         }
     }
 }
@@ -58,6 +63,14 @@ mod tests {
         let measure = ToolMode::ALL.iter().position(|&m| m == ToolMode::Measure);
 
         assert_eq!(measure, scale.map(|index| index + 1));
+    }
+
+    #[test]
+    fn grid_follows_measure_in_the_tool_bar() {
+        let measure = ToolMode::ALL.iter().position(|&m| m == ToolMode::Measure);
+        let grid = ToolMode::ALL.iter().position(|&m| m == ToolMode::Grid);
+
+        assert_eq!(grid, measure.map(|index| index + 1));
     }
 
     #[test]

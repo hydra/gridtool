@@ -1,6 +1,7 @@
 use eframe::egui::TextureHandle;
 use egui_ltreeview::TreeViewState;
 
+use super::grid_tool::GridTool;
 use super::measure_tool::MeasureTool;
 use super::object_tree::TreeNode;
 use super::scale_tool::ScaleTool;
@@ -15,6 +16,7 @@ pub struct DocumentView {
     pub selection: Selection,
     pub scale_tool: ScaleTool,
     pub measure_tool: MeasureTool,
+    pub grid_tool: GridTool,
     pub is_dragging_rotate_handle: bool,
     pub tree_state: TreeViewState<TreeNode>,
 }
@@ -27,6 +29,7 @@ impl DocumentView {
             selection: Selection::default(),
             scale_tool: ScaleTool::default(),
             measure_tool: MeasureTool::default(),
+            grid_tool: GridTool::default(),
             is_dragging_rotate_handle: false,
             tree_state: TreeViewState::default(),
         }

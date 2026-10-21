@@ -6,6 +6,7 @@
 use gridtool::action::Action;
 use gridtool::document::Document;
 use gridtool::geometry::{Bounds, BoundsHandle, Point};
+use gridtool::grid::Grid;
 use gridtool::measurement::Measurement;
 use gridtool::object::ObjectId;
 
@@ -21,6 +22,9 @@ struct Resize {
 pub struct Selection {
     active: Option<ObjectId>,
     resize: Option<Resize>,
+    /// Uncommitted style edits (colour, opacity) of the active grid, shown live while
+    /// the user is still choosing.
+    grid_preview: Option<Grid>,
 }
 
 impl Selection {
@@ -28,21 +32,44 @@ impl Selection {
         self.active
     }
 
-    /// Makes `id` the active object (or clears it with `None`), abandoning any resize.
+    /// Makes `id` the active object (or clears it with `None`), abandoning any resize or
+    /// preview.
     pub fn select(&mut self, id: Option<ObjectId>) {
         if self.active != id {
             self.resize = None;
+            self.grid_preview = None;
         }
         self.active = id;
     }
 
     /// Re-aligns with the document after it changed (an action, undo or redo): drops a
-    /// selection whose object no longer exists and abandons any resize.
+    /// selection whose object no longer exists and abandons any resize or preview.
     pub fn sync_to(&mut self, document: &Document) {
         if self.active.is_some_and(|id| !document.contains_object(id)) {
             self.active = None;
         }
         self.resize = None;
+        self.grid_preview = None;
+    }
+
+    /// How to display the grid with `id`: the preview if it is the active grid and has
+    /// uncommitted edits, otherwise the grid itself.
+    pub fn displayed_grid(&self, id: ObjectId, grid: &Grid) -> Grid {
+        match &self.grid_preview {
+            Some(preview) if self.active == Some(id) => preview.clone(),
+            _ => grid.clone(),
+        }
+    }
+
+    /// Shows `grid` in place of the active grid until the preview is cleared.
+    pub fn preview_grid(&mut self, grid: Grid) {
+        if self.active.is_some() {
+            self.grid_preview = Some(grid);
+        }
+    }
+
+    pub fn clear_grid_preview(&mut self) {
+        self.grid_preview = None;
     }
 
     /// How to display the measurement with `id`: the resize preview if it is being
@@ -282,6 +309,71 @@ mod tests {
         assert_eq!(
             selection.active_bounds(&document).map(|b| b.min),
             Some(Point::new(50.0, 50.0))
+        );
+    }
+
+    fn document_with_grid() -> (Document, ObjectId) {
+        use gridtool::grid::GridSource;
+
+        let mut document = document_with_two_measurements();
+        let source = GridSource::Measurement(id_of(&document, 0));
+        Action::AddGrid(Grid::new(source, LengthUnit::Centimetre))
+            .apply(&mut document)
+            .unwrap();
+        let id = document.grids()[0].id();
+        (document, id)
+    }
+
+    #[test]
+    fn grids_have_no_selection_box() {
+        let (document, id) = document_with_grid();
+        let mut selection = Selection::default();
+
+        selection.select(Some(id));
+
+        assert_eq!(selection.active_bounds(&document), None);
+        assert!(!selection.begin_resize(&document, BoundsHandle::Top, Point::default()));
+    }
+
+    #[test]
+    fn grid_preview_shows_only_for_the_active_grid_until_cleared() {
+        use gridtool::grid::Rgb;
+
+        let (document, id) = document_with_grid();
+        let stored = &document.grids()[0];
+        let mut selection = Selection::default();
+        selection.select(Some(id));
+
+        selection.preview_grid(stored.with_color(Rgb::new(1, 2, 3)));
+        assert_eq!(
+            selection.displayed_grid(id, stored).color(),
+            Rgb::new(1, 2, 3)
+        );
+
+        selection.clear_grid_preview();
+        assert_eq!(selection.displayed_grid(id, stored), **stored);
+    }
+
+    #[test]
+    fn changing_or_syncing_the_selection_drops_the_grid_preview() {
+        let (document, id) = document_with_grid();
+        let stored = &document.grids()[0];
+        let mut selection = Selection::default();
+        selection.select(Some(id));
+        selection.preview_grid(stored.with_opacity(0.1));
+
+        selection.sync_to(&document);
+        assert_eq!(
+            selection.displayed_grid(id, stored).opacity(),
+            stored.opacity()
+        );
+
+        selection.preview_grid(stored.with_opacity(0.1));
+        selection.select(None);
+        selection.select(Some(id));
+        assert_eq!(
+            selection.displayed_grid(id, stored).opacity(),
+            stored.opacity()
         );
     }
 }

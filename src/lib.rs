@@ -9,6 +9,7 @@ pub mod calibration;
 pub mod document;
 pub mod editor;
 pub mod geometry;
+pub mod grid;
 pub mod imaging;
 pub mod measurement;
 pub mod object;

@@ -7,6 +7,7 @@ use std::fmt;
 use crate::calibration::{CalibrationError, Line, ScalePoints};
 use crate::document::Document;
 use crate::geometry::Point;
+use crate::grid::{CellDimension, CellShape, Grid, GridSource, Rgb};
 use crate::measurement::{Endpoint, Measurement};
 use crate::object::Identified;
 use crate::units::LengthUnit;
@@ -39,6 +40,20 @@ pub enum Action {
     SetMeasurementUnit { index: usize, unit: LengthUnit },
     /// Removes a measurement; later measurements move up one place.
     DeleteMeasurement { index: usize },
+    /// Appends a grid to the end of the list.
+    AddGrid(Grid),
+    /// Changes a grid's cell shape.
+    SetGridShape { index: usize, shape: CellShape },
+    /// Changes one of a grid's cell sizes (in the grid's unit).
+    SetGridSize {
+        index: usize,
+        dimension: CellDimension,
+        size: f64,
+    },
+    /// Changes a grid's line colour.
+    SetGridColor { index: usize, color: Rgb },
+    /// Changes a grid's opacity (0 to 1).
+    SetGridOpacity { index: usize, opacity: f32 },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -47,6 +62,10 @@ pub enum ActionError {
     NoScalePoints,
     InvalidDistance(f64),
     MeasurementIndexOutOfRange { index: usize, count: usize },
+    GridIndexOutOfRange { index: usize, count: usize },
+    GridSourceMissing,
+    InvalidCellSize(f64),
+    InvalidOpacity(f32),
     Calibration(CalibrationError),
 }
 
@@ -63,6 +82,16 @@ impl fmt::Display for ActionError {
                 "measurement {} does not exist (there are {count})",
                 index + 1
             ),
+            Self::GridIndexOutOfRange { index, count } => {
+                write!(f, "grid {} does not exist (there are {count})", index + 1)
+            }
+            Self::GridSourceMissing => f.write_str("the grid's alignment line does not exist"),
+            Self::InvalidCellSize(size) => {
+                write!(f, "cell size must be a positive number, got {size}")
+            }
+            Self::InvalidOpacity(opacity) => {
+                write!(f, "opacity must be between 0 and 1, got {opacity}")
+            }
             Self::Calibration(error) => error.fmt(f),
         }
     }
@@ -132,9 +161,59 @@ impl Action {
                 measurement_mut(document, *index)?;
                 document.measurements_mut().remove(*index);
             }
+            Action::AddGrid(grid) => {
+                if grid.source_line(document).is_err() {
+                    return Err(ActionError::GridSourceMissing);
+                }
+                for dimension in [CellDimension::A, CellDimension::B] {
+                    ensure_valid_cell_size(grid.size(dimension))?;
+                }
+                ensure_valid_opacity(grid.opacity())?;
+                let id = document.allocate_object_id();
+                document.grids_mut().push(Identified::new(id, grid.clone()));
+            }
+            Action::SetGridShape { index, shape } => grid_mut(document, *index)?.set_shape(*shape),
+            Action::SetGridSize {
+                index,
+                dimension,
+                size,
+            } => {
+                ensure_valid_cell_size(*size)?;
+                grid_mut(document, *index)?.set_size(*dimension, *size);
+            }
+            Action::SetGridColor { index, color } => grid_mut(document, *index)?.set_color(*color),
+            Action::SetGridOpacity { index, opacity } => {
+                ensure_valid_opacity(*opacity)?;
+                grid_mut(document, *index)?.set_opacity(*opacity);
+            }
         }
         Ok(())
     }
+}
+
+fn ensure_valid_cell_size(size: f64) -> Result<(), ActionError> {
+    if size.is_finite() && size > 0.0 {
+        Ok(())
+    } else {
+        Err(ActionError::InvalidCellSize(size))
+    }
+}
+
+fn ensure_valid_opacity(opacity: f32) -> Result<(), ActionError> {
+    if (0.0..=1.0).contains(&opacity) {
+        Ok(())
+    } else {
+        Err(ActionError::InvalidOpacity(opacity))
+    }
+}
+
+fn grid_mut(document: &mut Document, index: usize) -> Result<&mut Grid, ActionError> {
+    let grids = document.grids_mut();
+    let count = grids.len();
+    grids
+        .get_mut(index)
+        .map(|grid| &mut **grid)
+        .ok_or(ActionError::GridIndexOutOfRange { index, count })
 }
 
 fn ensure_inside(document: &Document, point: Point) -> Result<(), ActionError> {
@@ -190,6 +269,27 @@ impl fmt::Display for Action {
             Action::DeleteMeasurement { index } => {
                 write!(f, "Delete measurement {}", index + 1)
             }
+            Action::AddGrid(grid) => match grid.source() {
+                GridSource::ScaleLine(line) => write!(f, "Add grid aligned to scale line {line}"),
+                GridSource::Measurement(_) => f.write_str("Add grid aligned to a measurement"),
+            },
+            Action::SetGridShape { index, shape } => {
+                write!(f, "Set grid {} cell shape to {}", index + 1, shape.name())
+            }
+            Action::SetGridSize {
+                index,
+                dimension,
+                size,
+            } => write!(f, "Set grid {} size {dimension} to {size}", index + 1),
+            Action::SetGridColor { index, color } => {
+                write!(f, "Set grid {} color to {color}", index + 1)
+            }
+            Action::SetGridOpacity { index, opacity } => write!(
+                f,
+                "Set grid {} opacity to {}%",
+                index + 1,
+                (opacity * 100.0).round()
+            ),
         }
     }
 }
@@ -558,5 +658,151 @@ mod tests {
             assert_eq!(action.apply(&mut document), Err(out_of_range.clone()));
         }
         assert_eq!(document, before);
+    }
+
+    fn document_with_grid() -> Document {
+        let mut document = document_with_points();
+        Action::AddGrid(Grid::new(
+            GridSource::ScaleLine(Line::A),
+            LengthUnit::Centimetre,
+        ))
+        .apply(&mut document)
+        .unwrap();
+        document
+    }
+
+    #[test]
+    fn adds_a_grid_with_its_own_object_id() {
+        let mut document = document_with_grid();
+        Action::AddMeasurement(measurement(1.0, 2.0))
+            .apply(&mut document)
+            .unwrap();
+
+        let grid_id = document.grids()[0].id();
+        assert_ne!(grid_id, document.measurements()[0].id());
+        assert!(document.contains_object(grid_id));
+        assert_eq!(document.grid_index(grid_id), Some(0));
+    }
+
+    #[test]
+    fn rejects_a_grid_whose_source_does_not_exist() {
+        let mut document = Document::new(100, 50);
+
+        let result = Action::AddGrid(Grid::new(
+            GridSource::ScaleLine(Line::B),
+            LengthUnit::Centimetre,
+        ))
+        .apply(&mut document);
+
+        assert_eq!(result, Err(ActionError::GridSourceMissing));
+        assert!(document.grids().is_empty());
+    }
+
+    #[test]
+    fn edits_grid_properties() {
+        let mut document = document_with_grid();
+
+        for action in [
+            Action::SetGridShape {
+                index: 0,
+                shape: CellShape::Rectangle,
+            },
+            Action::SetGridSize {
+                index: 0,
+                dimension: CellDimension::B,
+                size: 4.5,
+            },
+            Action::SetGridColor {
+                index: 0,
+                color: Rgb::new(1, 2, 3),
+            },
+            Action::SetGridOpacity {
+                index: 0,
+                opacity: 0.25,
+            },
+        ] {
+            action.apply(&mut document).unwrap();
+        }
+
+        let grid = &document.grids()[0];
+        assert_eq!(grid.shape(), CellShape::Rectangle);
+        assert_eq!(grid.cell_size(), (10.0, 4.5));
+        assert_eq!(grid.color(), Rgb::new(1, 2, 3));
+        assert_eq!(grid.opacity(), 0.25);
+    }
+
+    #[test]
+    fn rejects_invalid_grid_edits() {
+        let mut document = document_with_grid();
+        let before = document.clone();
+
+        for action in [
+            Action::SetGridSize {
+                index: 0,
+                dimension: CellDimension::Side,
+                size: 0.0,
+            },
+            Action::SetGridSize {
+                index: 0,
+                dimension: CellDimension::A,
+                size: f64::NAN,
+            },
+            Action::SetGridOpacity {
+                index: 0,
+                opacity: 1.5,
+            },
+            Action::SetGridShape {
+                index: 1,
+                shape: CellShape::Square,
+            },
+        ] {
+            assert!(action.apply(&mut document).is_err(), "{action:?}");
+        }
+        assert_eq!(document, before);
+    }
+
+    #[test]
+    fn describes_grid_actions() {
+        let labels = [
+            (
+                Action::AddGrid(Grid::new(
+                    GridSource::ScaleLine(Line::A),
+                    LengthUnit::Centimetre,
+                )),
+                "Add grid aligned to scale line A",
+            ),
+            (
+                Action::SetGridShape {
+                    index: 0,
+                    shape: CellShape::Rectangle,
+                },
+                "Set grid 1 cell shape to Rectangle",
+            ),
+            (
+                Action::SetGridSize {
+                    index: 1,
+                    dimension: CellDimension::Side,
+                    size: 12.0,
+                },
+                "Set grid 2 size L to 12",
+            ),
+            (
+                Action::SetGridColor {
+                    index: 0,
+                    color: Rgb::new(255, 0, 0),
+                },
+                "Set grid 1 color to #FF0000",
+            ),
+            (
+                Action::SetGridOpacity {
+                    index: 0,
+                    opacity: 0.25,
+                },
+                "Set grid 1 opacity to 25%",
+            ),
+        ];
+        for (action, label) in labels {
+            assert_eq!(action.to_string(), label);
+        }
     }
 }

@@ -1,5 +1,6 @@
 use crate::calibration::Calibration;
-use crate::geometry::Point;
+use crate::geometry::{Bounds, Point};
+use crate::grid::Grid;
 use crate::imaging::DecodedImage;
 use crate::measurement::Measurement;
 use crate::object::{Identified, ObjectId};
@@ -11,6 +12,7 @@ pub struct Document {
     height: u32,
     calibration: Calibration,
     measurements: Vec<Identified<Measurement>>,
+    grids: Vec<Identified<Grid>>,
     /// The id the next added object will get. Ids are never reused within a history.
     next_object_id: u64,
 }
@@ -23,6 +25,7 @@ impl Document {
             height,
             calibration: Calibration::default(),
             measurements: Vec::new(),
+            grids: Vec::new(),
             next_object_id: 1,
         }
     }
@@ -72,13 +75,39 @@ impl Document {
         self.measurements.iter().position(|m| m.id() == id)
     }
 
+    /// Grids, in the order they were added.
+    pub fn grids(&self) -> &[Identified<Grid>] {
+        &self.grids
+    }
+
+    /// List position of the grid with `id`, if it exists.
+    pub fn grid_index(&self, id: ObjectId) -> Option<usize> {
+        self.grids.iter().position(|grid| grid.id() == id)
+    }
+
     /// Whether any object with `id` exists.
     pub fn contains_object(&self, id: ObjectId) -> bool {
-        self.measurement_index(id).is_some()
+        self.measurement_index(id).is_some() || self.grid_index(id).is_some()
+    }
+
+    /// The image point to bring into view for an object: the centre of a measurement's
+    /// bounding box, or the midpoint of a grid's alignment line. `None` if the object
+    /// (or a grid's alignment line) does not exist.
+    pub fn object_focus_point(&self, id: ObjectId) -> Option<Point> {
+        if let Some(index) = self.measurement_index(id) {
+            return Some(self.measurements[index].bounds().center());
+        }
+        let grid = &self.grids[self.grid_index(id)?];
+        let (start, end) = grid.source_line(self).ok()?;
+        Some(Bounds::around(start, end).center())
     }
 
     pub(crate) fn measurements_mut(&mut self) -> &mut Vec<Identified<Measurement>> {
         &mut self.measurements
+    }
+
+    pub(crate) fn grids_mut(&mut self) -> &mut Vec<Identified<Grid>> {
+        &mut self.grids
     }
 
     pub(crate) fn allocate_object_id(&mut self) -> ObjectId {

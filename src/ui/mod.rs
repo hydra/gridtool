@@ -3,12 +3,16 @@
 
 mod angle;
 pub mod canvas;
+mod color;
 mod commit_field;
 pub mod document_view;
 mod format;
+pub mod grid_bar;
+mod grid_tool;
 mod history_panel;
 mod hit_test;
 mod icons;
+mod line_hit;
 mod measure_tool;
 pub mod measurements_panel;
 pub mod object_tree;

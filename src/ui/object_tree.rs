@@ -1,9 +1,10 @@
-//! Left-hand panel: a tree of the document's objects (Document > Measurements > each
-//! measurement, in document order). Clicking an object makes it the active object.
+//! Left-hand panel: a tree of the document's objects (Document > Measurements / Grids >
+//! each object, in document order). Clicking an object makes it the active object.
 
 use eframe::egui;
 use egui_ltreeview::{Action as TreeAction, TreeView};
 use gridtool::document::Document;
+use gridtool::grid::{Grid, GridSource};
 use gridtool::object::ObjectId;
 
 use super::format::format_length;
@@ -16,6 +17,7 @@ const DEFAULT_WIDTH: f32 = 220.0;
 pub enum TreeNode {
     Document,
     Measurements,
+    Grids,
     Object(ObjectId),
 }
 
@@ -69,6 +71,13 @@ pub fn show(
                         builder.leaf(TreeNode::Object(measurement.id()), label);
                     }
                     builder.close_dir();
+                    builder.dir(TreeNode::Grids, "Grids");
+                    for (index, grid) in document.grids().iter().enumerate() {
+                        let label =
+                            format!("Grid {} ({})", index + 1, source_label(document, grid));
+                        builder.leaf(TreeNode::Object(grid.id()), label);
+                    }
+                    builder.close_dir();
                     builder.close_dir();
                 });
             actions.into_iter().find_map(|action| match action {
@@ -77,6 +86,17 @@ pub fn show(
             })
         })
         .inner
+}
+
+/// Describes what a grid is aligned to, e.g. "scale line A" or "measurement 2".
+fn source_label(document: &Document, grid: &Grid) -> String {
+    match grid.source() {
+        GridSource::ScaleLine(line) => format!("scale line {line}"),
+        GridSource::Measurement(id) => match document.measurement_index(id) {
+            Some(index) => format!("measurement {}", index + 1),
+            None => "alignment line missing".to_owned(),
+        },
+    }
 }
 
 /// The tree selection that reflects `active`, or `None` if `current` already does.
@@ -156,6 +176,7 @@ mod tests {
 
         assert_eq!(pick_from(&[TreeNode::Object(a)]), TreePick::Object(a));
         assert_eq!(pick_from(&[TreeNode::Measurements]), TreePick::NoObject);
+        assert_eq!(pick_from(&[TreeNode::Grids]), TreePick::NoObject);
         assert_eq!(pick_from(&[TreeNode::Document]), TreePick::NoObject);
         assert_eq!(pick_from(&[]), TreePick::NoObject);
     }

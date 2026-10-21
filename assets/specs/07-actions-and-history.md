@@ -20,6 +20,11 @@ view change (pan, zoom, rotation).
 | **Move measurement point** | index (0-based), endpoint (start/end), new position | Moves one end of one measurement | The index exists and the position is inside the document | "`Move measurement <index+1> <start\|end> to (<x>, <y>)`", e.g. "`Move measurement 2 end to (3.0, 4.0)`" |
 | **Resize measurement** | index, new start, new end | Replaces both ends of one measurement at once; its id and unit are kept (`OBJ-9`) | The index exists and both points are inside the document | "`Resize measurement <index+1> to (<x1>, <y1>) - (<x2>, <y2>)`", with coordinates to 1 decimal place |
 | **Set measurement unit** | index, unit | Changes the unit of one measurement only | The index exists | "`Set measurement <index+1> units to <symbol>`" |
+| **Add grid** | grid (source and properties) | Appends a grid to the end of the list (`GRID-2`) and gives it the next object id | The source exists, both cell sizes are finite and > 0, and the opacity is in [0, 1] | "`Add grid aligned to scale line <A\|B>`", or "`Add grid aligned to a measurement`" |
+| **Set grid cell shape** | index, shape | Changes the cell shape | The index exists | "`Set grid <index+1> cell shape to <Square\|Rectangle>`" |
+| **Set grid cell size** | index, dimension (L/A/B), size | Sets A (A), B (B), or both (L) | The index exists and the size is finite and > 0 | "`Set grid <index+1> size <L\|A\|B> to <value>`", with the value written as for **Set distance** |
+| **Set grid colour** | index, RGB colour | Changes the line colour | The index exists | "`Set grid <index+1> color to #RRGGBB`", in upper-case hex |
+| **Set grid opacity** | index, opacity | Changes the opacity | The index exists and the opacity is in [0, 1] | "`Set grid <index+1> opacity to <percent>%`", rounded to a whole percent |
 | **Delete measurement** | index | Removes one measurement; later ones move up | The index exists | "`Delete measurement <index+1>`" |
 
 **HIST-3 — Errors.** A rejected action returns an error describing why, and changes

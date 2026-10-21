@@ -32,14 +32,17 @@ may have zero width or height.
 
 ```
 Document
-└─ Measurements
-   ├─ Measurement 1 (12.5 cm)
-   ├─ Measurement 2
+├─ Measurements
+│  ├─ Measurement 1 (12.5 cm)
+│  ├─ Measurement 2
+│  └─ …
+└─ Grids
+   ├─ Grid 1 (scale line A)
    └─ …
 ```
 
 - **Root node:** "`Document`".
-- **Folder:** one folder, "`Measurements`", under the root.
+- **Folders:** "`Measurements`", then "`Grids`" (`GRID-11`), under the root.
 - **Measurements:** one leaf per measurement, in list order (`MEAS-2`) and never sorted.
 - **Leaf label:** "`Measurement <n> (<distance> <unit symbol>)`", where `n` is the 1-based
   list position and the distance is formatted by `FMT-7`. When the distance is
@@ -47,13 +50,16 @@ Document
 - **Folders:** start expanded and can be collapsed.
 - **Selection:** only one node at a time. Nodes cannot be dragged or reordered.
 
-**OBJ-5 — Clicking an object in the tree.** When the user selects a measurement leaf:
-1. That measurement becomes the **active object** (`OBJ-6`).
-2. The view pans so that the **centre of the measurement's bounding box** (the midpoint
-   of the line) is at the centre of the canvas area. Zoom and view rotation are
-   unchanged (`VIEW-17`).
+**OBJ-5 — Clicking an object in the tree.** When the user selects an object leaf:
+1. That object becomes the **active object** (`OBJ-6`).
+2. The view pans so that the object's **focus point** is at the centre of the canvas
+   area. Zoom and view rotation are unchanged (`VIEW-17`). The focus point is:
+   - for a measurement, the centre of its bounding box (the midpoint of the line)
+   - for a grid, the midpoint of its alignment line. If that line no longer exists, the
+     view does not move.
 
-Selecting a non-object node ("`Document`" or "`Measurements`") clears the active object.
+Selecting a non-object node ("`Document`", "`Measurements`" or "`Grids`") clears the
+active object.
 
 **OBJ-6 — Tree reflects the active object.** The tree always shows the active object's
 leaf as selected:
@@ -73,8 +79,9 @@ leaf as selected:
 - Because selection uses ids, deleting an *earlier* measurement leaves the same
   measurement active, even though its list position changes.
 
-**OBJ-8 — Selection box.** While there is an active object, the canvas draws the
-following on top of everything else, in every tool mode:
+**OBJ-8 — Selection box.** While there is an active object that has a bounding box
+(currently measurements; grids do not, see `GRID-12`), the canvas draws the following on
+top of everything else, in every tool mode:
 - **Box.** A **dashed purple** (`#800080`) box, 1.5 px wide, with 6 px dashes and 4 px
   gaps, around the object's bounding box.
 - **Padding.** The box is pushed outward from the bounding box by **8 screen px** on
@@ -129,7 +136,8 @@ The endpoints follow the edges like this:
 
 **OBJ-10 — Clearing the selection.** In every tool mode, a primary click (press and
 release without dragging) whose position lies **outside** the selection box clears the
-active object. "Outside" means outside the bounding box grown by `8 + 5` screen px on
+active object. An active object without a selection box (a grid) is cleared by any
+primary click on the canvas (`GRID-12`). "Outside" means outside the bounding box grown by `8 + 5` screen px on
 every side (padding plus half a handle).
 - Clicks inside keep the active object.
 - The click is still passed to the active tool. In Measure mode, for example, it also

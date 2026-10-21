@@ -9,12 +9,16 @@ use gridtool::action::Action;
 use gridtool::calibration::{CalibrationMethod, Line};
 use gridtool::document::Document;
 use gridtool::geometry::{Bounds, BoundsHandle, Point};
+use gridtool::grid::GridSource;
 use gridtool::imaging::DecodedImage;
 use gridtool::measurement::Endpoint;
 
+use super::color::with_opacity;
 use super::document_view::DocumentView;
 use super::format::format_length;
+use super::grid_tool::add_grid;
 use super::hit_test::nearest_within;
+use super::line_hit::segment_at;
 use super::measure_tool::MeasureTool;
 use super::rotate_handle;
 use super::scale_tool::ScaleTool;
@@ -49,6 +53,16 @@ const SELECTION_PADDING: f32 = 8.0;
 const RESIZE_HANDLE_SIZE: f32 = 10.0;
 /// How close (in screen points) the pointer must be to a resize handle to grab it.
 const RESIZE_HANDLE_GRAB_RADIUS: f32 = 8.0;
+const GRID_LINE_WIDTH: f32 = 1.0;
+const HIGHLIGHT_STROKE: Stroke = Stroke {
+    width: 5.0,
+    color: Color32::from_rgba_premultiplied(255, 220, 0, 200),
+};
+/// How far (screen points) either side of a line still counts as hovering over it.
+const LINE_HOVER_TOLERANCE: f32 = 5.0;
+/// Pointer positions this close (screen points) to a line's ends are over its handles,
+/// which are not part of the line's hover area.
+const LINE_END_EXCLUSION: f32 = 8.0;
 const SCALE_MARKER_RADIUS: f32 = 6.0;
 const MEASUREMENT_HANDLE_RADIUS: f32 = 5.0;
 const CROSSHAIR_HALF_LENGTH: f32 = 11.0;
@@ -105,8 +119,12 @@ pub fn show(
             ToolMode::Measure => {
                 handle_measure(ui, &response, transform, document, &mut view.measure_tool)
             }
+            ToolMode::Grid => handle_grid(ui, &response, transform, document, view),
         },
     };
+    if mode != ToolMode::Grid {
+        view.grid_tool.set_hovered(None);
+    }
     if !view.selection.is_resizing()
         && hovered_resize_handle(&response, transform, document, &view.selection).is_some()
     {
@@ -115,11 +133,25 @@ pub fn show(
     // In every mode the secondary button pans. Done after the tool so its cursor wins.
     drag_pan(ui, &response, &mut view.viewport, PointerButton::Secondary);
 
+    // Drawing order: image, grids, then the lines grids align to, then tool overlays.
     let transform = view.viewport.transform(view_center, document_size);
     paint_document(&painter, transform, &view.texture);
+    paint_grids(&painter, transform, document, &view.selection);
     paint_measurements(&painter, transform, document, &view.selection);
     match mode {
-        ToolMode::Pan => {}
+        ToolMode::Scale => {
+            let points = view.scale_tool.points(document.calibration());
+            paint_scale_markers(&painter, transform, &points, view.scale_tool.method());
+        }
+        ToolMode::Grid => {
+            if let Some(points) = document.calibration().points() {
+                paint_scale_markers(&painter, transform, points.points(), points.method());
+            }
+        }
+        ToolMode::Pan | ToolMode::Rotate | ToolMode::Measure => {}
+    }
+    paint_active_grid_source(&painter, transform, document, &view.selection);
+    match mode {
         ToolMode::Rotate => {
             paint_rotate_handle(
                 &painter,
@@ -127,20 +159,63 @@ pub fn show(
                 view.viewport.rotation_radians(),
             );
         }
-        ToolMode::Scale => {
-            let points = view.scale_tool.points(document.calibration());
-            paint_scale_markers(&painter, transform, &points, view.scale_tool.method());
-        }
         ToolMode::Measure => {
             if let Some(start) = view.measure_tool.pending_start() {
                 paint_pending_measurement(&painter, transform, start, response.hover_pos());
             }
         }
+        ToolMode::Grid => {
+            if let Some(source) = view.grid_tool.hovered() {
+                paint_highlighted_source(&painter, transform, document, &view.selection, source);
+            }
+        }
+        ToolMode::Pan | ToolMode::Scale => {}
     }
     if let Some(bounds) = view.selection.active_bounds(document) {
         paint_selection(&painter, transform, bounds);
     }
     action
+}
+
+/// Highlights the alignable line under the pointer; a click on it adds a grid.
+fn handle_grid(
+    ui: &egui::Ui,
+    response: &Response,
+    transform: DocumentTransform,
+    document: &Document,
+    view: &mut DocumentView,
+) -> Option<Action> {
+    let candidates = view.grid_tool.candidate_lines(document, &view.selection);
+    let segments: Vec<(Pos2, Pos2)> = candidates
+        .iter()
+        .map(|&(_, start, end)| {
+            (
+                transform.image_to_screen(start),
+                transform.image_to_screen(end),
+            )
+        })
+        .collect();
+    let source_at = |position: Pos2| {
+        segment_at(
+            &segments,
+            position,
+            LINE_HOVER_TOLERANCE,
+            LINE_END_EXCLUSION,
+        )
+        .map(|index| candidates[index].0)
+    };
+
+    let hovered = response.hover_pos().and_then(source_at);
+    view.grid_tool.set_hovered(hovered);
+    if hovered.is_some() {
+        ui.set_cursor_icon(CursorIcon::PointingHand);
+    }
+
+    let clicked = response
+        .clicked()
+        .then(|| response.interact_pointer_pos())
+        .flatten()?;
+    add_grid(document, source_at(clicked)?)
 }
 
 /// Whether the active object's resize handles are handling the primary button.
@@ -159,7 +234,15 @@ fn handle_selection(
     document: &Document,
     selection: &mut Selection,
 ) -> SelectionInput {
+    if selection.active().is_none() {
+        return SelectionInput::NotResizing;
+    }
     let Some(bounds) = selection.active_bounds(document) else {
+        // Objects without a selection box (grids cover the whole document): any click
+        // on the canvas counts as outside.
+        if response.clicked() {
+            selection.select(None);
+        }
         return SelectionInput::NotResizing;
     };
 
@@ -465,20 +548,118 @@ fn paint_scale_markers(
         }
     }
 
-    let [x_axis, y_axis] = transform.image_axes();
     for (index, &position) in positions.iter().enumerate() {
-        painter.circle_stroke(position, SCALE_MARKER_RADIUS, SCALE_STROKE);
-        for axis in [x_axis, y_axis] {
-            let arm = axis * CROSSHAIR_HALF_LENGTH;
-            painter.line_segment([position - arm, position + arm], SCALE_STROKE);
+        paint_scale_point(painter, transform, position, index + 1);
+    }
+}
+
+/// A calibration point marker: circle, crosshair aligned with the image axes, and number.
+fn paint_scale_point(
+    painter: &egui::Painter,
+    transform: DocumentTransform,
+    position: Pos2,
+    number: usize,
+) {
+    let [x_axis, y_axis] = transform.image_axes();
+    painter.circle_stroke(position, SCALE_MARKER_RADIUS, SCALE_STROKE);
+    for axis in [x_axis, y_axis] {
+        let arm = axis * CROSSHAIR_HALF_LENGTH;
+        painter.line_segment([position - arm, position + arm], SCALE_STROKE);
+    }
+    let label_position =
+        position + (x_axis + y_axis).normalized() * (LABEL_OFFSET + SCALE_MARKER_RADIUS);
+    paint_label(
+        painter,
+        label_position,
+        number.to_string(),
+        SCALE_STROKE.color,
+    );
+}
+
+/// Draws every grid's lines in its colour and opacity.
+fn paint_grids(
+    painter: &egui::Painter,
+    transform: DocumentTransform,
+    document: &Document,
+    selection: &Selection,
+) {
+    for stored in document.grids() {
+        let grid = selection.displayed_grid(stored.id(), stored);
+        let Ok(lines) = grid.lines(document) else {
+            continue;
+        };
+        let stroke = Stroke::new(GRID_LINE_WIDTH, with_opacity(grid.color(), grid.opacity()));
+        for (start, end) in lines {
+            painter.line_segment(
+                [
+                    transform.image_to_screen(start),
+                    transform.image_to_screen(end),
+                ],
+                stroke,
+            );
         }
-        let label_position =
-            position + (x_axis + y_axis).normalized() * (LABEL_OFFSET + SCALE_MARKER_RADIUS);
-        paint_label(
-            painter,
-            label_position,
-            (index + 1).to_string(),
-            SCALE_STROKE.color,
+    }
+}
+
+/// The image-space ends of a grid alignment source as currently displayed.
+fn source_segment(
+    document: &Document,
+    selection: &Selection,
+    source: GridSource,
+) -> Option<(Point, Point)> {
+    match source {
+        GridSource::ScaleLine(line) => document
+            .calibration()
+            .points()
+            .map(|points| points.line(line)),
+        GridSource::Measurement(id) => {
+            let stored = &document.measurements()[document.measurement_index(id)?];
+            let measurement = selection.displayed(id, stored);
+            Some((measurement.start(), measurement.end()))
+        }
+    }
+}
+
+/// Always shows the scale line the active grid is aligned to, even in modes that hide
+/// scale lines. (Measurements are drawn in every mode already.)
+fn paint_active_grid_source(
+    painter: &egui::Painter,
+    transform: DocumentTransform,
+    document: &Document,
+    selection: &Selection,
+) {
+    let Some(index) = selection.active().and_then(|id| document.grid_index(id)) else {
+        return;
+    };
+    let GridSource::ScaleLine(line) = document.grids()[index].source() else {
+        return;
+    };
+    let Some(points) = document.calibration().points() else {
+        return;
+    };
+    let (start_index, end_index) = points.method().line_endpoints(line);
+    let (start, end) = points.line(line);
+    let [start, end] = [start, end].map(|point| transform.image_to_screen(point));
+    paint_labelled_line(painter, start, end, SCALE_STROKE, line.to_string());
+    paint_scale_point(painter, transform, start, start_index + 1);
+    paint_scale_point(painter, transform, end, end_index + 1);
+}
+
+/// Highlights the line the grid tool would align a new grid to.
+fn paint_highlighted_source(
+    painter: &egui::Painter,
+    transform: DocumentTransform,
+    document: &Document,
+    selection: &Selection,
+    source: GridSource,
+) {
+    if let Some((start, end)) = source_segment(document, selection, source) {
+        painter.line_segment(
+            [
+                transform.image_to_screen(start),
+                transform.image_to_screen(end),
+            ],
+            HIGHLIGHT_STROKE,
         );
     }
 }
@@ -801,6 +982,83 @@ mod tests {
             harness.click(EMPTY_SPOT);
             assert_eq!(harness.view.selection.active(), None, "{mode:?} outside");
         }
+    }
+
+    fn grid_on_the_measurement(harness: &Harness) -> Action {
+        let id = harness.document.measurements()[0].id();
+        Action::AddGrid(gridtool::grid::Grid::new(
+            GridSource::Measurement(id),
+            LengthUnit::Centimetre,
+        ))
+    }
+
+    #[test]
+    fn clicking_a_measurement_line_in_grid_mode_adds_a_grid() {
+        let mut harness = Harness::new(ToolMode::Grid);
+        harness
+            .view
+            .grid_tool
+            .set_via(super::super::grid_tool::GridVia::Measurement);
+
+        harness.click(MEASUREMENT_MIDDLE_ON_SCREEN + Vec2::new(0.0, 4.0));
+
+        assert_eq!(harness.actions, [grid_on_the_measurement(&harness)]);
+    }
+
+    #[test]
+    fn grid_mode_ignores_line_ends_and_clicks_too_far_from_the_line() {
+        let mut harness = Harness::new(ToolMode::Grid);
+        harness
+            .view
+            .grid_tool
+            .set_via(super::super::grid_tool::GridVia::Measurement);
+
+        harness.click(MEASUREMENT_START_ON_SCREEN + Vec2::new(4.0, 0.0));
+        harness.click(MEASUREMENT_MIDDLE_ON_SCREEN + Vec2::new(0.0, 7.0));
+
+        assert!(harness.actions.is_empty());
+    }
+
+    #[test]
+    fn via_scale_does_not_pick_measurement_lines() {
+        let mut harness = Harness::new(ToolMode::Grid);
+
+        harness.click(MEASUREMENT_MIDDLE_ON_SCREEN);
+
+        assert!(harness.actions.is_empty());
+    }
+
+    #[test]
+    fn hovering_a_line_in_grid_mode_highlights_it() {
+        let mut harness = Harness::new(ToolMode::Grid);
+        harness
+            .view
+            .grid_tool
+            .set_via(super::super::grid_tool::GridVia::Measurement);
+        let id = harness.document.measurements()[0].id();
+
+        harness.frame(vec![Event::PointerMoved(MEASUREMENT_MIDDLE_ON_SCREEN)]);
+        assert_eq!(
+            harness.view.grid_tool.hovered(),
+            Some(GridSource::Measurement(id))
+        );
+
+        harness.frame(vec![Event::PointerMoved(EMPTY_SPOT)]);
+        assert_eq!(harness.view.grid_tool.hovered(), None);
+    }
+
+    #[test]
+    fn any_click_on_the_canvas_clears_an_active_grid() {
+        let mut harness = Harness::new(ToolMode::Pan);
+        grid_on_the_measurement(&harness)
+            .apply(&mut harness.document)
+            .unwrap();
+        let grid_id = harness.document.grids()[0].id();
+        harness.view.selection.select(Some(grid_id));
+
+        harness.click(MEASUREMENT_MIDDLE_ON_SCREEN);
+
+        assert_eq!(harness.view.selection.active(), None);
     }
 
     #[test]

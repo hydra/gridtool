@@ -7,12 +7,16 @@ pub const ROTATE: &str = "🔄";
 pub const SCALE: &str = "📏";
 /// Unicode has no tape-measure symbol; the set square is the closest match.
 pub const MEASURE: &str = "📐";
+/// "Squared plus" (U+229E): a square divided into four cells.
+pub const GRID: &str = "\u{229E}";
 pub const UNDO: &str = "↩";
 pub const REDO: &str = "↪";
 pub const DELETE: &str = "🗑";
 
 #[cfg(test)]
-pub const ALL: [&str; 8] = [OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, UNDO, REDO, DELETE];
+pub const ALL: [&str; 9] = [
+    OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, GRID, UNDO, REDO, DELETE,
+];
 
 #[cfg(test)]
 mod tests {
