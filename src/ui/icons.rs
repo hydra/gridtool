@@ -1,7 +1,16 @@
 //! Every icon glyph used by the UI, in one place so they can be checked against the
 //! bundled fonts.
 
-pub const OPEN_IMAGE: &str = "🗁";
+/// "Empty document" (U+1F5CB).
+pub const NEW: &str = "🗋";
+/// "Open folder" (U+1F5C1).
+pub const LOAD: &str = "🗁";
+/// "Floppy disk" (U+1F4BE).
+pub const SAVE: &str = "💾";
+/// "Memo" (U+1F4DD): a page being written. Unicode has no "save as" symbol.
+pub const SAVE_AS: &str = "📝";
+/// "Document with picture" (U+1F5BB): an image file.
+pub const OPEN_IMAGE: &str = "🖻";
 pub const PAN: &str = "✋";
 pub const ROTATE: &str = "🔄";
 pub const SCALE: &str = "📏";
@@ -18,8 +27,9 @@ pub const DELETE: &str = "🗑";
 pub const DUPLICATE: &str = "🗐";
 
 #[cfg(test)]
-pub const ALL: [&str; 11] = [
-    OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, GRID, ORIGIN, UNDO, REDO, DELETE, DUPLICATE,
+pub const ALL: [&str; 15] = [
+    NEW, LOAD, SAVE, SAVE_AS, OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, GRID, ORIGIN, UNDO, REDO,
+    DELETE, DUPLICATE,
 ];
 
 #[cfg(test)]

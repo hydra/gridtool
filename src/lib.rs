@@ -7,6 +7,7 @@
 pub mod action;
 pub mod calibration;
 pub mod document;
+pub mod document_file;
 pub mod editor;
 pub mod geometry;
 pub mod grid;

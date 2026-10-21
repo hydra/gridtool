@@ -13,6 +13,10 @@ impl ObjectId {
     pub(crate) fn new(raw: u64) -> Self {
         Self(raw)
     }
+
+    pub(crate) fn raw(self) -> u64 {
+        self.0
+    }
 }
 
 impl fmt::Display for ObjectId {

@@ -136,6 +136,33 @@ impl Document {
         &mut self.grids
     }
 
+    /// The id the next added object will get.
+    pub(crate) fn next_object_id(&self) -> u64 {
+        self.next_object_id
+    }
+
+    /// Rebuilds a document from its parts, e.g. when loading a saved file. The caller
+    /// is responsible for the parts being consistent.
+    pub(crate) fn from_parts(
+        width: u32,
+        height: u32,
+        calibration: Calibration,
+        measurements: Vec<Identified<Measurement>>,
+        grids: Vec<Identified<Grid>>,
+        origin: Point,
+        next_object_id: u64,
+    ) -> Self {
+        Self {
+            width,
+            height,
+            calibration,
+            measurements,
+            grids,
+            origin,
+            next_object_id,
+        }
+    }
+
     pub(crate) fn allocate_object_id(&mut self) -> ObjectId {
         let id = ObjectId::new(self.next_object_id);
         self.next_object_id += 1;

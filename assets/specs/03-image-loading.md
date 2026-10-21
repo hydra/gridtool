@@ -8,8 +8,8 @@
 as `.png`, is not supported. The list of extensions MUST be defined once and used both
 for the dialog filter and for validation.
 
-**IMG-2 — Choosing a file.** Clicking the Open image button shows the platform's native
-file-open dialog:
+**IMG-2 — Choosing a file.** Clicking the Open image button (`SHELL-5`) first deals with
+any unsaved changes (`FILE-11`). It then shows the platform's native file-open dialog:
 - the title is "`Open image`"
 - there is one filter, named "`Images`", that limits the listing to the supported
   extensions
@@ -33,7 +33,8 @@ shown in the canvas area (`SHELL-4`). The message has one of these forms:
 
 **IMG-7 — Success.** On success, the previous document (if any) is discarded together
 with its history and view state. A new document is created from the image (`DOC-2`) with
-an empty history (`HIST`), and the view returns to its defaults (`VIEW-2`).
+an empty history (`HIST`), and the view returns to its defaults (`VIEW-2`). The new
+document has no file and has unsaved changes until it is saved (`FILE-9`).
 
 **IMG-8 — Display.** The decoded image is drawn as the document's content on the canvas
 and fills the document rectangle exactly (`VIEW-6`).

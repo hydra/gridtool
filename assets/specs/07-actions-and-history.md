@@ -62,7 +62,8 @@ becomes its exact state after the entry at the position, and the position moves 
 by one. Otherwise redo does nothing.
 
 **HIST-8 — Scope.** The history belongs to one open document. Opening a new image starts
-an empty history (`IMG-7`).
+an empty history (`IMG-7`), and so does loading a document (`FILE-13`). The history is
+never saved (`FILE-2`). Saving is not an action and does not change the history.
 
 ## UI
 

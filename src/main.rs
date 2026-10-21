@@ -1,6 +1,8 @@
 mod app;
 mod file_picker;
+mod open_document;
 mod open_image;
+mod session;
 mod ui;
 
 use eframe::egui;

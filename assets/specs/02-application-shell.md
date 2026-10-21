@@ -34,17 +34,22 @@ error message centred, in the toolkit's error colour (see `IMG-6`).
 
 | # | Item | Icon meaning (current glyph) | Tooltip |
 |---|---|---|---|
-| 1 | Open image button | open folder (🗁) | "`Open image…`" |
-| 2 | Horizontal spacer, 16 px | — | — |
-| 3 | Pan & zoom mode button | hand (✋) | "`Pan & zoom`" |
-| 4 | Rotate view mode button | rotate arrows (🔄) | "`Rotate view`" |
-| 5 | Scale mode button | ruler (📏) | "`Scale`" |
-| 6 | Measure distance mode button | measuring tool. A tape measure is preferred, but Unicode has none, so the current glyph is a set square (📐) | "`Measure distance`" |
-| 7 | Grid mode button | grid (⊞, U+229E) | "`Grid`" |
-| 8 | Origin mode button | crosshair (⌖, U+2316) | "`Origin`" (`ORIGIN-2`) |
-| 9 | Horizontal spacer, 16 px | — | — |
-| 10 | Undo button | undo arrow (↩) | "`Undo`" |
-| 11 | Redo button | redo arrow (↪) | "`Redo`" |
+| 1 | New button (`FILE-10`) | empty document (🗋) | "`New`" |
+| 2 | Load button | open folder (🗁) | "`Load…`" |
+| 3 | Save button | floppy disk (💾) | "`Save`" |
+| 4 | Save as button | page being written (📝) | "`Save as…`" |
+| 5 | Horizontal spacer, 16 px | — | — |
+| 6 | Open image button | image file: a document with a picture (🖻, U+1F5BB) | "`Open image…`" |
+| 7 | Horizontal spacer, 16 px | — | — |
+| 8 | Pan & zoom mode button | hand (✋) | "`Pan & zoom`" |
+| 9 | Rotate view mode button | rotate arrows (🔄) | "`Rotate view`" |
+| 10 | Scale mode button | ruler (📏) | "`Scale`" |
+| 11 | Measure distance mode button | measuring tool. A tape measure is preferred, but Unicode has none, so the current glyph is a set square (📐) | "`Measure distance`" |
+| 12 | Grid mode button | grid (⊞, U+229E) | "`Grid`" |
+| 13 | Origin mode button | crosshair (⌖, U+2316) | "`Origin`" (`ORIGIN-2`) |
+| 14 | Horizontal spacer, 16 px | — | — |
+| 15 | Undo button | undo arrow (↩) | "`Undo`" |
+| 16 | Redo button | redo arrow (↪) | "`Redo`" |
 
 **SHELL-6.** Tool bar icons are drawn at 18 px. The icon glyphs MUST be available on
 every supported platform. Bundle the icon font if necessary, rather than relying on

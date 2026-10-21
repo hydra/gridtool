@@ -5,6 +5,7 @@ mod angle;
 pub mod canvas;
 mod color;
 mod commit_field;
+pub mod dialog;
 pub mod document_view;
 mod format;
 pub mod grid_bar;
