@@ -22,6 +22,9 @@ fn main() -> eframe::Result {
     eframe::run_native(
         APP_NAME,
         options,
-        Box::new(|_cc| Ok(Box::<GridToolApp>::default())),
+        Box::new(|cc| {
+            egui_material_icons::initialize(&cc.egui_ctx);
+            Ok(Box::<GridToolApp>::default())
+        }),
     )
 }

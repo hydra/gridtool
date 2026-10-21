@@ -34,8 +34,8 @@ must satisfy them.
 - Lengths written as "px" or "points" are **logical screen units** (device-independent
   pixels), unless a requirement says they are *image pixels*.
 - Text in `code style` that appears inside quotation marks must be reproduced exactly.
-- Icons are described by meaning. The current glyph is given for reference, and any
-  icon with the same meaning is acceptable.
+- Icons are described by meaning. The current Google Material Symbols icon name is given
+  for reference (`SHELL-6`), and any icon with the same meaning is acceptable.
 - Each area ends with **acceptance criteria**. These are concrete scenarios that an
   implementation's automated tests must cover.
 
@@ -78,3 +78,4 @@ must satisfy them.
 | 2026-10-21 | The rotate arrow is now a fixed 100 px (was 200 px) (`VIEW-13`). |
 | 2026-10-21 | Wheel zoom always zooms about the point under the cursor, in every mode with no exceptions. This removes the short-lived Rotate-mode zoom about the origin (`VIEW-9`). |
 | 2026-10-21 | Added document files (`13`): New, Load, Save and Save as buttons, unsaved-change tracking, the Unsaved changes and overwrite dialogs, and the versioned `.ron` format (version 1), which references the image and does not save the history. The Open image button now shows an image-file icon (`SHELL-5`). |
+| 2026-10-21 | Icons are now Google Material Symbols (Rounded, filled) in a bundled icon font, named by their Material Symbols names (`SHELL-6`). This replaces the emoji glyphs and the delete button's "x" fallback. Measure distance now uses a tape measure (`measuring_tape`). Implemented with the `egui_material_icons` crate. |

@@ -3,6 +3,7 @@
 
 use eframe::egui;
 use egui_ltreeview::{Action as TreeAction, TreeView};
+use egui_material_icons::MaterialIcon;
 use gridtool::action::Action;
 use gridtool::document::Document;
 use gridtool::grid::{Grid, GridSource};
@@ -76,7 +77,7 @@ impl ObjectCommands {
 /// command when clicked.
 fn command_button(
     ui: &mut egui::Ui,
-    icon: &str,
+    icon: MaterialIcon,
     tooltip: &str,
     command: Option<Action>,
 ) -> Option<Action> {

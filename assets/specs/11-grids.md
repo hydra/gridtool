@@ -103,8 +103,7 @@ opacity applied as alpha (`round(opacity × 255)`). They are drawn in **every** 
 
 **GRID-7 — Tool mode.** **Grid** is a tool mode (`SHELL-8`):
 - its button comes directly after the Measure distance button (`SHELL-5`)
-- its icon means "grid". The current glyph is ⊞ (U+229E, squared plus), from the bundled
-  fonts (`SHELL-6a`)
+- its icon is a grid (`grid_on`, `SHELL-6`)
 - its tooltip is "`Grid`"
 
 **GRID-8 — Options row.** In Grid mode, with a document open, the tool options row shows:
@@ -271,5 +270,5 @@ discarded whenever the active object changes or the document changes (`OBJ-7`).
 - Canvas: any click clears an active grid.
 - Hit-testing: perpendicular distance inside the segment, end distance outside it.
   Points near the ends are excluded. The nearest of two crossing lines wins.
-- In the tool bar, Grid comes directly after Measure distance. The grid icon is a single
-  glyph present in the bundled fonts.
+- In the tool bar, Grid comes directly after Measure distance. The grid icon is in the bundled
+  icon font.

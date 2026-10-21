@@ -19,8 +19,7 @@ of the document (`DOC-1`), so moving it is an action and can be undone and redon
 
 **ORIGIN-2 — Tool bar button.** Origin mode has its own mode button on the main tool bar
 (`SHELL-5`):
-- **Icon:** a crosshair (⌖, U+2316 "position indicator", present in the bundled fonts,
-  `SHELL-6a`).
+- **Icon:** a crosshair (`my_location`, `SHELL-6`).
 - **Tooltip:** "`Origin`".
 - **Options row:** none (`SHELL-2`).
 

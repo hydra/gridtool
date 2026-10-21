@@ -1,3 +1,5 @@
+use egui_material_icons::MaterialIcon;
+
 use super::icons;
 
 /// The active canvas tool, which decides how mouse input on the canvas is interpreted.
@@ -29,7 +31,7 @@ impl ToolMode {
         ToolMode::Origin,
     ];
 
-    pub fn icon(self) -> &'static str {
+    pub fn icon(self) -> MaterialIcon {
         match self {
             ToolMode::Pan => icons::PAN,
             ToolMode::Rotate => icons::ROTATE,
@@ -80,7 +82,10 @@ mod tests {
 
     #[test]
     fn modes_have_distinct_icons_and_names() {
-        let icons: HashSet<_> = ToolMode::ALL.iter().map(|mode| mode.icon()).collect();
+        let icons: HashSet<_> = ToolMode::ALL
+            .iter()
+            .map(|mode| mode.icon().codepoint)
+            .collect();
         let names: HashSet<_> = ToolMode::ALL.iter().map(|mode| mode.name()).collect();
 
         assert_eq!(icons.len(), ToolMode::ALL.len());

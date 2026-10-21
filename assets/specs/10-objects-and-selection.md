@@ -156,10 +156,10 @@ The object tool bar is one horizontal row directly below the "`Objects`" heading
 buttons use the tool bar icon size (`SHELL-6`), and their tooltips show even while they
 are disabled (`SHELL-7`).
 
-| # | Item | Icon meaning (current glyph) | Tooltip |
+| # | Item | Icon meaning (current Material Symbols icon) | Tooltip |
 |---|---|---|---|
-| 1 | Duplicate button | two overlapping pages (🗐, U+1F5D0) | "`Duplicate`" |
-| 2 | Delete button | trash can (🗑, U+1F5D1), the same glyph as the measurements table (`MEAS-11`) | "`Delete`" |
+| 1 | Duplicate button | copy (`content_copy`) | "`Duplicate`" |
+| 2 | Delete button | trash can (`delete`), the same icon as the measurements table (`MEAS-11`) | "`Delete`" |
 
 **OBJ-12 — Duplicate.** The Duplicate button is enabled exactly when there is an active
 object and that kind of object can be duplicated. Measurements and grids can both be

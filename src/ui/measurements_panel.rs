@@ -2,6 +2,7 @@
 //! per-measurement units and delete buttons.
 
 use eframe::egui;
+use egui_material_icons::MaterialIcon;
 use gridtool::action::Action;
 use gridtool::document::Document;
 use gridtool::geometry::Point;
@@ -9,12 +10,13 @@ use gridtool::measurement::{Endpoint, Measurement};
 
 use super::commit_field::CommitField;
 use super::format::{format_coordinate, format_length, parse_number};
+use super::icon_button::inline_icon_text;
 use super::icons;
 use super::selection::Selection;
 use super::unit_picker;
 
 const COORDINATE_FIELD_WIDTH: f32 = 55.0;
-const DELETE_ICON: &str = icons::DELETE;
+const DELETE_ICON: MaterialIcon = icons::DELETE;
 const COLUMN_HEADERS: [&str; 6] = ["#", "x1, y1", "x2, y2", "Distance", "Units", ""];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -141,7 +143,7 @@ impl MeasurementsPanel {
         );
 
         if ui
-            .button(DELETE_ICON)
+            .button(inline_icon_text(DELETE_ICON))
             .on_hover_text("Delete measurement")
             .clicked()
         {

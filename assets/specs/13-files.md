@@ -89,12 +89,12 @@ document as it was last loaded or saved:
 **FILE-10 — File buttons.** The main tool bar (`SHELL-5`) starts with the file buttons, in
 this order, followed by a 16 px spacer:
 
-| Button | Icon meaning (current glyph) | Tooltip | Enabled |
+| Button | Icon meaning (current Material Symbols icon) | Tooltip | Enabled |
 |---|---|---|---|
-| New | empty document (🗋, U+1F5CB) | "`New`" | always |
-| Load | open folder (🗁, U+1F5C1) | "`Load…`" | always |
-| Save | floppy disk (💾, U+1F4BE) | "`Save`" | only when a document is open **and** it has unsaved changes (`FILE-9`) |
-| Save as | page being written (📝, U+1F4DD). Unicode has no "save as" symbol | "`Save as…`" | when a document is open |
+| New | new document (`note_add`) | "`New`" | always |
+| Load | open folder (`folder_open`) | "`Load…`" | always |
+| Save | save (`save`) | "`Save`" | only when a document is open **and** it has unsaved changes (`FILE-9`) |
+| Save as | save as (`save_as`) | "`Save as…`" | when a document is open |
 
 ## Commands
 

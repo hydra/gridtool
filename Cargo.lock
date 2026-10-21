@@ -903,6 +903,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui_material_icons"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a49b8d9217d02f0344160bff2f04fdc598f3244f65dc04ea7bf6ab74196d419c"
+dependencies = [
+ "egui",
+]
+
+[[package]]
 name = "egui_system_font_provider"
 version = "0.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1386,6 +1395,7 @@ dependencies = [
  "eframe",
  "egui",
  "egui_ltreeview",
+ "egui_material_icons",
  "image",
  "rfd",
  "ron",

@@ -31,8 +31,7 @@ metresPer(target)`, where `metresPer(cm) = 0.01` and `metresPer(m) = 1`.
 
 **MEAS-5 — Tool mode.** **Measure distance** is a tool mode (`SHELL-8`):
 - its button comes directly after the Scale button (`SHELL-5`)
-- its icon means "measuring tool". A tape measure is preferred, but Unicode has no
-  tape-measure symbol, so the current glyph is a triangular ruler / set square (📐)
+- its icon is a tape measure (`measuring_tape`, `SHELL-6`)
 - its tooltip is "`Measure distance`"
 - it has no tool options row
 
@@ -92,7 +91,7 @@ and has one header row followed by one row per measurement in list order (`MEAS-
 | "`x2, y2`" | Two editable fields, end x then end y (`MEAS-12`) |
 | "`Distance`" | The calculated distance (`MEAS-3`), formatted by `FMT-7` and without a unit, or a weak "`—`" if unavailable. Hovering the "`—`" shows "`Scale: <reason>`" (`SCALE-18`) |
 | "`Units`" | A unit drop-down, 50 px wide, with the tooltip "`Units of this measurement`" (`MEAS-13`) |
-| (blank) | A delete button with a trash-can icon (🗑, U+1F5D1, present in the bundled emoji font) and the tooltip "`Delete measurement`" (`MEAS-14`). If the toolkit's bundled fonts have no trash-can glyph, the button shows "`x`" instead (`SHELL-6a`) |
+| (blank) | A delete button with a trash-can icon (`delete`, `SHELL-6`) at the inline icon size, and the tooltip "`Delete measurement`" (`MEAS-14`) |
 
 **MEAS-12 — Editing coordinates.** Each coordinate field is a commit-on-blur field
 (`FMT-9`), 55 px wide:

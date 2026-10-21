@@ -32,36 +32,41 @@ error message centred, in the toolkit's error colour (see `IMG-6`).
 
 **SHELL-5.** The tool bar contains these items, left to right:
 
-| # | Item | Icon meaning (current glyph) | Tooltip |
+| # | Item | Icon meaning (current Material Symbols icon) | Tooltip |
 |---|---|---|---|
-| 1 | New button (`FILE-10`) | empty document (🗋) | "`New`" |
-| 2 | Load button | open folder (🗁) | "`Load…`" |
-| 3 | Save button | floppy disk (💾) | "`Save`" |
-| 4 | Save as button | page being written (📝) | "`Save as…`" |
+| 1 | New button (`FILE-10`) | new document (`note_add`) | "`New`" |
+| 2 | Load button | open folder (`folder_open`) | "`Load…`" |
+| 3 | Save button | save (`save`) | "`Save`" |
+| 4 | Save as button | save as (`save_as`) | "`Save as…`" |
 | 5 | Horizontal spacer, 16 px | — | — |
-| 6 | Open image button | image file: a document with a picture (🖻, U+1F5BB) | "`Open image…`" |
+| 6 | Open image button | image (`image`) | "`Open image…`" |
 | 7 | Horizontal spacer, 16 px | — | — |
-| 8 | Pan & zoom mode button | hand (✋) | "`Pan & zoom`" |
-| 9 | Rotate view mode button | rotate arrows (🔄) | "`Rotate view`" |
-| 10 | Scale mode button | ruler (📏) | "`Scale`" |
-| 11 | Measure distance mode button | measuring tool. A tape measure is preferred, but Unicode has none, so the current glyph is a set square (📐) | "`Measure distance`" |
-| 12 | Grid mode button | grid (⊞, U+229E) | "`Grid`" |
-| 13 | Origin mode button | crosshair (⌖, U+2316) | "`Origin`" (`ORIGIN-2`) |
+| 8 | Pan & zoom mode button | hand (`pan_tool`) | "`Pan & zoom`" |
+| 9 | Rotate view mode button | rotate (`rotate_right`) | "`Rotate view`" |
+| 10 | Scale mode button | ruler (`straighten`) | "`Scale`" |
+| 11 | Measure distance mode button | tape measure (`measuring_tape`) | "`Measure distance`" |
+| 12 | Grid mode button | grid (`grid_on`) | "`Grid`" |
+| 13 | Origin mode button | crosshair (`my_location`) | "`Origin`" (`ORIGIN-2`) |
 | 14 | Horizontal spacer, 16 px | — | — |
-| 15 | Undo button | undo arrow (↩) | "`Undo`" |
-| 16 | Redo button | redo arrow (↪) | "`Redo`" |
+| 15 | Undo button | undo arrow (`undo`) | "`Undo`" |
+| 16 | Redo button | redo arrow (`redo`) | "`Redo`" |
 
-**SHELL-6.** Tool bar icons are drawn at 18 px. The icon glyphs MUST be available on
-every supported platform. Bundle the icon font if necessary, rather than relying on
-system fonts.
+**SHELL-6 — Icon font.** Every icon in the UI is a **Google Material Symbols** icon
+(<https://fonts.google.com/icons>), style **Rounded**, **filled**.
+- **Bundled.** The icon font is bundled with the application (Apache License 2.0), so the
+  icons look the same on every platform and never depend on system fonts.
+- **Own family.** Icons are drawn in a font family that contains only this font, so an
+  icon can never silently come from another font.
+- **Sizes.** Tool bar icons are drawn at 18 px. Icons inside table rows are drawn at
+  14 px.
+- **Names.** The specs name each icon by its Material Symbols name, for example
+  `measuring_tape`. An implementation refers to an icon by its code point in the font.
 
 **SHELL-6a — Icon verification.** Every icon used anywhere in the UI MUST be defined in
 one place.
-- An automated test MUST check that each icon is exactly one character and that the
-  bundled fonts contain a glyph for it. System fonts don't count, because they are not
-  guaranteed to be present.
-- If no suitable glyph exists for an icon's meaning, use a plain-text fallback instead.
-  The delete button, for example, falls back to an "x" button (`MEAS-11`).
+- An automated test MUST check that each icon is exactly one character, that the icons
+  are distinct, and that the bundled icon font contains a glyph for each. System fonts
+  don't count, because they are not guaranteed to be present.
 
 **SHELL-7.** Tooltips MUST appear on hover, including when the button is disabled.
 
