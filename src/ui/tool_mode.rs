@@ -6,7 +6,7 @@ pub enum ToolMode {
     /// Drag to move the view; scroll to zoom.
     #[default]
     Pan,
-    /// Drag the arrow handle to rotate the view about the document's center.
+    /// Drag the arrow handle to rotate the view about the document origin.
     Rotate,
     /// Place and drag calibration points to set the real-world scale.
     Scale,
@@ -14,16 +14,19 @@ pub enum ToolMode {
     Measure,
     /// Add grids aligned to a scale line or a measurement line.
     Grid,
+    /// Click on the image to move the document origin (the rotation centre).
+    Origin,
 }
 
 impl ToolMode {
     /// Every mode, in tool bar order.
-    pub const ALL: [ToolMode; 5] = [
+    pub const ALL: [ToolMode; 6] = [
         ToolMode::Pan,
         ToolMode::Rotate,
         ToolMode::Scale,
         ToolMode::Measure,
         ToolMode::Grid,
+        ToolMode::Origin,
     ];
 
     pub fn icon(self) -> &'static str {
@@ -33,6 +36,7 @@ impl ToolMode {
             ToolMode::Scale => icons::SCALE,
             ToolMode::Measure => icons::MEASURE,
             ToolMode::Grid => icons::GRID,
+            ToolMode::Origin => icons::ORIGIN,
         }
     }
 
@@ -43,6 +47,7 @@ impl ToolMode {
             ToolMode::Scale => "Scale",
             ToolMode::Measure => "Measure distance",
             ToolMode::Grid => "Grid",
+            ToolMode::Origin => "Origin",
         }
     }
 }

@@ -9,6 +9,8 @@ pub const SCALE: &str = "📏";
 pub const MEASURE: &str = "📐";
 /// "Squared plus" (U+229E): a square divided into four cells.
 pub const GRID: &str = "\u{229E}";
+/// "Position indicator" (U+2316): a crosshair.
+pub const ORIGIN: &str = "\u{2316}";
 pub const UNDO: &str = "↩";
 pub const REDO: &str = "↪";
 pub const DELETE: &str = "🗑";
@@ -16,8 +18,8 @@ pub const DELETE: &str = "🗑";
 pub const DUPLICATE: &str = "🗐";
 
 #[cfg(test)]
-pub const ALL: [&str; 10] = [
-    OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, GRID, UNDO, REDO, DELETE, DUPLICATE,
+pub const ALL: [&str; 11] = [
+    OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, GRID, ORIGIN, UNDO, REDO, DELETE, DUPLICATE,
 ];
 
 #[cfg(test)]

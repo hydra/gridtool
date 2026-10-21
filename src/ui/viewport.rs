@@ -39,12 +39,27 @@ impl Viewport {
         self.rotation_degrees.to_radians()
     }
 
+    /// Sets the view rotation, pivoting about the document's centre.
     pub fn set_rotation_degrees(&mut self, degrees: f32) {
         self.rotation_degrees = normalize_degrees(degrees);
     }
 
+    #[cfg(test)]
     pub fn set_rotation_radians(&mut self, radians: f32) {
         self.set_rotation_degrees(radians.to_degrees());
+    }
+
+    /// Sets the view rotation, pivoting about image point `pivot` (e.g. the document's
+    /// origin): `pivot` stays at the same screen position.
+    pub fn rotate_about(&mut self, degrees: f32, pivot: Point, document_size: Vec2) {
+        let before = Rot2::from_angle(self.rotation_radians());
+        self.set_rotation_degrees(degrees);
+        let after = Rot2::from_angle(self.rotation_radians());
+        // The pivot is drawn at `pan + R · (pivot − size/2) · zoom` from the view centre;
+        // adjust the pan so that stays the same under the new rotation.
+        let from_center =
+            (Vec2::new(pivot.x as f32, pivot.y as f32) - document_size * 0.5) * self.zoom;
+        self.pan += before * from_center - after * from_center;
     }
 
     /// Screen points per image pixel.
@@ -96,6 +111,7 @@ pub struct DocumentTransform {
 
 impl DocumentTransform {
     /// Screen position of the document's center.
+    #[cfg(test)]
     pub fn center(self) -> Pos2 {
         self.center
     }
@@ -305,6 +321,22 @@ mod tests {
 
         viewport.set_rotation_radians(std::f32::consts::PI);
         assert!((viewport.rotation_degrees() - 180.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn rotating_about_a_pivot_keeps_it_in_place() {
+        let mut viewport = Viewport::default();
+        viewport.zoom_about(VIEW_CENTER, Pos2::new(700.0, 100.0), 8.0);
+        viewport.pan_by(Vec2::new(-30.0, 12.0));
+        let pivot = Point::new(80.0, 10.0);
+        let before = transform(&viewport).image_to_screen(pivot);
+
+        for degrees in [90.0, 33.0, 300.0] {
+            viewport.rotate_about(degrees, pivot, DOCUMENT_SIZE);
+
+            assert_near(transform(&viewport).image_to_screen(pivot), before);
+            assert!((viewport.rotation_degrees() - degrees).abs() < 1e-3);
+        }
     }
 
     #[test]

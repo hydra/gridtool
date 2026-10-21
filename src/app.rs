@@ -161,9 +161,10 @@ impl GridToolApp {
     fn show_tool_options(&mut self, ui: &mut egui::Ui) -> Option<Action> {
         let open = self.content.document_mut()?;
         match self.mode {
-            ToolMode::Pan | ToolMode::Measure => None,
+            ToolMode::Pan | ToolMode::Measure | ToolMode::Origin => None,
             ToolMode::Rotate => {
-                self.rotation_bar.show(ui, &mut open.view.viewport);
+                self.rotation_bar
+                    .show(ui, &mut open.view.viewport, open.editor.document());
                 None
             }
             ToolMode::Scale => {

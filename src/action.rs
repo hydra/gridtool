@@ -22,6 +22,8 @@ pub enum Action {
     SetDistance { line: Line, distance: Option<f64> },
     /// Changes the unit the reference distances are measured in.
     SetUnit(LengthUnit),
+    /// Moves the image's origin (the point the view rotates about).
+    SetOrigin(Point),
     /// Appends a measurement to the end of the list.
     AddMeasurement(Measurement),
     /// Moves one end of an existing measurement.
@@ -140,6 +142,10 @@ impl Action {
                 document.calibration_mut().set_distance(*line, *distance);
             }
             Action::SetUnit(unit) => document.calibration_mut().set_unit(*unit),
+            Action::SetOrigin(origin) => {
+                ensure_inside(document, *origin)?;
+                document.set_origin(*origin);
+            }
             Action::AddMeasurement(measurement) => {
                 for endpoint in Endpoint::ALL {
                     ensure_inside(document, measurement.point(endpoint))?;
@@ -302,6 +308,7 @@ impl fmt::Display for Action {
                 distance: None,
             } => write!(f, "Clear distance {line}"),
             Action::SetUnit(unit) => write!(f, "Set units to {unit}"),
+            Action::SetOrigin(origin) => write!(f, "Set origin to {origin}"),
             Action::AddMeasurement(measurement) => write!(
                 f,
                 "Add measurement from {} to {}",
@@ -481,6 +488,27 @@ mod tests {
             .unwrap();
 
         assert_eq!(document.calibration().unit(), LengthUnit::Metre);
+    }
+
+    #[test]
+    fn sets_the_origin_inside_the_document_only() {
+        let mut document = Document::new(100, 50);
+
+        Action::SetOrigin(Point::new(10.0, 40.0))
+            .apply(&mut document)
+            .unwrap();
+        assert_eq!(document.origin(), Point::new(10.0, 40.0));
+
+        let before = document.clone();
+        assert!(matches!(
+            Action::SetOrigin(Point::new(100.5, 10.0)).apply(&mut document),
+            Err(ActionError::PointOutsideDocument(_))
+        ));
+        assert_eq!(document, before);
+        assert_eq!(
+            Action::SetOrigin(Point::new(12.0, 3.5)).to_string(),
+            "Set origin to (12.0, 3.5)"
+        );
     }
 
     #[test]

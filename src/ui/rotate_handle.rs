@@ -1,11 +1,11 @@
-//! Geometry of the rotate tool's arrow handle, which points from the document's
-//! center in the direction of its rotation.
+//! Geometry of the rotate tool's arrow handle, which points from the document origin
+//! (the rotation centre) in the direction of the view rotation.
 
 use eframe::egui::emath::Rot2;
 use eframe::egui::{Pos2, Vec2};
 
 /// Arrow length in screen points.
-pub const ARROW_LENGTH: f32 = 200.0;
+pub const ARROW_LENGTH: f32 = 100.0;
 
 /// How close (in screen points) the pointer must be to the arrow tip to grab it.
 pub const GRAB_RADIUS: f32 = 12.0;

@@ -22,6 +22,7 @@ must satisfy them.
 | [09-measurements.md](09-measurements.md) | Measure tool, measurement list and table | `MEAS` |
 | [10-objects-and-selection.md](10-objects-and-selection.md) | Object ids, object tree, active object, selection box and resizing | `OBJ` |
 | [11-grids.md](11-grids.md) | Grid tool, grid geometry, grid properties row | `GRID` |
+| [12-origin.md](12-origin.md) | Document origin (rotation centre), Origin mode and marker | `ORIGIN` |
 
 ## Conventions
 
@@ -53,6 +54,7 @@ must satisfy them.
 | **Object** | Something the user places on the document and can select: currently measurements and grids; later area measurements. Each has a stable object id. |
 | **Active object** | The single selected object. Measurements show a purple selection box with resize handles; grids show their properties row. It is presentation state, not part of the document. |
 | **Grid** | Regularly spaced lines over the whole document, aligned to a scale line or measurement line, with cells sized in real-world units. |
+| **Origin** | A point on the image, stored in the document, that the view rotates about. It defaults to the image centre. |
 | **Alignment source** | The scale line or measurement line a grid is aligned to. |
 
 ## Change log
@@ -68,3 +70,7 @@ must satisfy them.
 | 2026-10-21 | Added the object tool bar with Duplicate and Delete buttons (`OBJ-12`–`OBJ-14`), and the Duplicate measurement, Duplicate grid and Delete grid actions (`HIST-2`). |
 | 2026-10-21 | Added the grid units drop-down (`GRID-14`) and the Set grid units action (`HIST-2`). A grid's unit now belongs to the grid and can be changed (`GRID-1`). |
 | 2026-10-21 | Removed the whole-document 10 000-line limit that hid grids with cells of about 1 cm or less. Grids now draw only the visible region, and any cell size > 0 can be drawn, hidden only while under 3 screen px (`GRID-18`, `GRID-4`). Raised the maximum zoom from 64 to 1024 (`VIEW-10`). |
+| 2026-10-21 | The rotate arrow now starts at the canvas centre instead of the document centre, so it stays a full 200 px at every zoom (`VIEW-13`). The view rotation now pivots about the canvas centre (`VIEW-3a`, `VIEW-14`). |
+| 2026-10-21 | Added the document origin and Origin mode (`12`), the Set origin action (`HIST-2`), and the Origin mode button (`SHELL-5`). The origin defaults to the image centre. Rotation now pivots about the origin, and the rotate arrow starts there (`VIEW-3a`, `VIEW-13`, `VIEW-14`). This replaces the canvas-centre pivot of the previous entry. |
+| 2026-10-21 | The rotate arrow is now a fixed 100 px (was 200 px) (`VIEW-13`). |
+| 2026-10-21 | Wheel zoom always zooms about the point under the cursor, in every mode with no exceptions. This removes the short-lived Rotate-mode zoom about the origin (`VIEW-9`). |

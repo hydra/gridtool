@@ -25,8 +25,20 @@ screen(p) = c + pan + R(rotation) · ((p − size/2) · zoom)
 - `size` is the document size.
 - `R(θ)` rotates by θ in screen space, where y points down. A positive θ therefore
   appears **clockwise**: `R(θ)·(x, y) = (x·cosθ − y·sinθ, x·sinθ + y·cosθ)`.
-- So the document's centre is drawn at `c + pan`, and the view rotates about the
-  document's centre.
+- So the document's centre is drawn at `c + pan`.
+
+**VIEW-3a — Rotation pivots about the document origin.** The rotation centre is always
+the document's origin `o` (`ORIGIN-1`). Changing the rotation from `θ` to `θ'`, by any
+route (arrow handle or text field), also adjusts the pan so that the origin stays at the
+same screen position:
+
+```
+pan' = pan + (R(θ) − R(θ')) · ((o − size/2) · zoom)
+```
+
+With the default origin (the image centre) the pan does not change. Moving the origin
+does not move the view, because `VIEW-3` does not depend on it. Only later rotations
+pivot about the new origin.
 
 **VIEW-4 — Inverse transform.** The inverse of `VIEW-3` maps a screen position back to
 image coordinates. Mapping an image point to the screen and back MUST give the original
@@ -71,6 +83,11 @@ fixed on the screen. If `a` is the pointer position, the new pan is:
 pan' = (a − c) − ((a − c − pan) × zoom'/zoom)
 ```
 
+This holds in **every** tool mode, with no exceptions, including Rotate view and Origin.
+Wheel zoom always zooms in on the document at the point under the cursor. In Rotate view
+mode the origin and its arrow (`VIEW-13`) can therefore move on screen while zooming. The
+arrow itself keeps its fixed length.
+
 **VIEW-10 — Zoom limits.** Zoom is clamped to the range `[0.02, 1024]` (2 % – 102 400 %). The high limit lets very small grid cells be inspected (`GRID-18`).
 
 ## Pan & zoom mode
@@ -110,8 +127,10 @@ tree (`OBJ-5`).
 
 **VIEW-13 — Arrow handle.** The canvas shows an arrow:
 - **colour** `rgb(0,170,255)`, 2 px wide
-- **start** the document centre on screen
-- **length** 200 screen units, the same at every zoom level
+- **start** the document origin's screen position (`ORIGIN-1`), the rotation centre
+- **length** **100 screen units**, fixed: the same at every zoom level, measured on screen
+  and never scaled with the image. If the origin is near or beyond the canvas edge, the
+  arrow is clipped there like any other canvas content.
 - **direction** the view rotation: at 0° it points right, and positive angles turn it
   clockwise
 
@@ -119,9 +138,10 @@ A circle with a 12 px radius, drawn in the same stroke, marks the arrow tip.
 
 **VIEW-14 — Dragging the arrow.**
 - A primary-button drag that *starts* within 12 px of the arrow tip rotates the view. While dragging,
-  the rotation is the direction from the document centre to the pointer, so the arrow
-  follows the pointer.
-- If the pointer is exactly on the centre, the rotation does not change.
+  the rotation is the direction from the origin's screen position to the pointer, so the
+  arrow follows the pointer. The view pivots about the origin (`VIEW-3a`), so the
+  arrow's start stays put.
+- If the pointer is exactly on the origin, the rotation does not change.
 - A drag that starts anywhere else does nothing.
 - The cursor is an open hand while hovering within 12 px of the tip, and a grabbing hand
   while dragging the arrow.
@@ -161,7 +181,14 @@ A circle with a 12 px radius, drawn in the same stroke, marks the arrow tip.
   the scaled corners.
 - Rotation normalisation: 0→0, 123.5→123.5, 360→0, 450→90, −90→270, −720→0,
   −1e−7→less than 360, NaN→0, ∞→0.
-- The arrow tip is at `centre + (200, 0)` at 0°, and at `centre + (0, 200)` at 90°.
+- The arrow tip is at `start + (100, 0)` at 0°, and at `start + (0, 100)` at 90°.
 - The arrow tip can be grabbed at a distance of up to 12 px, and not at 13 px.
+- After zooming ×8 about an off-centre point and panning, rotating about the pivot
+  (80, 10) to 90°, 33° or 300° keeps the pivot's screen position.
+- Canvas, simulated, with the origin at (50, 50) and zoom ×3: the arrow tip is 100 px
+  right of the origin on screen. Dragging it to 100 px below the origin sets 90°, keeps
+  the origin's screen position, and records no action.
+- Canvas, simulated, in **every** mode (including Rotate view and Origin): scrolling to
+  zoom in keeps the image point under the cursor at the cursor's screen position.
 - Pointer direction maps to rotation: right gives 0, down gives π/2, left gives π.
   Pointing at the exact centre gives no rotation.

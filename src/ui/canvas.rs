@@ -65,6 +65,14 @@ const LINE_END_EXCLUSION: f32 = 8.0;
 const SCALE_MARKER_RADIUS: f32 = 6.0;
 const MEASUREMENT_HANDLE_RADIUS: f32 = 5.0;
 const CROSSHAIR_HALF_LENGTH: f32 = 11.0;
+const ORIGIN_STROKE: Stroke = Stroke {
+    width: 2.0,
+    color: Color32::BLUE,
+};
+/// Screen points, the same at every zoom level.
+const ORIGIN_CIRCLE_DIAMETER: f32 = 15.0;
+/// Full length of each line of the origin's cross, in screen points.
+const ORIGIN_CROSS_LENGTH: f32 = 25.0;
 /// How close (in screen points) the pointer must be to a point to grab it.
 const POINT_GRAB_RADIUS: f32 = 10.0;
 const LABEL_OFFSET: f32 = 12.0;
@@ -109,7 +117,7 @@ pub fn show(
                 None
             }
             ToolMode::Rotate => {
-                handle_rotate(ui, &response, transform.center(), view);
+                handle_rotate(ui, &response, transform, document, view);
                 None
             }
             ToolMode::Scale => {
@@ -119,6 +127,7 @@ pub fn show(
                 handle_measure(ui, &response, transform, document, &mut view.measure_tool)
             }
             ToolMode::Grid => handle_grid(ui, &response, transform, document, view),
+            ToolMode::Origin => handle_origin(ui, &response, transform, document),
         },
     };
     if mode != ToolMode::Grid {
@@ -147,17 +156,18 @@ pub fn show(
                 paint_scale_markers(&painter, transform, points.points(), points.method());
             }
         }
-        ToolMode::Pan | ToolMode::Rotate | ToolMode::Measure => {}
+        ToolMode::Pan | ToolMode::Rotate | ToolMode::Measure | ToolMode::Origin => {}
     }
     paint_active_grid_source(&painter, transform, document, &view.selection);
     match mode {
         ToolMode::Rotate => {
             paint_rotate_handle(
                 &painter,
-                transform.center(),
+                transform.image_to_screen(document.origin()),
                 view.viewport.rotation_radians(),
             );
         }
+        ToolMode::Origin => paint_origin(&painter, transform, document.origin()),
         ToolMode::Measure => {
             if let Some(start) = view.measure_tool.pending_start() {
                 paint_pending_measurement(&painter, transform, start, response.hover_pos());
@@ -336,6 +346,8 @@ fn paint_selection(painter: &egui::Painter, transform: DocumentTransform, bounds
     }
 }
 
+/// Zooms with the wheel or pinch while the pointer is over the canvas, in every mode,
+/// keeping the document point under the pointer fixed on screen.
 fn handle_zoom(ui: &egui::Ui, response: &Response, view_center: Pos2, viewport: &mut Viewport) {
     let Some(pointer) = response.hover_pos() else {
         return;
@@ -368,12 +380,21 @@ fn drag_pan(
     true
 }
 
-fn handle_rotate(ui: &egui::Ui, response: &Response, center: Pos2, view: &mut DocumentView) {
+fn handle_rotate(
+    ui: &egui::Ui,
+    response: &Response,
+    transform: DocumentTransform,
+    document: &Document,
+    view: &mut DocumentView,
+) {
+    // The view rotates about the document origin, which the arrow starts from.
+    let center = transform.image_to_screen(document.origin());
+    let document_size = Vec2::new(document.width() as f32, document.height() as f32);
     let rotation = view.viewport.rotation_radians();
 
     if response.drag_started_by(PointerButton::Primary) {
         view.is_dragging_rotate_handle = press_origin(ui)
-            .is_some_and(|origin| rotate_handle::is_over_tip(center, rotation, origin));
+            .is_some_and(|press| rotate_handle::is_over_tip(center, rotation, press));
     }
 
     if view.is_dragging_rotate_handle {
@@ -381,7 +402,8 @@ fn handle_rotate(ui: &egui::Ui, response: &Response, center: Pos2, view: &mut Do
             .interact_pointer_pos()
             .and_then(|pointer| rotate_handle::rotation_towards(center, pointer))
         {
-            view.viewport.set_rotation_radians(radians);
+            view.viewport
+                .rotate_about(radians.to_degrees(), document.origin(), document_size);
         }
         ui.set_cursor_icon(CursorIcon::Grabbing);
     } else if response
@@ -509,6 +531,20 @@ fn handle_measure(
     None
 }
 
+/// A click anywhere on the image moves the document origin there.
+fn handle_origin(
+    ui: &egui::Ui,
+    response: &Response,
+    transform: DocumentTransform,
+    document: &Document,
+) -> Option<Action> {
+    let gesture = PointGesture::read(ui, response, &[]);
+    gesture.update_cursor(ui, response, false, false, true);
+
+    let point = transform.screen_to_image(gesture.clicked?);
+    (document.contains(point) && point != document.origin()).then_some(Action::SetOrigin(point))
+}
+
 fn press_origin(ui: &egui::Ui) -> Option<Pos2> {
     ui.input(|input| input.pointer.press_origin())
 }
@@ -560,11 +596,14 @@ fn paint_scale_point(
     number: usize,
 ) {
     let [x_axis, y_axis] = transform.image_axes();
-    painter.circle_stroke(position, SCALE_MARKER_RADIUS, SCALE_STROKE);
-    for axis in [x_axis, y_axis] {
-        let arm = axis * CROSSHAIR_HALF_LENGTH;
-        painter.line_segment([position - arm, position + arm], SCALE_STROKE);
-    }
+    paint_crosshair(
+        painter,
+        transform,
+        position,
+        SCALE_MARKER_RADIUS,
+        CROSSHAIR_HALF_LENGTH,
+        SCALE_STROKE,
+    );
     let label_position =
         position + (x_axis + y_axis).normalized() * (LABEL_OFFSET + SCALE_MARKER_RADIUS);
     paint_label(
@@ -572,6 +611,35 @@ fn paint_scale_point(
         label_position,
         number.to_string(),
         SCALE_STROKE.color,
+    );
+}
+
+/// A circle with a cross through it, at a fixed screen size. The cross's arms follow the
+/// image axes, so they turn with the view rotation.
+fn paint_crosshair(
+    painter: &egui::Painter,
+    transform: DocumentTransform,
+    position: Pos2,
+    radius: f32,
+    arm_length: f32,
+    stroke: Stroke,
+) {
+    painter.circle_stroke(position, radius, stroke);
+    for axis in transform.image_axes() {
+        let arm = axis * arm_length;
+        painter.line_segment([position - arm, position + arm], stroke);
+    }
+}
+
+/// Marks the document origin (shown only in Origin mode).
+fn paint_origin(painter: &egui::Painter, transform: DocumentTransform, origin: Point) {
+    paint_crosshair(
+        painter,
+        transform,
+        transform.image_to_screen(origin),
+        ORIGIN_CIRCLE_DIAMETER / 2.0,
+        ORIGIN_CROSS_LENGTH / 2.0,
+        ORIGIN_STROKE,
     );
 }
 
@@ -855,6 +923,59 @@ mod tests {
                 .center()
                 .to_vec2()
         }
+
+        fn transform(&self) -> DocumentTransform {
+            self.view
+                .viewport
+                .transform(SCREEN.center(), Vec2::new(200.0, 100.0))
+        }
+    }
+
+    #[test]
+    fn the_view_rotates_about_the_origin_and_the_arrow_starts_there() {
+        let mut harness = Harness::new(ToolMode::Rotate);
+        let origin = Point::new(50.0, 50.0);
+        Action::SetOrigin(origin)
+            .apply(&mut harness.document)
+            .unwrap();
+        harness
+            .view
+            .viewport
+            .zoom_about(SCREEN.center(), Pos2::new(350.0, 300.0), 3.0);
+        let pivot = harness.transform().image_to_screen(origin);
+
+        // Zoomed ×3 about the origin, which stays at (350, 300). The tip is still 200 px
+        // right of the origin; drag it to straight below.
+        let tip = rotate_handle::tip(pivot, 0.0);
+        harness.drag(
+            PointerButton::Primary,
+            tip,
+            Vec2::new(-rotate_handle::ARROW_LENGTH, rotate_handle::ARROW_LENGTH),
+        );
+
+        assert!((harness.view.viewport.rotation_degrees() - 90.0).abs() < 1e-3);
+        let now = harness.transform().image_to_screen(origin);
+        assert!((now - pivot).length() < 1e-2, "origin moved to {now:?}");
+        assert!(harness.actions.is_empty(), "rotation is not an action");
+    }
+
+    #[test]
+    fn clicking_the_image_in_origin_mode_sets_the_origin() {
+        let mut harness = Harness::new(ToolMode::Origin);
+        // The document spans (300, 250)–(500, 350) on screen.
+        harness.click(Pos2::new(320.0, 260.0));
+
+        assert_eq!(harness.actions, [Action::SetOrigin(Point::new(20.0, 10.0))]);
+    }
+
+    #[test]
+    fn clicking_outside_the_image_in_origin_mode_does_nothing() {
+        let mut harness = Harness::new(ToolMode::Origin);
+        harness.click(EMPTY_SPOT);
+        // Clicking the current origin (the centre) changes nothing either.
+        harness.click(SCREEN.center());
+
+        assert!(harness.actions.is_empty());
     }
 
     #[test]
@@ -1075,6 +1196,37 @@ mod tests {
             assert!(
                 corner(&harness).x < before.x,
                 "{mode:?} should zoom in on scroll up"
+            );
+        }
+    }
+
+    #[test]
+    fn wheel_zoom_keeps_the_point_under_the_cursor_in_every_mode() {
+        for mode in ToolMode::ALL {
+            let mut harness = Harness::new(mode);
+            let cursor = Pos2::new(470.0, 330.0);
+            let under_cursor = harness.transform().screen_to_image(cursor);
+
+            harness.frame(vec![Event::PointerMoved(cursor)]);
+            harness.frame(vec![Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: Vec2::new(0.0, 300.0),
+                phase: egui::TouchPhase::Move,
+                modifiers: Modifiers::NONE,
+                source: egui::MouseWheelSource::Wheel,
+            }]);
+            for _ in 0..30 {
+                harness.frame(Vec::new()); // Let smooth scrolling settle.
+            }
+
+            assert!(
+                harness.view.viewport.zoom() > 1.5,
+                "{mode:?} should zoom in"
+            );
+            let now = harness.transform().image_to_screen(under_cursor);
+            assert!(
+                (now - cursor).length() < 1e-2,
+                "{mode:?} moved the point under the cursor to {now:?}"
             );
         }
     }

@@ -13,12 +13,14 @@ pub struct Document {
     calibration: Calibration,
     measurements: Vec<Identified<Measurement>>,
     grids: Vec<Identified<Grid>>,
+    /// The image's origin: the point the view rotates about. Always inside the document.
+    origin: Point,
     /// The id the next added object will get. Ids are never reused within a history.
     next_object_id: u64,
 }
 
 impl Document {
-    /// Creates a document of `width` × `height` pixels.
+    /// Creates a document of `width` × `height` pixels, with its origin at the centre.
     pub fn new(width: u32, height: u32) -> Self {
         Self {
             width,
@@ -26,8 +28,18 @@ impl Document {
             calibration: Calibration::default(),
             measurements: Vec::new(),
             grids: Vec::new(),
+            origin: Point::new(f64::from(width) / 2.0, f64::from(height) / 2.0),
             next_object_id: 1,
         }
+    }
+
+    /// The image's origin, in image coordinates.
+    pub fn origin(&self) -> Point {
+        self.origin
+    }
+
+    pub(crate) fn set_origin(&mut self, origin: Point) {
+        self.origin = origin;
     }
 
     /// Creates a document the same size as `image`.
@@ -148,6 +160,12 @@ mod tests {
         let document = Document::sized_to(&image);
 
         assert_eq!((document.width(), document.height()), (640, 480));
+    }
+
+    #[test]
+    fn the_origin_defaults_to_the_centre() {
+        assert_eq!(Document::new(100, 50).origin(), Point::new(50.0, 25.0));
+        assert_eq!(Document::new(5, 3).origin(), Point::new(2.5, 1.5));
     }
 
     #[test]

@@ -13,7 +13,7 @@ initial inner size of 1280 × 800.
 2. **Tool options row.** A second horizontal row directly below the tool bar. It is shown
    only when the active tool mode has options *and* a document is open. Its contents
    depend on the mode: see `VIEW-12` (Rotate), `SCALE-3` (Scale) and `GRID-8` (Grid).
-   The Pan & zoom and Measure distance modes have no options row.
+   The Pan & zoom, Measure distance and Origin modes have no options row.
 3. **Object properties row.** Shown below the tool options row while the active object
    has editable properties. Currently this means grids (`GRID-14`).
 4. Below the rows, side by side, from left to right:
@@ -41,9 +41,10 @@ error message centred, in the toolkit's error colour (see `IMG-6`).
 | 5 | Scale mode button | ruler (📏) | "`Scale`" |
 | 6 | Measure distance mode button | measuring tool. A tape measure is preferred, but Unicode has none, so the current glyph is a set square (📐) | "`Measure distance`" |
 | 7 | Grid mode button | grid (⊞, U+229E) | "`Grid`" |
-| 8 | Horizontal spacer, 16 px | — | — |
-| 9 | Undo button | undo arrow (↩) | "`Undo`" |
-| 10 | Redo button | redo arrow (↪) | "`Redo`" |
+| 8 | Origin mode button | crosshair (⌖, U+2316) | "`Origin`" (`ORIGIN-2`) |
+| 9 | Horizontal spacer, 16 px | — | — |
+| 10 | Undo button | undo arrow (↩) | "`Undo`" |
+| 11 | Redo button | redo arrow (↪) | "`Redo`" |
 
 **SHELL-6.** Tool bar icons are drawn at 18 px. The icon glyphs MUST be available on
 every supported platform. Bundle the icon font if necessary, rather than relying on
@@ -62,7 +63,7 @@ one place.
 ## Tool modes
 
 **SHELL-8.** There is exactly one active tool mode at a time. The modes are **Pan &
-zoom**, **Rotate view**, **Scale**, **Measure distance** and **Grid**. **Pan & zoom is
+zoom**, **Rotate view**, **Scale**, **Measure distance**, **Grid** and **Origin**. **Pan & zoom is
 the default** when the application starts.
 
 **SHELL-9.** The mode buttons work like a radio group. The active mode's button is shown
