@@ -1,0 +1,26 @@
+# Vendored copy of egui_ltreeview 0.9.0 (https://github.com/LennysLounge/egui_ltreeview),
+# patched to build against egui 0.37. Upstream 0.9.0 and its main branch require egui 0.36.
+# See PATCHES.md for the changes. Drop this copy once upstream supports egui 0.37.
+[package]
+edition = "2021"
+name = "egui_ltreeview"
+version = "0.9.0"
+authors = ["Leonard Schüngel <schuengel.leonard@gmail.com>"]
+description = "A tree view widget for egui"
+license = "MIT"
+repository = "https://github.com/LennysLounge/egui_ltreeview"
+publish = false
+
+[features]
+default = []
+doc = ["dep:make_table_of_contents"]
+persistence = ["dep:serde", "egui/persistence"]
+
+[lib]
+name = "egui_ltreeview"
+path = "src/lib.rs"
+
+[dependencies]
+egui = { version = "0.37", default-features = false }
+make_table_of_contents = { version = "0.1.0", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
