@@ -12,10 +12,12 @@ pub const GRID: &str = "\u{229E}";
 pub const UNDO: &str = "↩";
 pub const REDO: &str = "↪";
 pub const DELETE: &str = "🗑";
+/// "Two pages" (U+1F5D0): a copy of a page.
+pub const DUPLICATE: &str = "🗐";
 
 #[cfg(test)]
-pub const ALL: [&str; 9] = [
-    OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, GRID, UNDO, REDO, DELETE,
+pub const ALL: [&str; 10] = [
+    OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, GRID, UNDO, REDO, DELETE, DUPLICATE,
 ];
 
 #[cfg(test)]

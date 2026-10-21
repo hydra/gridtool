@@ -116,6 +116,40 @@ mod tests {
     }
 
     #[test]
+    fn duplicating_and_deleting_can_be_undone_and_redone() {
+        let mut editor = new_editor();
+        editor
+            .perform(Action::AddMeasurement(
+                crate::measurement::Measurement::new(
+                    Point::new(1.0, 1.0),
+                    Point::new(9.0, 9.0),
+                    LengthUnit::Centimetre,
+                ),
+            ))
+            .unwrap();
+        let added = editor.document().clone();
+
+        editor
+            .perform(Action::DuplicateMeasurement { index: 0 })
+            .unwrap();
+        let duplicated = editor.document().clone();
+        editor
+            .perform(Action::DeleteMeasurement { index: 0 })
+            .unwrap();
+        let deleted = editor.document().clone();
+        assert_eq!(duplicated.measurements().len(), 2);
+        assert_eq!(deleted.measurements().len(), 1);
+
+        assert!(editor.undo());
+        assert_eq!(editor.document(), &duplicated);
+        assert!(editor.undo());
+        assert_eq!(editor.document(), &added);
+        assert!(editor.redo());
+        assert!(editor.redo());
+        assert_eq!(editor.document(), &deleted);
+    }
+
+    #[test]
     fn starts_with_nothing_to_undo_or_redo() {
         let editor = new_editor();
 

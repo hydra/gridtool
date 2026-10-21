@@ -1,9 +1,9 @@
 # 10 — Objects, Object Tree and Selection
 
-The document holds **objects** that the user places. Today the only kind is the
-straight-line measurement (`MEAS`). Grids and area measurements will be added later and
-MUST fit the same model: identity, an entry in the tree, a bounding box and a resize
-behaviour.
+The document holds **objects** that the user places: straight-line measurements (`MEAS`)
+and grids (`GRID`). Area measurements will be added later and MUST fit the same model:
+identity, an entry in the tree, duplicate and delete, and, where it makes sense, a
+bounding box and a resize behaviour.
 
 ## Object identity
 
@@ -25,8 +25,10 @@ may have zero width or height.
 
 **OBJ-3 — Panel.** A panel docked on the **left** of the window (`SHELL-2`):
 - It can be resized horizontally and has a default width of 220 px.
-- It has the heading "`Objects`", then a separator, then a tree view.
-- With no document open it shows "`No document open`" in weak text.
+- It has the heading "`Objects`", then the **object tool bar** (`OBJ-12`, `OBJ-13`),
+  then a separator, then a tree view.
+- With no document open it shows "`No document open`" in weak text below the separator,
+  and both tool bar buttons are disabled.
 
 **OBJ-4 — Tree contents.** With a document open, the tree contains:
 
@@ -148,8 +150,54 @@ directly in any mode. They change only through the resize handles (`OBJ-9`) or t
 coordinate fields in the measurements table (`MEAS-12`). This replaces the withdrawn
 `MEAS-7`.
 
+## Object tool bar
+
+The object tool bar is one horizontal row directly below the "`Objects`" heading. Its
+buttons use the tool bar icon size (`SHELL-6`), and their tooltips show even while they
+are disabled (`SHELL-7`).
+
+| # | Item | Icon meaning (current glyph) | Tooltip |
+|---|---|---|---|
+| 1 | Duplicate button | two overlapping pages (🗐, U+1F5D0) | "`Duplicate`" |
+| 2 | Delete button | trash can (🗑, U+1F5D1), the same glyph as the measurements table (`MEAS-11`) | "`Delete`" |
+
+**OBJ-12 — Duplicate.** The Duplicate button is enabled exactly when there is an active
+object and that kind of object can be duplicated. Measurements and grids can both be
+duplicated. Clicking it:
+1. Commits one **Duplicate measurement** or **Duplicate grid** action (`HIST-2`) for the
+   active object.
+2. The copy has **exactly the same properties** as the original, and only its object id
+   differs (a new id, `OBJ-1`):
+   - measurement: both endpoints and the unit
+   - grid: alignment source, cell shape, both cell sizes, unit, colour and opacity
+3. The copy is appended to the end of its list, so it is the last leaf of its tree folder.
+4. The copy becomes the **active object**. Because it lies exactly on top of the
+   original, its selection box (if any) is in the same place.
+
+**OBJ-13 — Delete.** The Delete button is enabled exactly when there is an active object
+and that kind of object can be deleted. Measurements and grids can both be deleted.
+Clicking it commits one **Delete measurement** or **Delete grid** action (`HIST-2`) for
+the active object. The object no longer exists, so the active object is cleared
+(`OBJ-7`). Grids aligned to a deleted measurement remain but are not drawn (`GRID-4`).
+
+**OBJ-14 — Undo.** Duplicating and deleting are document actions, so they can be undone
+and redone (`HIST-6`, `HIST-7`). Undo of a delete restores the object with its original
+id. Undo of a duplicate removes the copy; if the copy was active, the active object is
+cleared (`OBJ-7`).
+
 ## Acceptance criteria
 
+- Object tool bar:
+  - Both buttons are disabled with no active object (and with no document open).
+  - With an active measurement or grid, both buttons are enabled and target it by its
+    current list position.
+  - Duplicating a measurement or a grid appends a copy equal to the original in every
+    property, with a new id; the copy is the document's newest object and becomes active.
+  - Deleting a grid keeps the order of the others. Duplicate and delete with a missing
+    index are rejected and change nothing.
+  - Duplicate then delete, undone twice, restores each earlier document exactly; redone
+    twice, restores the final one.
+  - Labels: "`Duplicate measurement 1`", "`Duplicate grid 2`", "`Delete grid 3`".
 - Ids are distinct. An object keeps its id when earlier objects are deleted, and the id
   of a deleted object is not reused by the next object added.
 - Measurement bounding box: the line (10,50)→(40,20) has bounds (10,20)–(40,50).

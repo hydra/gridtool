@@ -3,11 +3,14 @@
 
 use eframe::egui;
 use egui_ltreeview::{Action as TreeAction, TreeView};
+use gridtool::action::Action;
 use gridtool::document::Document;
 use gridtool::grid::{Grid, GridSource};
 use gridtool::object::ObjectId;
 
 use super::format::format_length;
+use super::icon_button::icon_button;
+use super::icons::{DELETE as DELETE_ICON, DUPLICATE as DUPLICATE_ICON};
 use super::selection::Selection;
 
 const DEFAULT_WIDTH: f32 = 220.0;
@@ -30,6 +33,57 @@ pub enum TreePick {
     NoObject,
 }
 
+/// What the user did in the panel this frame.
+#[derive(Debug, Default)]
+pub struct ObjectPanelOutput {
+    /// A tree node the user selected.
+    pub pick: Option<TreePick>,
+    /// A document action from the panel's tool bar.
+    pub action: Option<Action>,
+}
+
+/// The tool bar commands available for the active object: `None` means the button is
+/// disabled.
+#[derive(Debug, Default, PartialEq)]
+struct ObjectCommands {
+    duplicate: Option<Action>,
+    delete: Option<Action>,
+}
+
+impl ObjectCommands {
+    fn for_active(document: &Document, active: Option<ObjectId>) -> Self {
+        let Some(id) = active else {
+            return Self::default();
+        };
+        Self {
+            duplicate: Action::duplicate_object(document, id),
+            delete: Action::delete_object(document, id),
+        }
+    }
+
+    /// Shows the tool bar, returning the command the user clicked.
+    fn show(self, ui: &mut egui::Ui) -> Option<Action> {
+        ui.horizontal(|ui| {
+            let duplicate = command_button(ui, DUPLICATE_ICON, "Duplicate", self.duplicate);
+            let delete = command_button(ui, DELETE_ICON, "Delete", self.delete);
+            duplicate.or(delete)
+        })
+        .inner
+    }
+}
+
+/// A tool bar button that is enabled exactly when `command` is available; returns the
+/// command when clicked.
+fn command_button(
+    ui: &mut egui::Ui,
+    icon: &str,
+    tooltip: &str,
+    command: Option<Action>,
+) -> Option<Action> {
+    let clicked = icon_button(ui, icon, tooltip, command.is_some());
+    command.filter(|_| clicked)
+}
+
 /// Shows the panel. `open` is the open document with its tree state and selection.
 pub fn show(
     ui: &mut egui::Ui,
@@ -38,54 +92,70 @@ pub fn show(
         &mut egui_ltreeview::TreeViewState<TreeNode>,
         &Selection,
     )>,
-) -> Option<TreePick> {
+) -> ObjectPanelOutput {
     egui::Panel::left("object_panel")
         .resizable(true)
         .default_size(DEFAULT_WIDTH)
         .show(ui, |ui| {
             ui.heading("Objects");
+            let commands = match &open {
+                Some((document, _, selection)) => {
+                    ObjectCommands::for_active(document, selection.active())
+                }
+                None => ObjectCommands::default(),
+            };
+            let action = commands.show(ui);
             ui.separator();
             let Some((document, state, selection)) = open else {
                 ui.weak("No document open");
-                return None;
+                return ObjectPanelOutput::default();
             };
-            if let Some(nodes) = tree_selection_for(selection.active(), state.selected()) {
-                state.set_selected(nodes);
-            }
-            let (_, actions) = TreeView::new(egui::Id::unique("object_tree"))
-                .allow_multi_selection(false)
-                .allow_drag_and_drop(false)
-                .show_state(ui, state, |builder| {
-                    builder.dir(TreeNode::Document, "Document");
-                    builder.dir(TreeNode::Measurements, "Measurements");
-                    for (index, measurement) in document.measurements().iter().enumerate() {
-                        let label = match measurement.distance(document.calibration()) {
-                            Ok(distance) => format!(
-                                "Measurement {} ({} {})",
-                                index + 1,
-                                format_length(distance),
-                                measurement.unit()
-                            ),
-                            Err(_) => format!("Measurement {}", index + 1),
-                        };
-                        builder.leaf(TreeNode::Object(measurement.id()), label);
-                    }
-                    builder.close_dir();
-                    builder.dir(TreeNode::Grids, "Grids");
-                    for (index, grid) in document.grids().iter().enumerate() {
-                        let label =
-                            format!("Grid {} ({})", index + 1, source_label(document, grid));
-                        builder.leaf(TreeNode::Object(grid.id()), label);
-                    }
-                    builder.close_dir();
-                    builder.close_dir();
-                });
-            actions.into_iter().find_map(|action| match action {
-                TreeAction::SetSelected(nodes) => Some(pick_from(&nodes)),
-                _ => None,
-            })
+            let pick = show_tree(ui, document, state, selection);
+            ObjectPanelOutput { pick, action }
         })
         .inner
+}
+
+fn show_tree(
+    ui: &mut egui::Ui,
+    document: &Document,
+    state: &mut egui_ltreeview::TreeViewState<TreeNode>,
+    selection: &Selection,
+) -> Option<TreePick> {
+    if let Some(nodes) = tree_selection_for(selection.active(), state.selected()) {
+        state.set_selected(nodes);
+    }
+    let (_, actions) = TreeView::new(egui::Id::unique("object_tree"))
+        .allow_multi_selection(false)
+        .allow_drag_and_drop(false)
+        .show_state(ui, state, |builder| {
+            builder.dir(TreeNode::Document, "Document");
+            builder.dir(TreeNode::Measurements, "Measurements");
+            for (index, measurement) in document.measurements().iter().enumerate() {
+                let label = match measurement.distance(document.calibration()) {
+                    Ok(distance) => format!(
+                        "Measurement {} ({} {})",
+                        index + 1,
+                        format_length(distance),
+                        measurement.unit()
+                    ),
+                    Err(_) => format!("Measurement {}", index + 1),
+                };
+                builder.leaf(TreeNode::Object(measurement.id()), label);
+            }
+            builder.close_dir();
+            builder.dir(TreeNode::Grids, "Grids");
+            for (index, grid) in document.grids().iter().enumerate() {
+                let label = format!("Grid {} ({})", index + 1, source_label(document, grid));
+                builder.leaf(TreeNode::Object(grid.id()), label);
+            }
+            builder.close_dir();
+            builder.close_dir();
+        });
+    actions.into_iter().find_map(|action| match action {
+        TreeAction::SetSelected(nodes) => Some(pick_from(&nodes)),
+        _ => None,
+    })
 }
 
 /// Describes what a grid is aligned to, e.g. "scale line A" or "measurement 2".
@@ -168,6 +238,51 @@ mod tests {
         );
         assert_eq!(tree_selection_for(None, &[TreeNode::Measurements]), None);
         assert_eq!(tree_selection_for(None, &[]), None);
+    }
+
+    #[test]
+    fn commands_are_disabled_without_an_active_object() {
+        let document = Document::new(10, 10);
+
+        assert_eq!(
+            ObjectCommands::for_active(&document, None),
+            ObjectCommands::default()
+        );
+    }
+
+    #[test]
+    fn commands_target_the_active_measurement_or_grid() {
+        let mut document = Document::new(100, 100);
+        Action::AddMeasurement(Measurement::new(
+            Point::new(1.0, 1.0),
+            Point::new(2.0, 2.0),
+            LengthUnit::Centimetre,
+        ))
+        .apply(&mut document)
+        .unwrap();
+        let measurement = document.measurements()[0].id();
+        Action::AddGrid(Grid::new(
+            GridSource::Measurement(measurement),
+            LengthUnit::Centimetre,
+        ))
+        .apply(&mut document)
+        .unwrap();
+        let grid = document.grids()[0].id();
+
+        assert_eq!(
+            ObjectCommands::for_active(&document, Some(measurement)),
+            ObjectCommands {
+                duplicate: Some(Action::DuplicateMeasurement { index: 0 }),
+                delete: Some(Action::DeleteMeasurement { index: 0 }),
+            }
+        );
+        assert_eq!(
+            ObjectCommands::for_active(&document, Some(grid)),
+            ObjectCommands {
+                duplicate: Some(Action::DuplicateGrid { index: 0 }),
+                delete: Some(Action::DeleteGrid { index: 0 }),
+            }
+        );
     }
 
     #[test]

@@ -25,7 +25,10 @@ view change (pan, zoom, rotation).
 | **Set grid cell size** | index, dimension (L/A/B), size | Sets A (A), B (B), or both (L) | The index exists and the size is finite and > 0 | "`Set grid <index+1> size <L\|A\|B> to <value>`", with the value written as for **Set distance** |
 | **Set grid colour** | index, RGB colour | Changes the line colour | The index exists | "`Set grid <index+1> color to #RRGGBB`", in upper-case hex |
 | **Set grid opacity** | index, opacity | Changes the opacity | The index exists and the opacity is in [0, 1] | "`Set grid <index+1> opacity to <percent>%`", rounded to a whole percent |
-| **Delete measurement** | index | Removes one measurement; later ones move up | The index exists | "`Delete measurement <index+1>`" |
+| **Delete measurement** | index | Removes one measurement; later ones move up. Grids aligned to it remain, without an alignment line (`GRID-4`) | The index exists | "`Delete measurement <index+1>`" |
+| **Duplicate measurement** | index | Appends an exact copy (both endpoints and the unit) to the end of the list, with the next object id (`OBJ-12`) | The index exists | "`Duplicate measurement <index+1>`" |
+| **Duplicate grid** | index | Appends an exact copy (alignment source, shape, both cell sizes, unit, colour and opacity) to the end of the list, with the next object id (`OBJ-12`). A grid whose alignment line is missing can still be duplicated | The index exists | "`Duplicate grid <index+1>`" |
+| **Delete grid** | index | Removes one grid; later ones move up | The index exists | "`Delete grid <index+1>`" |
 
 **HIST-3 — Errors.** A rejected action returns an error describing why, and changes
 nothing. The UI should never produce an invalid action. If one is rejected anyway, it is

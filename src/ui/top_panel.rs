@@ -1,9 +1,8 @@
 use eframe::egui;
 
+use super::icon_button::{icon_button, icon_text};
 use super::icons::{OPEN_IMAGE as OPEN_IMAGE_ICON, REDO as REDO_ICON, UNDO as UNDO_ICON};
 use super::tool_mode::ToolMode;
-
-const ICON_SIZE: f32 = 18.0;
 /// Gap between groups of tool bar buttons.
 const SECTION_SPACING: f32 = 16.0;
 
@@ -55,16 +54,4 @@ pub fn show(
             .inner
         })
         .inner
-}
-
-/// An icon button with a tooltip; returns whether it was clicked.
-fn icon_button(ui: &mut egui::Ui, icon: &str, tooltip: &str, enabled: bool) -> bool {
-    ui.add_enabled(enabled, egui::Button::new(icon_text(icon)))
-        .on_hover_text(tooltip)
-        .on_disabled_hover_text(tooltip)
-        .clicked()
-}
-
-fn icon_text(icon: &str) -> egui::RichText {
-    egui::RichText::new(icon).size(ICON_SIZE)
 }

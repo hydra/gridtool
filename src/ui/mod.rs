@@ -11,6 +11,7 @@ pub mod grid_bar;
 mod grid_tool;
 mod history_panel;
 mod hit_test;
+mod icon_button;
 mod icons;
 mod line_hit;
 mod measure_tool;

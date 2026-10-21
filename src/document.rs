@@ -102,6 +102,12 @@ impl Document {
         Some(Bounds::around(start, end).center())
     }
 
+    /// The most recently added object, if it still exists.
+    pub fn newest_object(&self) -> Option<ObjectId> {
+        let id = ObjectId::new(self.next_object_id.checked_sub(1)?);
+        self.contains_object(id).then_some(id)
+    }
+
     pub(crate) fn measurements_mut(&mut self) -> &mut Vec<Identified<Measurement>> {
         &mut self.measurements
     }
@@ -187,6 +193,24 @@ mod tests {
 
         assert_eq!(document.measurement_index(ids[2]), Some(1));
         assert!(!document.contains_object(ids[0]));
+    }
+
+    #[test]
+    fn the_newest_object_is_the_last_added_while_it_exists() {
+        let mut document = Document::new(10, 10);
+        assert_eq!(document.newest_object(), None);
+
+        add_measurement(&mut document);
+        add_measurement(&mut document);
+        assert_eq!(
+            document.newest_object(),
+            Some(document.measurements()[1].id())
+        );
+
+        Action::DeleteMeasurement { index: 1 }
+            .apply(&mut document)
+            .unwrap();
+        assert_eq!(document.newest_object(), None);
     }
 
     #[test]

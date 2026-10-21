@@ -26,8 +26,8 @@ struct OpenDocument {
 
 impl OpenDocument {
     fn perform(&mut self, action: Action) {
-        let adds_grid = matches!(action, Action::AddGrid(_));
-        let added = match self.editor.perform(action) {
+        let activates_new_object = action.activates_new_object();
+        let changed = match self.editor.perform(action) {
             Ok(changed) => changed,
             Err(error) => {
                 eprintln!("action rejected: {error}");
@@ -36,11 +36,9 @@ impl OpenDocument {
         };
         let document = self.editor.document();
         self.view.selection.sync_to(document);
-        if adds_grid && added {
-            // A newly added grid becomes the active object.
-            self.view
-                .selection
-                .select(document.grids().last().map(|grid| grid.id()));
+        if activates_new_object && changed {
+            // A newly added grid or a duplicate becomes the active object.
+            self.view.selection.select(document.newest_object());
         }
     }
 
@@ -216,7 +214,9 @@ impl eframe::App for GridToolApp {
                 &view.selection,
             )
         });
-        if let Some(pick) = object_tree::show(ui, tree)
+        let objects = object_tree::show(ui, tree);
+        actions.extend(objects.action);
+        if let Some(pick) = objects.pick
             && let Some(open) = self.content.document_mut()
         {
             open.pick(pick);

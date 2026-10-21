@@ -9,7 +9,7 @@ use crate::document::Document;
 use crate::geometry::Point;
 use crate::grid::{CellDimension, CellShape, Grid, GridSource, Rgb};
 use crate::measurement::{Endpoint, Measurement};
-use crate::object::Identified;
+use crate::object::{Identified, ObjectId};
 use crate::units::LengthUnit;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -40,8 +40,14 @@ pub enum Action {
     SetMeasurementUnit { index: usize, unit: LengthUnit },
     /// Removes a measurement; later measurements move up one place.
     DeleteMeasurement { index: usize },
+    /// Appends an exact copy of a measurement, with a new object id, to the end of the list.
+    DuplicateMeasurement { index: usize },
     /// Appends a grid to the end of the list.
     AddGrid(Grid),
+    /// Appends an exact copy of a grid, with a new object id, to the end of the list.
+    DuplicateGrid { index: usize },
+    /// Removes a grid; later grids move up one place.
+    DeleteGrid { index: usize },
     /// Changes a grid's cell shape.
     SetGridShape { index: usize, shape: CellShape },
     /// Changes one of a grid's cell sizes (in the grid's unit).
@@ -161,6 +167,11 @@ impl Action {
                 measurement_mut(document, *index)?;
                 document.measurements_mut().remove(*index);
             }
+            Action::DuplicateMeasurement { index } => {
+                let copy = measurement_mut(document, *index)?.clone();
+                let id = document.allocate_object_id();
+                document.measurements_mut().push(Identified::new(id, copy));
+            }
             Action::AddGrid(grid) => {
                 if grid.source_line(document).is_err() {
                     return Err(ActionError::GridSourceMissing);
@@ -171,6 +182,15 @@ impl Action {
                 ensure_valid_opacity(grid.opacity())?;
                 let id = document.allocate_object_id();
                 document.grids_mut().push(Identified::new(id, grid.clone()));
+            }
+            Action::DuplicateGrid { index } => {
+                let copy = grid_mut(document, *index)?.clone();
+                let id = document.allocate_object_id();
+                document.grids_mut().push(Identified::new(id, copy));
+            }
+            Action::DeleteGrid { index } => {
+                grid_mut(document, *index)?;
+                document.grids_mut().remove(*index);
             }
             Action::SetGridShape { index, shape } => grid_mut(document, *index)?.set_shape(*shape),
             Action::SetGridSize {
@@ -188,6 +208,36 @@ impl Action {
             }
         }
         Ok(())
+    }
+
+    /// The action that duplicates the object with `id`, or `None` if there is no such
+    /// object or it cannot be duplicated.
+    pub fn duplicate_object(document: &Document, id: ObjectId) -> Option<Action> {
+        if let Some(index) = document.measurement_index(id) {
+            return Some(Action::DuplicateMeasurement { index });
+        }
+        document
+            .grid_index(id)
+            .map(|index| Action::DuplicateGrid { index })
+    }
+
+    /// The action that deletes the object with `id`, or `None` if there is no such object
+    /// or it cannot be deleted.
+    pub fn delete_object(document: &Document, id: ObjectId) -> Option<Action> {
+        if let Some(index) = document.measurement_index(id) {
+            return Some(Action::DeleteMeasurement { index });
+        }
+        document
+            .grid_index(id)
+            .map(|index| Action::DeleteGrid { index })
+    }
+
+    /// Whether the object this action adds should become the active object.
+    pub fn activates_new_object(&self) -> bool {
+        matches!(
+            self,
+            Action::AddGrid(_) | Action::DuplicateMeasurement { .. } | Action::DuplicateGrid { .. }
+        )
     }
 }
 
@@ -269,6 +319,11 @@ impl fmt::Display for Action {
             Action::DeleteMeasurement { index } => {
                 write!(f, "Delete measurement {}", index + 1)
             }
+            Action::DuplicateMeasurement { index } => {
+                write!(f, "Duplicate measurement {}", index + 1)
+            }
+            Action::DuplicateGrid { index } => write!(f, "Duplicate grid {}", index + 1),
+            Action::DeleteGrid { index } => write!(f, "Delete grid {}", index + 1),
             Action::AddGrid(grid) => match grid.source() {
                 GridSource::ScaleLine(line) => write!(f, "Add grid aligned to scale line {line}"),
                 GridSource::Measurement(_) => f.write_str("Add grid aligned to a measurement"),
@@ -759,6 +814,165 @@ mod tests {
             assert!(action.apply(&mut document).is_err(), "{action:?}");
         }
         assert_eq!(document, before);
+    }
+
+    #[test]
+    fn duplicates_a_measurement_with_a_new_id_and_the_same_properties() {
+        let mut document = document_with_measurements(2);
+        Action::SetMeasurementUnit {
+            index: 0,
+            unit: LengthUnit::Metre,
+        }
+        .apply(&mut document)
+        .unwrap();
+
+        Action::DuplicateMeasurement { index: 0 }
+            .apply(&mut document)
+            .unwrap();
+
+        let [original, _, copy] = document.measurements() else {
+            panic!("expected three measurements");
+        };
+        assert_eq!(**copy, **original);
+        assert_ne!(copy.id(), original.id());
+        assert_eq!(document.newest_object(), Some(copy.id()));
+    }
+
+    #[test]
+    fn duplicates_a_grid_with_a_new_id_and_the_same_properties() {
+        let mut document = document_with_grid();
+        for action in [
+            Action::SetGridShape {
+                index: 0,
+                shape: CellShape::Rectangle,
+            },
+            Action::SetGridSize {
+                index: 0,
+                dimension: CellDimension::B,
+                size: 4.5,
+            },
+            Action::SetGridColor {
+                index: 0,
+                color: Rgb::new(1, 2, 3),
+            },
+            Action::SetGridOpacity {
+                index: 0,
+                opacity: 0.25,
+            },
+            Action::DuplicateGrid { index: 0 },
+        ] {
+            action.apply(&mut document).unwrap();
+        }
+
+        let [original, copy] = document.grids() else {
+            panic!("expected two grids");
+        };
+        assert_eq!(**copy, **original);
+        assert_ne!(copy.id(), original.id());
+        assert_eq!(document.newest_object(), Some(copy.id()));
+    }
+
+    #[test]
+    fn deletes_a_grid_keeping_the_order_of_the_rest() {
+        let mut document = document_with_grid();
+        for _ in 0..2 {
+            Action::DuplicateGrid { index: 0 }
+                .apply(&mut document)
+                .unwrap();
+        }
+        let ids: Vec<_> = document.grids().iter().map(|grid| grid.id()).collect();
+
+        Action::DeleteGrid { index: 1 }
+            .apply(&mut document)
+            .unwrap();
+
+        let remaining: Vec<_> = document.grids().iter().map(|grid| grid.id()).collect();
+        assert_eq!(remaining, [ids[0], ids[2]]);
+    }
+
+    #[test]
+    fn duplicate_and_delete_reject_missing_indices() {
+        let mut document = document_with_grid();
+        Action::AddMeasurement(measurement(1.0, 2.0))
+            .apply(&mut document)
+            .unwrap();
+        let before = document.clone();
+
+        assert_eq!(
+            Action::DuplicateMeasurement { index: 1 }.apply(&mut document),
+            Err(ActionError::MeasurementIndexOutOfRange { index: 1, count: 1 })
+        );
+        for action in [
+            Action::DuplicateGrid { index: 1 },
+            Action::DeleteGrid { index: 1 },
+        ] {
+            assert_eq!(
+                action.apply(&mut document),
+                Err(ActionError::GridIndexOutOfRange { index: 1, count: 1 })
+            );
+        }
+        assert_eq!(document, before);
+    }
+
+    #[test]
+    fn finds_the_duplicate_and_delete_actions_for_an_object() {
+        let mut document = document_with_grid();
+        Action::AddMeasurement(measurement(1.0, 2.0))
+            .apply(&mut document)
+            .unwrap();
+        let grid = document.grids()[0].id();
+        let measurement = document.measurements()[0].id();
+
+        assert_eq!(
+            Action::duplicate_object(&document, measurement),
+            Some(Action::DuplicateMeasurement { index: 0 })
+        );
+        assert_eq!(
+            Action::delete_object(&document, measurement),
+            Some(Action::DeleteMeasurement { index: 0 })
+        );
+        assert_eq!(
+            Action::duplicate_object(&document, grid),
+            Some(Action::DuplicateGrid { index: 0 })
+        );
+        assert_eq!(
+            Action::delete_object(&document, grid),
+            Some(Action::DeleteGrid { index: 0 })
+        );
+
+        Action::DeleteGrid { index: 0 }
+            .apply(&mut document)
+            .unwrap();
+        assert_eq!(Action::duplicate_object(&document, grid), None);
+        assert_eq!(Action::delete_object(&document, grid), None);
+    }
+
+    #[test]
+    fn only_adding_grids_and_duplicating_activate_the_new_object() {
+        assert!(Action::DuplicateMeasurement { index: 0 }.activates_new_object());
+        assert!(Action::DuplicateGrid { index: 0 }.activates_new_object());
+        assert!(
+            Action::AddGrid(Grid::new(
+                GridSource::ScaleLine(Line::A),
+                LengthUnit::Centimetre
+            ))
+            .activates_new_object()
+        );
+        assert!(!Action::AddMeasurement(measurement(1.0, 2.0)).activates_new_object());
+        assert!(!Action::DeleteGrid { index: 0 }.activates_new_object());
+    }
+
+    #[test]
+    fn describes_duplicate_and_delete_actions() {
+        assert_eq!(
+            Action::DuplicateMeasurement { index: 0 }.to_string(),
+            "Duplicate measurement 1"
+        );
+        assert_eq!(
+            Action::DuplicateGrid { index: 1 }.to_string(),
+            "Duplicate grid 2"
+        );
+        assert_eq!(Action::DeleteGrid { index: 2 }.to_string(), "Delete grid 3");
     }
 
     #[test]
