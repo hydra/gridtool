@@ -23,7 +23,7 @@ must satisfy them.
 | [10-objects-and-selection.md](10-objects-and-selection.md) | Object ids, object tree, active object, selection box and resizing | `OBJ` |
 | [11-grids.md](11-grids.md) | Grid tool, grid geometry, grid properties row | `GRID` |
 | [12-origin.md](12-origin.md) | Document origin (rotation centre), Origin mode and marker | `ORIGIN` |
-| [13-files.md](13-files.md) | New, Load, Save, Save as; unsaved changes; the `.ron` file format | `FILE` |
+| [13-files.md](13-files.md) | New, Load, Save, Save as; unsaved changes; closing the window; closing the window; the `.ron` file format | `FILE` |
 
 ## Conventions
 
@@ -79,3 +79,4 @@ must satisfy them.
 | 2026-10-21 | Wheel zoom always zooms about the point under the cursor, in every mode with no exceptions. This removes the short-lived Rotate-mode zoom about the origin (`VIEW-9`). |
 | 2026-10-21 | Added document files (`13`): New, Load, Save and Save as buttons, unsaved-change tracking, the Unsaved changes and overwrite dialogs, and the versioned `.ron` format (version 1), which references the image and does not save the history. The Open image button now shows an image-file icon (`SHELL-5`). |
 | 2026-10-21 | Icons are now Google Material Symbols (Rounded, filled) in a bundled icon font, named by their Material Symbols names (`SHELL-6`). This replaces the emoji glyphs and the delete button's "x" fallback. Measure distance now uses a tape measure (`measuring_tape`). Implemented with the `egui_material_icons` crate. |
+| 2026-10-21 | Closing the window with unsaved changes now asks with the Unsaved changes dialog (`FILE-17`, `FILE-11`). The window title shows the document's file name, or "`unsaved document`", before the application name (`SHELL-1`). |

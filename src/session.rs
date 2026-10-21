@@ -23,7 +23,8 @@ pub enum Content {
     Document(Box<OpenDocument>),
 }
 
-/// A command that replaces the open document, once any unsaved changes are dealt with.
+/// A command that replaces or closes the open document, once any unsaved changes are
+/// dealt with.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Replacement {
     /// Close the document, forgetting its file.
@@ -32,6 +33,8 @@ pub enum Replacement {
     Load,
     /// Start a new document from an image file.
     OpenImage,
+    /// Close the window, ending the application.
+    Exit,
 }
 
 /// A question or report waiting for the user.
@@ -54,6 +57,8 @@ pub struct Session {
     image_picker: Box<dyn ImageFilePicker>,
     document_picker: Box<dyn DocumentFilePicker>,
     prompt: Option<Prompt>,
+    /// The user has agreed to close the window.
+    exiting: bool,
 }
 
 impl Session {
@@ -66,6 +71,7 @@ impl Session {
             image_picker,
             document_picker,
             prompt: None,
+            exiting: false,
         }
     }
 
@@ -110,6 +116,29 @@ impl Session {
             self.prompt = Some(Prompt::UnsavedChanges { then: replacement });
         } else {
             self.carry_out(ctx, replacement);
+        }
+    }
+
+    /// Called when the user asks to close the window; returns whether it may close now.
+    ///
+    /// With unsaved changes it may not: the Unsaved changes dialog is shown instead, and
+    /// answering it closes the window by itself once the changes are saved or discarded.
+    pub fn request_close(&mut self, ctx: &egui::Context) -> bool {
+        self.replace(ctx, Replacement::Exit);
+        self.exiting
+    }
+
+    /// The window title: the document's file name, or "`unsaved document`" for one that
+    /// was never saved, then the application name.
+    pub fn window_title(&self) -> String {
+        match self.document() {
+            None => crate::APP_NAME.to_owned(),
+            Some(open) => {
+                let name = open
+                    .file()
+                    .map_or_else(|| UNSAVED_NAME.to_owned(), file_name);
+                format!("{name} - {}", crate::APP_NAME)
+            }
         }
     }
 
@@ -189,6 +218,10 @@ impl Session {
     fn carry_out(&mut self, ctx: &egui::Context, replacement: Replacement) {
         match replacement {
             Replacement::New => self.content = Content::Empty,
+            Replacement::Exit => {
+                self.exiting = true;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
             Replacement::Load => {
                 let Some(path) = self.document_picker.pick_document() else {
                     return;
@@ -221,6 +254,9 @@ impl Session {
         }
     }
 }
+
+/// The name shown for a document that has no file yet.
+const UNSAVED_NAME: &str = "unsaved document";
 
 fn file_name(path: &Path) -> String {
     path.file_name()

@@ -22,6 +22,8 @@ pub struct GridToolApp {
     scale_bar: ScaleBar,
     grid_bar: GridBar,
     measurements_panel: MeasurementsPanel,
+    /// The window title last sent to the window.
+    title: String,
 }
 
 impl GridToolApp {
@@ -33,6 +35,7 @@ impl GridToolApp {
             scale_bar: ScaleBar::default(),
             grid_bar: GridBar::default(),
             measurements_panel: MeasurementsPanel::default(),
+            title: crate::APP_NAME.to_owned(),
         }
     }
 
@@ -93,6 +96,22 @@ impl GridToolApp {
         )
     }
 
+    /// Keeps the window open while the session asks about unsaved changes.
+    fn handle_close_request(&mut self, ctx: &egui::Context) {
+        if ctx.input(|input| input.viewport().close_requested()) && !self.session.request_close(ctx)
+        {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+        }
+    }
+
+    fn update_title(&mut self, ctx: &egui::Context) {
+        let title = self.session.window_title();
+        if title != self.title {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
+            self.title = title;
+        }
+    }
+
     /// Shows the dialog the session is waiting on, if any, and passes on the answer.
     fn show_dialog(&mut self, ctx: &egui::Context) {
         if let Some(button) = self.session.dialog().and_then(|dialog| dialog.show(ctx)) {
@@ -113,6 +132,7 @@ impl Default for GridToolApp {
 impl eframe::App for GridToolApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        self.handle_close_request(&ctx);
         let state = self.tool_bar_state();
         if let Some(action) = top_panel::show(ui, &mut self.mode, state) {
             self.handle(&ctx, action);
@@ -167,5 +187,6 @@ impl eframe::App for GridToolApp {
         }
 
         self.show_dialog(&ctx);
+        self.update_title(&ctx);
     }
 }

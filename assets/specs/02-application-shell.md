@@ -2,8 +2,15 @@
 
 ## Window
 
-**SHELL-1.** The application opens one native window titled "`GridTool`", with an
-initial inner size of 1280 × 800.
+**SHELL-1.** The application opens one native window with an initial inner size of
+1280 × 800. Its title follows the usual Windows form "`<document> - GridTool`":
+- With no document open, the title is "`GridTool`".
+- With a document that has a file (`FILE-14`), `<document>` is the file's name with its
+  extension and without its folder, for example "`plan.ron - GridTool`".
+- With a document that has never been saved, `<document>` is "`unsaved document`".
+- The title updates as soon as a document is opened, saved under a new name or closed.
+
+Closing the window may first ask about unsaved changes (`FILE-17`).
 
 ## Layout
 

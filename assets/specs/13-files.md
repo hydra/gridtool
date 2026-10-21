@@ -98,8 +98,9 @@ this order, followed by a 16 px spacer:
 
 ## Commands
 
-**FILE-11 — Unsaved changes dialog.** New, Load and Open image replace the open document.
-If it has unsaved changes, they first show a modal dialog:
+**FILE-11 — Unsaved changes dialog.** New, Load and Open image replace the open document,
+and closing the window (`FILE-17`) closes it. If it has unsaved changes, each of these
+first shows a modal dialog:
 - **Title:** "`Unsaved changes`"
 - **Question:** "`Do you want to save now?`"
 - **Buttons:** "`Yes`", "`No`", "`Cancel`", left to right.
@@ -127,6 +128,15 @@ filter, "`GridTool document`" (`*.ron`).
 - **Failure** (`FILE-7`, `FILE-8`, or an unreadable file): an error dialog titled
   "`Could not load document`" shows "`<path>: <reason>`" with one "`OK`" button. The open
   document, if any, is kept.
+
+**FILE-17 — Closing the window.** When the user closes the application window (the
+window's close button, or the system's close shortcut):
+- With unsaved changes, the window stays open and the Unsaved changes dialog
+  (`FILE-11`) is shown, the same dialog with the same title, question, buttons and
+  default. **Yes** saves and then closes the window; **No** closes it without saving;
+  **Cancel**, or a cancelled or failed save, keeps the window and the document open.
+- With no unsaved changes, or no document open, the window closes straight away.
+- While any dialog is already open, closing the window does nothing.
 
 **FILE-14 — Save.** If the document has a file (it was loaded or saved before), write to
 it without asking. Otherwise behave as **Save as**.

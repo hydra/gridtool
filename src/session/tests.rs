@@ -383,3 +383,91 @@ fn a_failed_save_reports_the_error() {
     assert_eq!(dialog.title, "Could not save document");
     assert!(fixture.open().has_unsaved_changes());
 }
+
+#[test]
+fn closing_with_nothing_unsaved_closes_straight_away() {
+    let mut fixture = Fixture::new("close_empty");
+    assert!(fixture.session.request_close(&fixture.ctx));
+
+    let mut fixture = Fixture::new("close_saved");
+    fixture.open_image();
+    fixture.save_as_new("plan.ron");
+    assert!(fixture.session.request_close(&fixture.ctx));
+    assert_eq!(fixture.session.dialog(), None);
+}
+
+#[test]
+fn closing_with_unsaved_changes_asks_and_cancel_keeps_the_window_open() {
+    let mut fixture = Fixture::new("close_cancel");
+    fixture.open_image();
+
+    assert!(!fixture.session.request_close(&fixture.ctx));
+    assert_eq!(fixture.session.dialog(), Some(Dialog::unsaved_changes()));
+    // Asking again while the dialog is open keeps the one dialog.
+    assert!(!fixture.session.request_close(&fixture.ctx));
+    fixture.answer(DialogButton::Cancel);
+
+    assert_eq!(fixture.session.dialog(), None);
+    assert!(fixture.open().has_unsaved_changes());
+    assert!(!fixture.session.exiting);
+}
+
+#[test]
+fn closing_then_no_closes_without_saving() {
+    let mut fixture = Fixture::new("close_no");
+    fixture.open_image();
+
+    assert!(!fixture.session.request_close(&fixture.ctx));
+    fixture.answer(DialogButton::No);
+
+    assert!(fixture.session.exiting);
+    // The close the session then asks for is let through.
+    assert!(fixture.session.request_close(&fixture.ctx));
+    fixture.script.assert_all_dialogs_used();
+}
+
+#[test]
+fn closing_then_yes_saves_then_closes() {
+    let mut fixture = Fixture::new("close_yes");
+    fixture.open_image();
+    fixture.edit(3.0);
+    fixture.script.save(Some(fixture.path("plan.ron")));
+
+    assert!(!fixture.session.request_close(&fixture.ctx));
+    fixture.answer(DialogButton::Yes);
+
+    assert!(fixture.session.exiting);
+    let saved = document_file::load(&fixture.path("plan.ron")).unwrap();
+    assert_eq!(saved.document.origin(), Point::new(3.0, 1.0));
+}
+
+#[test]
+fn closing_then_yes_but_cancelling_the_save_dialog_keeps_the_window_open() {
+    let mut fixture = Fixture::new("close_yes_cancel");
+    fixture.open_image();
+    fixture.script.save(None);
+
+    assert!(!fixture.session.request_close(&fixture.ctx));
+    fixture.answer(DialogButton::Yes);
+
+    assert!(!fixture.session.exiting);
+    assert!(fixture.open().has_unsaved_changes());
+}
+
+#[test]
+fn the_window_title_names_the_document_file() {
+    let mut fixture = Fixture::new("title");
+    assert_eq!(fixture.session.window_title(), "GridTool");
+
+    fixture.open_image();
+    assert_eq!(
+        fixture.session.window_title(),
+        "unsaved document - GridTool"
+    );
+
+    fixture.save_as_new("plan");
+    assert_eq!(fixture.session.window_title(), "plan.ron - GridTool");
+
+    fixture.session.replace(&fixture.ctx, Replacement::New);
+    assert_eq!(fixture.session.window_title(), "GridTool");
+}
