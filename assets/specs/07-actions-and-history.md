@@ -23,6 +23,7 @@ view change (pan, zoom, rotation).
 | **Add grid** | grid (source and properties) | Appends a grid to the end of the list (`GRID-2`) and gives it the next object id | The source exists, both cell sizes are finite and > 0, and the opacity is in [0, 1] | "`Add grid aligned to scale line <A\|B>`", or "`Add grid aligned to a measurement`" |
 | **Set grid cell shape** | index, shape | Changes the cell shape | The index exists | "`Set grid <index+1> cell shape to <Square\|Rectangle>`" |
 | **Set grid cell size** | index, dimension (L/A/B), size | Sets A (A), B (B), or both (L) | The index exists and the size is finite and > 0 | "`Set grid <index+1> size <L\|A\|B> to <value>`", with the value written as for **Set distance** |
+| **Set grid units** | index, unit | Changes the unit of one grid's cell sizes, keeping the size values (`GRID-1`) | The index exists | "`Set grid <index+1> units to <symbol>`" |
 | **Set grid colour** | index, RGB colour | Changes the line colour | The index exists | "`Set grid <index+1> color to #RRGGBB`", in upper-case hex |
 | **Set grid opacity** | index, opacity | Changes the opacity | The index exists and the opacity is in [0, 1] | "`Set grid <index+1> opacity to <percent>%`", rounded to a whole percent |
 | **Delete measurement** | index | Removes one measurement; later ones move up. Grids aligned to it remain, without an alignment line (`GRID-4`) | The index exists | "`Delete measurement <index+1>`" |

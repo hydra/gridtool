@@ -204,6 +204,11 @@ impl Grid {
         }
     }
 
+    /// Changes the unit the cell sizes are in. The size values are kept as they are.
+    pub(crate) fn set_unit(&mut self, unit: LengthUnit) {
+        self.unit = unit;
+    }
+
     pub(crate) fn set_color(&mut self, color: Rgb) {
         self.color = color;
     }

@@ -56,6 +56,8 @@ pub enum Action {
         dimension: CellDimension,
         size: f64,
     },
+    /// Changes the unit a grid's cell sizes are in, keeping the size values.
+    SetGridUnit { index: usize, unit: LengthUnit },
     /// Changes a grid's line colour.
     SetGridColor { index: usize, color: Rgb },
     /// Changes a grid's opacity (0 to 1).
@@ -201,6 +203,7 @@ impl Action {
                 ensure_valid_cell_size(*size)?;
                 grid_mut(document, *index)?.set_size(*dimension, *size);
             }
+            Action::SetGridUnit { index, unit } => grid_mut(document, *index)?.set_unit(*unit),
             Action::SetGridColor { index, color } => grid_mut(document, *index)?.set_color(*color),
             Action::SetGridOpacity { index, opacity } => {
                 ensure_valid_opacity(*opacity)?;
@@ -336,6 +339,9 @@ impl fmt::Display for Action {
                 dimension,
                 size,
             } => write!(f, "Set grid {} size {dimension} to {size}", index + 1),
+            Action::SetGridUnit { index, unit } => {
+                write!(f, "Set grid {} units to {unit}", index + 1)
+            }
             Action::SetGridColor { index, color } => {
                 write!(f, "Set grid {} color to {color}", index + 1)
             }
@@ -817,6 +823,41 @@ mod tests {
     }
 
     #[test]
+    fn sets_a_grid_unit_keeping_the_size_values() {
+        let mut document = document_with_grid();
+
+        Action::SetGridUnit {
+            index: 0,
+            unit: LengthUnit::Metre,
+        }
+        .apply(&mut document)
+        .unwrap();
+
+        let grid = &document.grids()[0];
+        assert_eq!(grid.unit(), LengthUnit::Metre);
+        assert_eq!(grid.cell_size(), (10.0, 10.0));
+        assert_eq!(document.calibration().unit(), LengthUnit::Centimetre);
+    }
+
+    #[test]
+    fn rejects_setting_the_unit_of_a_missing_grid() {
+        let mut document = document_with_grid();
+        let before = document.clone();
+
+        let result = Action::SetGridUnit {
+            index: 1,
+            unit: LengthUnit::Metre,
+        }
+        .apply(&mut document);
+
+        assert_eq!(
+            result,
+            Err(ActionError::GridIndexOutOfRange { index: 1, count: 1 })
+        );
+        assert_eq!(document, before);
+    }
+
+    #[test]
     fn duplicates_a_measurement_with_a_new_id_and_the_same_properties() {
         let mut document = document_with_measurements(2);
         Action::SetMeasurementUnit {
@@ -999,6 +1040,13 @@ mod tests {
                     size: 12.0,
                 },
                 "Set grid 2 size L to 12",
+            ),
+            (
+                Action::SetGridUnit {
+                    index: 0,
+                    unit: LengthUnit::Metre,
+                },
+                "Set grid 1 units to m",
             ),
             (
                 Action::SetGridColor {

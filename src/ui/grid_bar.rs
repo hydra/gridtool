@@ -1,4 +1,5 @@
-//! Properties row for the active grid: cell shape, cell size, colour and opacity.
+//! Properties row for the active grid: cell shape, cell size and units, colour and
+//! opacity.
 
 use eframe::egui::{self, Popup, PopupCloseBehavior};
 use gridtool::action::Action;
@@ -10,6 +11,7 @@ use super::color::{from_color32, to_color32};
 use super::commit_field::CommitField;
 use super::format::{format_length, parse_number};
 use super::selection::Selection;
+use super::unit_picker;
 
 const SIZE_FIELD_WIDTH: f32 = 60.0;
 const COLOR_SWATCH_SIZE: egui::Vec2 = egui::Vec2::new(36.0, 18.0);
@@ -94,7 +96,10 @@ impl GridBar {
                     }),
             );
         }
-        ui.label(grid.unit().symbol());
+        actions.extend(
+            unit_picker::show(ui, ("grid_unit", id), grid.unit(), "Units of the cell size")
+                .map(|unit| Action::SetGridUnit { index, unit }),
+        );
         actions.into_iter().next()
     }
 }

@@ -18,8 +18,12 @@ measurement line. Cell sizes are real-world lengths.
 | colour | opaque RGB | green `#00FF00` |
 | opacity | 0 to 1 | 0.5 (50 %) |
 
-- **Fixed unit.** The unit is captured when the grid is added. Changing the source's unit
-  later does not change the grid.
+- **Own unit.** The unit defaults to the source's unit when the grid is added, and from
+  then on belongs to the grid. Changing the source's unit later does not change the
+  grid. The user can change the grid's unit with the units drop-down in the grid
+  properties row (`GRID-14`).
+- **Changing the unit keeps the numbers.** Changing a grid's unit keeps the size values
+  A and B as they are. For example, 10 cm cells become 10 m cells, not 0.1 m cells.
 - **Square cells.** A square cell uses size A for both directions, and size B is kept but
   ignored. Setting the square's side length (L) sets **both** A and B, so switching to
   Rectangle starts from L × L.
@@ -162,7 +166,10 @@ Groups are separated by vertical separators:
      - L: "`Side length of each square cell`"
      - A: "`Cell size along the alignment line`"
      - B: "`Cell size perpendicular to the alignment line`"
-   - The grid's unit symbol follows the fields.
+   - A **units drop-down** follows the fields. It shows the grid's unit symbol, lists
+     every supported unit (`cm`, `m`), and has the tooltip "`Units of the cell size`".
+     Choosing a different unit commits **Set grid units**. Choosing the current unit
+     commits nothing.
    - A committed value that parses (`FMT-8`), is greater than 0 and differs from the
      stored value commits **Set grid cell size** for that dimension (L, A or B).
      Anything else reverts.
@@ -214,6 +221,8 @@ discarded whenever the active object changes or the document changes (`OBJ-7`).
   - Shape, size, colour and opacity edits apply.
   - A size of zero or NaN, opacity 1.5, or a missing index is rejected, leaving the
     document unchanged.
+  - Setting a grid's unit to m keeps its sizes (10 × 10) and leaves the calibration unit
+    unchanged. Setting the unit of a missing grid is rejected.
   - Labels match `HIST-2`.
 - Tool:
   - Via scale is the default.
