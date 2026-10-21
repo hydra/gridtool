@@ -1,10 +1,8 @@
 use eframe::egui;
 
+use super::icons::{OPEN_IMAGE as OPEN_IMAGE_ICON, REDO as REDO_ICON, UNDO as UNDO_ICON};
 use super::tool_mode::ToolMode;
 
-const OPEN_IMAGE_ICON: &str = "🗁";
-const UNDO_ICON: &str = "↩";
-const REDO_ICON: &str = "↪";
 const ICON_SIZE: f32 = 18.0;
 /// Gap between groups of tool bar buttons.
 const SECTION_SPACING: f32 = 16.0;

@@ -118,7 +118,8 @@ pending points while placing.
   - **valid positive number**: commits *Set distance* for that line
   - **invalid**: commits nothing, and the field goes back to showing the current value
 - No action is committed if the parsed value equals the current value.
-- Keystrokes while editing are never actions.
+- Keystrokes while editing are never actions. The fields are commit-on-blur fields
+  (`FMT-9`).
 
 **SCALE-15.** Distances are in the selected unit. Changing the unit does **not** convert
 the stored distance numbers. Only the unit label changes.

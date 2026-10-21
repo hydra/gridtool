@@ -50,7 +50,7 @@ impl fmt::Display for CalibrationMethod {
 }
 
 /// One of the two reference lines.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Line {
     A,
     B,
@@ -154,6 +154,15 @@ pub struct Scale {
     pub x_per_pixel: f64,
     pub y_per_pixel: f64,
     pub unit: LengthUnit,
+}
+
+impl Scale {
+    /// Real-world length, in [`Self::unit`], of the line between two image points.
+    pub fn length(&self, from: Point, to: Point) -> f64 {
+        let dx = (to.x - from.x) * self.x_per_pixel;
+        let dy = (to.y - from.y) * self.y_per_pixel;
+        dx.hypot(dy)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

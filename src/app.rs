@@ -8,10 +8,11 @@ use crate::file_picker::{ImageFilePicker, RfdImagePicker};
 use crate::open_image::{OpenedImage, pick_and_decode};
 use crate::ui::canvas;
 use crate::ui::document_view::DocumentView;
-use crate::ui::history_panel;
+use crate::ui::measurements_panel::MeasurementsPanel;
 use crate::ui::placeholder;
 use crate::ui::rotation_bar::RotationBar;
 use crate::ui::scale_bar::ScaleBar;
+use crate::ui::side_panel;
 use crate::ui::tool_mode::ToolMode;
 use crate::ui::top_panel::{self, HistoryAvailability, TopPanelAction};
 
@@ -44,6 +45,7 @@ impl OpenDocument {
         self.view
             .scale_tool
             .sync_to(self.editor.document().calibration());
+        self.view.measure_tool.sync_to_document();
     }
 
     fn history_availability(&self) -> HistoryAvailability {
@@ -83,6 +85,7 @@ pub struct GridToolApp {
     content: Content,
     rotation_bar: RotationBar,
     scale_bar: ScaleBar,
+    measurements_panel: MeasurementsPanel,
 }
 
 impl GridToolApp {
@@ -93,6 +96,7 @@ impl GridToolApp {
             content: Content::Empty,
             rotation_bar: RotationBar::default(),
             scale_bar: ScaleBar::default(),
+            measurements_panel: MeasurementsPanel::default(),
         }
     }
 
@@ -125,7 +129,7 @@ impl GridToolApp {
     fn show_tool_options(&mut self, ui: &mut egui::Ui) -> Option<Action> {
         let open = self.content.document_mut()?;
         match self.mode {
-            ToolMode::Pan => None,
+            ToolMode::Pan | ToolMode::Measure => None,
             ToolMode::Rotate => {
                 self.rotation_bar.show(ui, &mut open.view.viewport);
                 None
@@ -158,7 +162,11 @@ impl eframe::App for GridToolApp {
 
         let mut actions: Vec<Action> = self.show_tool_options(ui).into_iter().collect();
 
-        history_panel::show(ui, self.content.document().map(|open| &open.editor));
+        let open = self
+            .content
+            .document()
+            .map(|open| (&open.editor, &open.view.measure_tool));
+        actions.extend(side_panel::show(ui, &mut self.measurements_panel, open));
 
         egui::CentralPanel::default().show(ui, |ui| match &mut self.content {
             Content::Empty => placeholder::show(ui, "Open an image to get started."),

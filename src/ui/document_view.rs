@@ -1,5 +1,6 @@
 use eframe::egui::TextureHandle;
 
+use super::measure_tool::MeasureTool;
 use super::scale_tool::ScaleTool;
 use super::viewport::Viewport;
 
@@ -9,6 +10,7 @@ pub struct DocumentView {
     pub texture: TextureHandle,
     pub viewport: Viewport,
     pub scale_tool: ScaleTool,
+    pub measure_tool: MeasureTool,
     pub is_dragging_rotate_handle: bool,
 }
 
@@ -18,6 +20,7 @@ impl DocumentView {
             texture,
             viewport: Viewport::default(),
             scale_tool: ScaleTool::default(),
+            measure_tool: MeasureTool::default(),
             is_dragging_rotate_handle: false,
         }
     }

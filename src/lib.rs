@@ -10,4 +10,5 @@ pub mod document;
 pub mod editor;
 pub mod geometry;
 pub mod imaging;
+pub mod measurement;
 pub mod units;

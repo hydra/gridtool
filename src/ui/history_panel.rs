@@ -1,26 +1,22 @@
 use eframe::egui;
 use gridtool::editor::Editor;
 
-const DEFAULT_WIDTH: f32 = 240.0;
-
-/// Right-hand panel listing every recorded action. The row for the current position in
-/// the undo/redo stack is highlighted; undone actions are dimmed.
+/// Lists every recorded action. The row for the current position in the undo/redo
+/// stack is highlighted; undone actions are dimmed.
 pub fn show(ui: &mut egui::Ui, editor: Option<&Editor>) {
-    egui::Panel::right("history_panel")
-        .resizable(true)
-        .default_size(DEFAULT_WIDTH)
+    ui.heading("History");
+    ui.separator();
+    egui::ScrollArea::both()
+        .id_salt("history_scroll")
+        .auto_shrink(false)
         .show(ui, |ui| {
-            ui.heading("History");
-            ui.separator();
-            egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
-                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
-                match editor {
-                    Some(editor) => history_rows(ui, editor),
-                    None => {
-                        ui.weak("No document open");
-                    }
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
+            match editor {
+                Some(editor) => history_rows(ui, editor),
+                None => {
+                    ui.weak("No document open");
                 }
-            });
+            }
         });
 }
 

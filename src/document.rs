@@ -1,6 +1,7 @@
 use crate::calibration::Calibration;
 use crate::geometry::Point;
 use crate::imaging::DecodedImage;
+use crate::measurement::Measurement;
 
 /// The thing being edited. Modified only through [`crate::action::Action`]s.
 #[derive(Debug, Clone, PartialEq)]
@@ -8,6 +9,7 @@ pub struct Document {
     width: u32,
     height: u32,
     calibration: Calibration,
+    measurements: Vec<Measurement>,
 }
 
 impl Document {
@@ -17,6 +19,7 @@ impl Document {
             width,
             height,
             calibration: Calibration::default(),
+            measurements: Vec::new(),
         }
     }
 
@@ -53,6 +56,15 @@ impl Document {
 
     pub(crate) fn calibration_mut(&mut self) -> &mut Calibration {
         &mut self.calibration
+    }
+
+    /// Distance measurements, in the order they were added.
+    pub fn measurements(&self) -> &[Measurement] {
+        &self.measurements
+    }
+
+    pub(crate) fn measurements_mut(&mut self) -> &mut Vec<Measurement> {
+        &mut self.measurements
     }
 }
 

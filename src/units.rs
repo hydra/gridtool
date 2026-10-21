@@ -17,6 +17,18 @@ impl LengthUnit {
             LengthUnit::Metre => "m",
         }
     }
+
+    /// Converts `value` from this unit to `target`.
+    pub fn convert(self, value: f64, target: LengthUnit) -> f64 {
+        value * self.metres_per_unit() / target.metres_per_unit()
+    }
+
+    fn metres_per_unit(self) -> f64 {
+        match self {
+            LengthUnit::Centimetre => 0.01,
+            LengthUnit::Metre => 1.0,
+        }
+    }
 }
 
 impl fmt::Display for LengthUnit {
@@ -38,5 +50,18 @@ mod tests {
     fn displays_as_symbol() {
         assert_eq!(LengthUnit::Centimetre.to_string(), "cm");
         assert_eq!(LengthUnit::Metre.to_string(), "m");
+    }
+
+    #[test]
+    fn converts_between_units() {
+        assert_eq!(
+            LengthUnit::Centimetre.convert(150.0, LengthUnit::Metre),
+            1.5
+        );
+        assert_eq!(
+            LengthUnit::Metre.convert(2.5, LengthUnit::Centimetre),
+            250.0
+        );
+        assert_eq!(LengthUnit::Metre.convert(2.5, LengthUnit::Metre), 2.5);
     }
 }

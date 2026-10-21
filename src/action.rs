@@ -7,6 +7,7 @@ use std::fmt;
 use crate::calibration::{CalibrationError, Line, ScalePoints};
 use crate::document::Document;
 use crate::geometry::Point;
+use crate::measurement::{Endpoint, Measurement};
 use crate::units::LengthUnit;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,6 +20,18 @@ pub enum Action {
     SetDistance { line: Line, distance: Option<f64> },
     /// Changes the unit the reference distances are measured in.
     SetUnit(LengthUnit),
+    /// Appends a measurement to the end of the list.
+    AddMeasurement(Measurement),
+    /// Moves one end of an existing measurement.
+    MoveMeasurementPoint {
+        index: usize,
+        endpoint: Endpoint,
+        to: Point,
+    },
+    /// Changes the unit a measurement's distance is reported in.
+    SetMeasurementUnit { index: usize, unit: LengthUnit },
+    /// Removes a measurement; later measurements move up one place.
+    DeleteMeasurement { index: usize },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,6 +39,7 @@ pub enum ActionError {
     PointOutsideDocument(Point),
     NoScalePoints,
     InvalidDistance(f64),
+    MeasurementIndexOutOfRange { index: usize, count: usize },
     Calibration(CalibrationError),
 }
 
@@ -37,6 +51,11 @@ impl fmt::Display for ActionError {
             Self::InvalidDistance(distance) => {
                 write!(f, "distance must be a positive number, got {distance}")
             }
+            Self::MeasurementIndexOutOfRange { index, count } => write!(
+                f,
+                "measurement {} does not exist (there are {count})",
+                index + 1
+            ),
             Self::Calibration(error) => error.fmt(f),
         }
     }
@@ -77,6 +96,27 @@ impl Action {
                 document.calibration_mut().set_distance(*line, *distance);
             }
             Action::SetUnit(unit) => document.calibration_mut().set_unit(*unit),
+            Action::AddMeasurement(measurement) => {
+                for endpoint in Endpoint::ALL {
+                    ensure_inside(document, measurement.point(endpoint))?;
+                }
+                document.measurements_mut().push(measurement.clone());
+            }
+            Action::MoveMeasurementPoint {
+                index,
+                endpoint,
+                to,
+            } => {
+                ensure_inside(document, *to)?;
+                measurement_mut(document, *index)?.set_point(*endpoint, *to);
+            }
+            Action::SetMeasurementUnit { index, unit } => {
+                measurement_mut(document, *index)?.set_unit(*unit);
+            }
+            Action::DeleteMeasurement { index } => {
+                measurement_mut(document, *index)?;
+                document.measurements_mut().remove(*index);
+            }
         }
         Ok(())
     }
@@ -88,6 +128,14 @@ fn ensure_inside(document: &Document, point: Point) -> Result<(), ActionError> {
     } else {
         Err(ActionError::PointOutsideDocument(point))
     }
+}
+
+fn measurement_mut(document: &mut Document, index: usize) -> Result<&mut Measurement, ActionError> {
+    let measurements = document.measurements_mut();
+    let count = measurements.len();
+    measurements
+        .get_mut(index)
+        .ok_or(ActionError::MeasurementIndexOutOfRange { index, count })
 }
 
 impl fmt::Display for Action {
@@ -106,6 +154,23 @@ impl fmt::Display for Action {
                 distance: None,
             } => write!(f, "Clear distance {line}"),
             Action::SetUnit(unit) => write!(f, "Set units to {unit}"),
+            Action::AddMeasurement(measurement) => write!(
+                f,
+                "Add measurement from {} to {}",
+                measurement.start(),
+                measurement.end()
+            ),
+            Action::MoveMeasurementPoint {
+                index,
+                endpoint,
+                to,
+            } => write!(f, "Move measurement {} {endpoint} to {to}", index + 1),
+            Action::SetMeasurementUnit { index, unit } => {
+                write!(f, "Set measurement {} units to {unit}", index + 1)
+            }
+            Action::DeleteMeasurement { index } => {
+                write!(f, "Delete measurement {}", index + 1)
+            }
         }
     }
 }
@@ -264,5 +329,158 @@ mod tests {
             Action::SetUnit(LengthUnit::Metre).to_string(),
             "Set units to m"
         );
+        assert_eq!(
+            Action::AddMeasurement(measurement(1.0, 9.0)).to_string(),
+            "Add measurement from (1.0, 1.0) to (9.0, 9.0)"
+        );
+        assert_eq!(
+            Action::MoveMeasurementPoint {
+                index: 1,
+                endpoint: Endpoint::End,
+                to: Point::new(3.0, 4.0)
+            }
+            .to_string(),
+            "Move measurement 2 end to (3.0, 4.0)"
+        );
+        assert_eq!(
+            Action::SetMeasurementUnit {
+                index: 0,
+                unit: LengthUnit::Metre
+            }
+            .to_string(),
+            "Set measurement 1 units to m"
+        );
+        assert_eq!(
+            Action::DeleteMeasurement { index: 2 }.to_string(),
+            "Delete measurement 3"
+        );
+    }
+
+    fn measurement(from: f64, to: f64) -> Measurement {
+        Measurement::new(
+            Point::new(from, from),
+            Point::new(to, to),
+            LengthUnit::Centimetre,
+        )
+    }
+
+    fn document_with_measurements(count: usize) -> Document {
+        let mut document = Document::new(100, 50);
+        for n in 0..count {
+            Action::AddMeasurement(measurement(n as f64, n as f64 + 10.0))
+                .apply(&mut document)
+                .unwrap();
+        }
+        document
+    }
+
+    #[test]
+    fn adds_measurements_in_order() {
+        let document = document_with_measurements(3);
+
+        let starts: Vec<_> = document
+            .measurements()
+            .iter()
+            .map(|m| m.start().x)
+            .collect();
+        assert_eq!(starts, [0.0, 1.0, 2.0]);
+    }
+
+    #[test]
+    fn rejects_measurements_outside_the_document() {
+        let mut document = Document::new(100, 50);
+
+        let result = Action::AddMeasurement(measurement(0.0, 60.0)).apply(&mut document);
+
+        assert!(matches!(result, Err(ActionError::PointOutsideDocument(_))));
+        assert!(document.measurements().is_empty());
+    }
+
+    #[test]
+    fn moves_a_measurement_endpoint() {
+        let mut document = document_with_measurements(2);
+
+        Action::MoveMeasurementPoint {
+            index: 1,
+            endpoint: Endpoint::Start,
+            to: Point::new(40.0, 20.0),
+        }
+        .apply(&mut document)
+        .unwrap();
+
+        let moved = &document.measurements()[1];
+        assert_eq!(moved.start(), Point::new(40.0, 20.0));
+        assert_eq!(moved.end(), Point::new(11.0, 11.0));
+    }
+
+    #[test]
+    fn rejects_moving_a_measurement_endpoint_outside_the_document() {
+        let mut document = document_with_measurements(1);
+        let before = document.clone();
+
+        let result = Action::MoveMeasurementPoint {
+            index: 0,
+            endpoint: Endpoint::End,
+            to: Point::new(101.0, 0.0),
+        }
+        .apply(&mut document);
+
+        assert!(result.is_err());
+        assert_eq!(document, before);
+    }
+
+    #[test]
+    fn sets_a_measurement_unit() {
+        let mut document = document_with_measurements(2);
+
+        Action::SetMeasurementUnit {
+            index: 0,
+            unit: LengthUnit::Metre,
+        }
+        .apply(&mut document)
+        .unwrap();
+
+        assert_eq!(document.measurements()[0].unit(), LengthUnit::Metre);
+        assert_eq!(document.measurements()[1].unit(), LengthUnit::Centimetre);
+        assert_eq!(document.calibration().unit(), LengthUnit::Centimetre);
+    }
+
+    #[test]
+    fn deletes_a_measurement_keeping_the_order_of_the_rest() {
+        let mut document = document_with_measurements(3);
+
+        Action::DeleteMeasurement { index: 1 }
+            .apply(&mut document)
+            .unwrap();
+
+        let starts: Vec<_> = document
+            .measurements()
+            .iter()
+            .map(|m| m.start().x)
+            .collect();
+        assert_eq!(starts, [0.0, 2.0]);
+    }
+
+    #[test]
+    fn measurement_actions_reject_missing_indices() {
+        let mut document = document_with_measurements(2);
+        let before = document.clone();
+        let out_of_range = ActionError::MeasurementIndexOutOfRange { index: 2, count: 2 };
+
+        for action in [
+            Action::MoveMeasurementPoint {
+                index: 2,
+                endpoint: Endpoint::Start,
+                to: Point::default(),
+            },
+            Action::SetMeasurementUnit {
+                index: 2,
+                unit: LengthUnit::Metre,
+            },
+            Action::DeleteMeasurement { index: 2 },
+        ] {
+            assert_eq!(action.apply(&mut document), Err(out_of_range.clone()));
+        }
+        assert_eq!(document, before);
     }
 }

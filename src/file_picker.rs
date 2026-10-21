@@ -1,4 +1,4 @@
-﻿use std::path::PathBuf;
+use std::path::PathBuf;
 
 use gridtool::imaging::format::SUPPORTED_EXTENSIONS;
 

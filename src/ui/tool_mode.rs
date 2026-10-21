@@ -1,3 +1,5 @@
+use super::icons;
+
 /// The active canvas tool, which decides how mouse input on the canvas is interpreted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ToolMode {
@@ -8,17 +10,25 @@ pub enum ToolMode {
     Rotate,
     /// Place and drag calibration points to set the real-world scale.
     Scale,
+    /// Add measurement lines and drag their end handles.
+    Measure,
 }
 
 impl ToolMode {
     /// Every mode, in tool bar order.
-    pub const ALL: [ToolMode; 3] = [ToolMode::Pan, ToolMode::Rotate, ToolMode::Scale];
+    pub const ALL: [ToolMode; 4] = [
+        ToolMode::Pan,
+        ToolMode::Rotate,
+        ToolMode::Scale,
+        ToolMode::Measure,
+    ];
 
     pub fn icon(self) -> &'static str {
         match self {
-            ToolMode::Pan => "✋",
-            ToolMode::Rotate => "🔄",
-            ToolMode::Scale => "📏",
+            ToolMode::Pan => icons::PAN,
+            ToolMode::Rotate => icons::ROTATE,
+            ToolMode::Scale => icons::SCALE,
+            ToolMode::Measure => icons::MEASURE,
         }
     }
 
@@ -27,6 +37,7 @@ impl ToolMode {
             ToolMode::Pan => "Pan & zoom",
             ToolMode::Rotate => "Rotate view",
             ToolMode::Scale => "Scale",
+            ToolMode::Measure => "Measure distance",
         }
     }
 }
@@ -39,6 +50,14 @@ mod tests {
     #[test]
     fn pan_is_the_default_mode() {
         assert_eq!(ToolMode::default(), ToolMode::Pan);
+    }
+
+    #[test]
+    fn measure_follows_scale_in_the_tool_bar() {
+        let scale = ToolMode::ALL.iter().position(|&m| m == ToolMode::Scale);
+        let measure = ToolMode::ALL.iter().position(|&m| m == ToolMode::Measure);
+
+        assert_eq!(measure, scale.map(|index| index + 1));
     }
 
     #[test]

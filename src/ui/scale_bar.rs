@@ -4,10 +4,11 @@ use eframe::egui;
 use gridtool::action::Action;
 use gridtool::calibration::{Calibration, CalibrationMethod, Line};
 use gridtool::document::Document;
-use gridtool::units::LengthUnit;
 
+use super::commit_field::CommitField;
 use super::format::format_trimmed;
 use super::scale_tool::ScaleTool;
+use super::unit_picker;
 
 const DISTANCE_FIELD_WIDTH: f32 = 70.0;
 const DISTANCE_DECIMALS: usize = 6;
@@ -17,7 +18,7 @@ const SCALE_DECIMALS: usize = 6;
 /// resulting scale. Edits are returned as actions rather than applied.
 #[derive(Default)]
 pub struct ScaleBar {
-    distance_texts: [String; 2],
+    distance_fields: CommitField,
 }
 
 impl ScaleBar {
@@ -38,10 +39,18 @@ impl ScaleBar {
 
                     // Every widget must be drawn each frame, so collect actions eagerly.
                     let mut actions = Vec::new();
-                    for (line, text) in Line::ALL.into_iter().zip(&mut self.distance_texts) {
-                        actions.extend(distance_field(ui, line, text, calibration.distance(line)));
+                    for line in Line::ALL {
+                        actions.extend(self.distance_field(ui, line, calibration.distance(line)));
                     }
-                    actions.extend(unit_selector(ui, calibration.unit()));
+                    actions.extend(
+                        unit_picker::show(
+                            ui,
+                            "scale_unit",
+                            calibration.unit(),
+                            "Units of distances A and B",
+                        )
+                        .map(Action::SetUnit),
+                    );
 
                     ui.separator();
                     scale_result(ui, calibration);
@@ -50,6 +59,25 @@ impl ScaleBar {
                 .inner
             })
             .inner
+    }
+
+    /// A labelled distance field. The value is committed as an action when editing ends.
+    fn distance_field(
+        &mut self,
+        ui: &mut egui::Ui,
+        line: Line,
+        current: Option<f64>,
+    ) -> Option<Action> {
+        let label = ui.label(line.to_string());
+        let id = egui::Id::unique(("scale_distance", line));
+        let (field, committed) =
+            self.distance_fields
+                .show(ui, id, format_distance(current), DISTANCE_FIELD_WIDTH);
+        field.labelled_by(label.id);
+
+        parse_distance(&committed?)
+            .filter(|&distance| distance != current)
+            .map(|distance| Action::SetDistance { line, distance })
     }
 }
 
@@ -72,44 +100,6 @@ fn point_coordinates(ui: &mut egui::Ui, tool: &ScaleTool, calibration: &Calibrat
             .map_or_else(|| "—".to_owned(), ToString::to_string);
         ui.label(format!("{}: {position}", index + 1));
     }
-}
-
-/// A labelled distance field. The value is committed as an action when editing ends.
-fn distance_field(
-    ui: &mut egui::Ui,
-    line: Line,
-    text: &mut String,
-    current: Option<f64>,
-) -> Option<Action> {
-    let label = ui.label(line.to_string());
-    let field = ui
-        .add(egui::TextEdit::singleline(text).desired_width(DISTANCE_FIELD_WIDTH))
-        .labelled_by(label.id);
-
-    if field.lost_focus() {
-        return parse_distance(text)
-            .filter(|&distance| distance != current)
-            .map(|distance| Action::SetDistance { line, distance });
-    }
-    if !field.has_focus() {
-        *text = format_distance(current);
-    }
-    None
-}
-
-fn unit_selector(ui: &mut egui::Ui, current: LengthUnit) -> Option<Action> {
-    let mut selected = current;
-    egui::ComboBox::from_id_salt("scale_unit")
-        .selected_text(current.symbol())
-        .width(50.0)
-        .show_ui(ui, |ui| {
-            for unit in LengthUnit::ALL {
-                ui.selectable_value(&mut selected, unit, unit.symbol());
-            }
-        })
-        .response
-        .on_hover_text("Units of distances A and B");
-    (selected != current).then_some(Action::SetUnit(selected))
 }
 
 fn scale_result(ui: &mut egui::Ui, calibration: &Calibration) {

@@ -5,6 +5,8 @@
 **DOC-1 — Contents.** A document consists of:
 - **size**: a width and height in whole image pixels
 - **calibration**: the scale calibration data (see `SCALE-20`)
+- **measurements**: an ordered list of distance measurements (see `MEAS-1`, `MEAS-2`).
+  Their distances are derived from the calibration, not stored (`MEAS-3`).
 
 View state (pan, zoom, rotation) is **not** part of the document (`ARCH-4`).
 

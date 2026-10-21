@@ -15,7 +15,11 @@ view change (pan, zoom, rotation).
 | **Move scale point** | index (0-based), new position | Moves one existing point | A point set exists, the index exists, and the position is inside the document | "`Move scale point <index+1> to (<x>, <y>)`", with x and y to 1 decimal place |
 | **Set distance** | line (A/B), a positive distance | Sets the line's real-world length | The distance is finite and > 0 | "`Set distance <line> to <value>`". The value is written in the shortest form that converts back to the same number, e.g. `50`, `12.5` |
 | **Clear distance** | line (A/B) | Removes the line's length | — | "`Clear distance <line>`" |
-| **Set units** | unit | Changes the length unit | — | "`Set units to <symbol>`" |
+| **Set units** | unit | Changes the calibration length unit | — | "`Set units to <symbol>`" |
+| **Add measurement** | start point, end point, unit | Appends a measurement to the end of the list (`MEAS-2`) | Both points are inside the document | "`Add measurement from (<x1>, <y1>) to (<x2>, <y2>)`", with coordinates to 1 decimal place |
+| **Move measurement point** | index (0-based), endpoint (start/end), new position | Moves one end of one measurement | The index exists and the position is inside the document | "`Move measurement <index+1> <start\|end> to (<x>, <y>)`", e.g. "`Move measurement 2 end to (3.0, 4.0)`" |
+| **Set measurement unit** | index, unit | Changes the unit of one measurement only | The index exists | "`Set measurement <index+1> units to <symbol>`" |
+| **Delete measurement** | index | Removes one measurement; later ones move up | The index exists | "`Delete measurement <index+1>`" |
 
 **HIST-3 — Errors.** A rejected action returns an error describing why, and changes
 nothing. The UI should never produce an invalid action. If one is rejected anyway, it is
@@ -58,7 +62,7 @@ an empty history (`IMG-7`).
 - Every user-facing action MUST be undoable and redoable through these buttons.
 
 **HIST-10 — History panel.**
-- The panel is docked on the right, can be resized, and has a default width of 240 px.
+- The history list is the lower section of the side panel (`SHELL-11`).
 - It has the heading "`History`", then a separator, then a list that scrolls **both
   vertically and horizontally**. Rows do not wrap, so long labels scroll horizontally.
 - With no document open, the list shows "`No document open`" in weak text.

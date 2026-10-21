@@ -80,7 +80,20 @@ pan' = (a − c) − ((a − c − pan) × zoom'/zoom)
   pointer's movement, so the document follows the pointer exactly.
 - The cursor is an open hand while hovering over the canvas and a closed (grabbing) hand
   while dragging.
-- Dragging to pan works only in this mode.
+- Panning with the *primary* button works only in this mode. In other modes the primary
+  button belongs to the tool.
+
+**VIEW-11a — Right-drag pan (all tool modes).**
+- In **every** tool mode, dragging on the canvas with the **secondary** (right) mouse
+  button pans the view by the pointer's movement, exactly as in `VIEW-11`.
+- The cursor is a grabbing hand while right-dragging.
+- A right-drag never triggers a tool action, even when it starts on a calibration point,
+  a measurement handle or the rotate arrow. It is never recorded in the history.
+- All tool gestures use the **primary** button only: placing points, dragging points or
+  handles, and dragging the rotate arrow (`SCALE-5`, `SCALE-7`, `MEAS-6`, `MEAS-7`,
+  `VIEW-14`).
+- Together with wheel zoom (`VIEW-8`), this means the view can always be navigated
+  without changing tool.
 
 ## Rotate view mode
 
@@ -98,7 +111,7 @@ pan' = (a − c) − ((a − c − pan) × zoom'/zoom)
 A circle with a 12 px radius, drawn in the same stroke, marks the arrow tip.
 
 **VIEW-14 — Dragging the arrow.**
-- A drag that *starts* within 12 px of the arrow tip rotates the view. While dragging,
+- A primary-button drag that *starts* within 12 px of the arrow tip rotates the view. While dragging,
   the rotation is the direction from the document centre to the pointer, so the arrow
   follows the pointer.
 - If the pointer is exactly on the centre, the rotation does not change.
@@ -123,6 +136,14 @@ A circle with a 12 px radius, drawn in the same stroke, marks the arrow tip.
 
 - With default view, image point `(0,0)` of a 100×50 document lies at `c + (−50,−25)`.
 - Panning by `(15,−20)` moves the document centre by exactly that amount.
+- These canvas input scenarios are simulated with real pointer events and no window:
+  - A right-drag pans by exactly the pointer's movement in every mode, and records no
+    action.
+  - A right-drag that starts on a measurement handle pans and leaves the handle where it
+    was.
+  - A left-drag on a measurement handle moves it, records one action, and does not pan.
+  - A left-drag on empty canvas pans only in Pan & zoom mode.
+  - Scrolling the wheel up zooms in, in every mode.
 - Zooming by 2.5 about an arbitrary pointer keeps the image point under that pointer
   fixed.
 - Zoom saturates at 64 and 0.02.
