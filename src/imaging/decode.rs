@@ -6,14 +6,14 @@ use super::format;
 /// An image decoded into tightly packed 8-bit RGBA pixels.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecodedImage {
-    pub width: usize,
-    pub height: usize,
+    pub width: u32,
+    pub height: u32,
     pub rgba: Vec<u8>,
 }
 
 impl DecodedImage {
     pub fn size(&self) -> [usize; 2] {
-        [self.width, self.height]
+        [self.width as usize, self.height as usize]
     }
 }
 
@@ -62,8 +62,8 @@ impl From<image::ImageError> for ImageLoadError {
 pub fn decode_bytes(bytes: &[u8]) -> Result<DecodedImage, ImageLoadError> {
     let rgba = image::load_from_memory(bytes)?.to_rgba8();
     Ok(DecodedImage {
-        width: rgba.width() as usize,
-        height: rgba.height() as usize,
+        width: rgba.width(),
+        height: rgba.height(),
         rgba: rgba.into_raw(),
     })
 }
@@ -84,7 +84,9 @@ mod tests {
 
     fn encode(image: &RgbaImage, format: ImageFormat) -> Vec<u8> {
         let mut bytes = Cursor::new(Vec::new());
-        image.write_to(&mut bytes, format).expect("encoding should succeed");
+        image
+            .write_to(&mut bytes, format)
+            .expect("encoding should succeed");
         bytes.into_inner()
     }
 

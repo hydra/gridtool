@@ -4,25 +4,29 @@ pub enum ToolMode {
     /// Drag to move the view; scroll to zoom.
     #[default]
     Pan,
-    /// Drag the arrow handle to rotate the document about its center.
+    /// Drag the arrow handle to rotate the view about the document's center.
     Rotate,
+    /// Place and drag calibration points to set the real-world scale.
+    Scale,
 }
 
 impl ToolMode {
     /// Every mode, in tool bar order.
-    pub const ALL: [ToolMode; 2] = [ToolMode::Pan, ToolMode::Rotate];
+    pub const ALL: [ToolMode; 3] = [ToolMode::Pan, ToolMode::Rotate, ToolMode::Scale];
 
     pub fn icon(self) -> &'static str {
         match self {
             ToolMode::Pan => "✋",
             ToolMode::Rotate => "🔄",
+            ToolMode::Scale => "📏",
         }
     }
 
     pub fn name(self) -> &'static str {
         match self {
             ToolMode::Pan => "Pan & zoom",
-            ToolMode::Rotate => "Rotate",
+            ToolMode::Rotate => "Rotate view",
+            ToolMode::Scale => "Scale",
         }
     }
 }

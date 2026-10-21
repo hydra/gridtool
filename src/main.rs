@@ -1,13 +1,7 @@
-mod angle;
 mod app;
-mod document;
 mod file_picker;
-mod imaging;
 mod open_image;
-mod rotate_handle;
-mod tool_mode;
 mod ui;
-mod viewport;
 
 use eframe::egui;
 
@@ -19,7 +13,7 @@ fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(APP_NAME)
-            .with_inner_size([1024.0, 768.0]),
+            .with_inner_size([1280.0, 800.0]),
         ..Default::default()
     };
 

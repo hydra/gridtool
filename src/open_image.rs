@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::file_picker::ImageFilePicker;
-use crate::imaging::{DecodedImage, ImageLoadError, decode_file};
+use gridtool::imaging::{DecodedImage, ImageLoadError, decode_file};
 
 /// An image the user picked, together with where it came from.
 #[derive(Debug)]
@@ -60,7 +60,9 @@ mod tests {
         let result = pick_and_decode(&FakePicker(Some(path.clone())));
         std::fs::remove_file(&path).ok();
 
-        let opened = result.expect("a file was picked").expect("decoding should succeed");
+        let opened = result
+            .expect("a file was picked")
+            .expect("decoding should succeed");
         assert_eq!(opened.path, path);
         assert_eq!(opened.image.size(), [3, 2]);
     }

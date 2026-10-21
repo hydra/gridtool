@@ -1,6 +1,6 @@
-use std::path::PathBuf;
+﻿use std::path::PathBuf;
 
-use crate::imaging::format::SUPPORTED_EXTENSIONS;
+use gridtool::imaging::format::SUPPORTED_EXTENSIONS;
 
 /// Asks the user to choose an image file. Abstracted so the app logic can be tested
 /// without showing a native dialog.

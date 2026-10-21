@@ -1,4 +1,4 @@
-﻿//! Geometry of the rotate tool's arrow handle, which points from the document's
+//! Geometry of the rotate tool's arrow handle, which points from the document's
 //! center in the direction of its rotation.
 
 use eframe::egui::emath::Rot2;
@@ -35,7 +35,10 @@ mod tests {
     const CENTER: Pos2 = Pos2::new(100.0, 100.0);
 
     fn assert_near(actual: f32, expected: f32) {
-        assert!((actual - expected).abs() < 1e-4, "expected {expected}, got {actual}");
+        assert!(
+            (actual - expected).abs() < 1e-4,
+            "expected {expected}, got {actual}"
+        );
     }
 
     #[test]
@@ -57,15 +60,28 @@ mod tests {
 
         assert!(is_over_tip(CENTER, 0.0, tip));
         assert!(is_over_tip(CENTER, 0.0, tip + Vec2::new(0.0, GRAB_RADIUS)));
-        assert!(!is_over_tip(CENTER, 0.0, tip + Vec2::new(0.0, GRAB_RADIUS + 1.0)));
+        assert!(!is_over_tip(
+            CENTER,
+            0.0,
+            tip + Vec2::new(0.0, GRAB_RADIUS + 1.0)
+        ));
         assert!(!is_over_tip(CENTER, 0.0, CENTER));
     }
 
     #[test]
     fn rotation_follows_the_pointer_direction() {
-        assert_near(rotation_towards(CENTER, CENTER + Vec2::new(5.0, 0.0)).unwrap(), 0.0);
-        assert_near(rotation_towards(CENTER, CENTER + Vec2::new(0.0, 5.0)).unwrap(), FRAC_PI_2);
-        assert_near(rotation_towards(CENTER, CENTER + Vec2::new(-5.0, 0.0)).unwrap(), PI);
+        assert_near(
+            rotation_towards(CENTER, CENTER + Vec2::new(5.0, 0.0)).unwrap(),
+            0.0,
+        );
+        assert_near(
+            rotation_towards(CENTER, CENTER + Vec2::new(0.0, 5.0)).unwrap(),
+            FRAC_PI_2,
+        );
+        assert_near(
+            rotation_towards(CENTER, CENTER + Vec2::new(-5.0, 0.0)).unwrap(),
+            PI,
+        );
     }
 
     #[test]

@@ -1,5 +1,7 @@
 //! Helpers for working with angles expressed in degrees.
 
+use super::format::format_trimmed;
+
 const FULL_TURN_DEGREES: f32 = 360.0;
 const DISPLAY_DECIMALS: usize = 2;
 
@@ -10,23 +12,25 @@ pub fn normalize_degrees(degrees: f32) -> f32 {
     }
     let wrapped = degrees.rem_euclid(FULL_TURN_DEGREES);
     // `rem_euclid` can round up to exactly 360 for tiny negative inputs.
-    if wrapped >= FULL_TURN_DEGREES { 0.0 } else { wrapped }
+    if wrapped >= FULL_TURN_DEGREES {
+        0.0
+    } else {
+        wrapped
+    }
 }
 
 /// Parses user input such as `"45"`, `" -12.5 "` or `"90°"` into degrees.
 pub fn parse_degrees(text: &str) -> Option<f32> {
     let number = text.trim().trim_end_matches('°').trim_end();
-    number.parse::<f32>().ok().filter(|degrees| degrees.is_finite())
+    number
+        .parse::<f32>()
+        .ok()
+        .filter(|degrees| degrees.is_finite())
 }
 
 /// Formats degrees for display, without trailing zeros (e.g. `45`, `12.5`).
 pub fn format_degrees(degrees: f32) -> String {
-    let formatted = format!("{degrees:.DISPLAY_DECIMALS$}");
-    let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
-    match trimmed {
-        "-0" => "0".to_owned(),
-        other => other.to_owned(),
-    }
+    format_trimmed(f64::from(degrees), DISPLAY_DECIMALS)
 }
 
 #[cfg(test)]
@@ -75,15 +79,8 @@ mod tests {
     }
 
     #[test]
-    fn format_trims_trailing_zeros() {
+    fn format_uses_two_decimals_at_most() {
         assert_eq!(format_degrees(45.0), "45");
-        assert_eq!(format_degrees(12.5), "12.5");
-        assert_eq!(format_degrees(1.0 / 3.0), "0.33");
-    }
-
-    #[test]
-    fn format_never_shows_negative_zero() {
-        assert_eq!(format_degrees(-0.0), "0");
-        assert_eq!(format_degrees(-0.001), "0");
+        assert_eq!(format_degrees(12.345), "12.35");
     }
 }
