@@ -47,9 +47,11 @@ image:
   - lines **parallel to the source** (direction `d`), at offsets `k·b` along `n`
   - lines **perpendicular to the source** (direction `n`), at offsets `k·a` along `d`
 
-  where `k` is every whole number for which the line meets the document.
-- **Clipping.** Each line is clipped to the document rectangle. Lines that only touch a
-  corner are dropped. The segments are then mapped back to image pixels.
+  where `k` is every whole number for which the line meets the drawn region (the
+  document, or the visible part of it, `GRID-18`).
+- **Clipping.** Each line is clipped to the drawn region. Lines that only touch a corner
+  are dropped. A line lying exactly on the region's edge is kept. The segments are then
+  mapped back to image pixels.
 
 Laying the grid out in real-world space keeps cells truly square (or rectangular) in the
 real world even when `sx ≠ sy`. In image pixels such a cell is a parallelogram.
@@ -61,10 +63,27 @@ real world even when `sx ≠ sy`. In image pixels such a cell is a parallelogram
 - **Zero-length source.** Its source has zero length ("`its alignment line has zero
   length`").
 - **No scale.** There is no scale ("`it needs a scale (<scale reason>)`", `SCALE-18`).
-- **Too dense.** It would need more than **10 000** lines ("`the cells are too small to
-  draw`").
+- **Too small at this zoom.** Neighbouring parallel lines would be less than **3 screen
+  px** apart (`GRID-18`) ("`the cells are under 3 px on screen; zoom in to see them`").
 
 The grid stays in the document. It is drawn again as soon as the condition clears.
+
+**GRID-18 — Any cell size can be drawn.** There is no lower limit on the cell size
+beyond `> 0` (`HIST-2`). For example, 0.01 cm is valid. To make this possible:
+- **Visible region only.** Only the grid lines inside the visible part of the canvas are
+  generated and drawn. For a rotated view, the region is the smallest image-space
+  axis-aligned box containing the canvas. The lines are clipped to that region
+  intersected with the document. The lines' positions depend only on the grid and the
+  calibration (`GRID-3`), never on the region, so panning does not shift the grid.
+- **Line spacing.** The *line spacing* is the smallest perpendicular distance, in image
+  pixels, between neighbouring parallel lines of either family. With world-space spacing
+  `s` along unit offset axis `n`, it is `s / |(nₓ·sx, n_y·sy)|`.
+- **Too small to see.** If `line spacing × zoom` is less than 3 screen px, the grid is
+  not drawn and the reason is shown in the properties row (`GRID-4`), because the lines
+  would merge into a solid fill. Zooming in until the spacing reaches 3 px shows the
+  grid. The zoom limit (`VIEW-10`) is high enough for very small cells.
+- **Safety limit.** An implementation MAY refuse to generate more than 10 000 lines for
+  one region. With the 3 px rule this limit is not reached on normal screens.
 
 ## Drawing
 
@@ -214,7 +233,18 @@ discarded whenever the active object changes or the document changes (`OBJ-7`).
 - Errors:
   - No scale gives the no-scale error.
   - A deleted source measurement, or no scale points, gives "source missing".
-  - A 0.001 cm cell gives "too dense".
+  - Over the whole 100×50 document, a 0.001 cm cell exceeds the safety limit.
+- Small cells (`GRID-18`), at 1 cm/px:
+  - A 0.01 cm grid within the region (30, 20)–(30.5, 20.5) gives 51 vertical lines from
+    x = 30 to 30.5, each spanning exactly y = 20 to 20.5.
+  - The region (15, −100)–(45, 100) gives vertical lines at exactly x = 20, 30, 40,
+    clipped to the document.
+  - A region outside the document gives no lines.
+  - Line spacing is 10 px for 10 cm cells, and 5 px at 2 cm/px across and 0.5 cm/px
+    down.
+  - A 0.01 cm grid is hidden as too small at zoom 299 and drawn at zoom 300.
+- View: the image bounds of a screen rectangle follow zoom, and swap width and height at
+  a 90° rotation.
 - Actions:
   - **Add grid** gets its own object id.
   - **Add grid** with a missing source is rejected.

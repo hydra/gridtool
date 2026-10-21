@@ -8,6 +8,7 @@ mod commit_field;
 pub mod document_view;
 mod format;
 pub mod grid_bar;
+mod grid_display;
 mod grid_tool;
 mod history_panel;
 mod hit_test;

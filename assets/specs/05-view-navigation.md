@@ -71,7 +71,7 @@ fixed on the screen. If `a` is the pointer position, the new pan is:
 pan' = (a − c) − ((a − c − pan) × zoom'/zoom)
 ```
 
-**VIEW-10 — Zoom limits.** Zoom is clamped to the range `[0.02, 64]` (2 % – 6400 %).
+**VIEW-10 — Zoom limits.** Zoom is clamped to the range `[0.02, 1024]` (2 % – 102 400 %). The high limit lets very small grid cells be inspected (`GRID-18`).
 
 ## Pan & zoom mode
 
@@ -153,7 +153,7 @@ A circle with a 12 px radius, drawn in the same stroke, marks the arrow tip.
   - Scrolling the wheel up zooms in, in every mode.
 - Zooming by 2.5 about an arbitrary pointer keeps the image point under that pointer
   fixed.
-- Zoom saturates at 64 and 0.02.
+- Zoom saturates at 1024 and 0.02.
 - At 90° rotation the top-left corner of a 100×50 document is drawn at
   `c + (25, −50)`, and the image X axis points down the screen.
 - Screen↔image round-trip holds at an arbitrary rotation, zoom and pan.

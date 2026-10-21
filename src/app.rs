@@ -180,8 +180,12 @@ impl GridToolApp {
     /// Shows the properties row of the active object, if it has one (grids do).
     fn show_object_properties(&mut self, ui: &mut egui::Ui) -> Option<Action> {
         let open = self.content.document_mut()?;
-        self.grid_bar
-            .show(ui, open.editor.document(), &mut open.view.selection)
+        self.grid_bar.show(
+            ui,
+            open.editor.document(),
+            &mut open.view.selection,
+            open.view.viewport.zoom(),
+        )
     }
 }
 

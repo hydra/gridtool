@@ -13,9 +13,9 @@ use gridtool::grid::GridSource;
 use gridtool::imaging::DecodedImage;
 use gridtool::measurement::Endpoint;
 
-use super::color::with_opacity;
 use super::document_view::DocumentView;
 use super::format::format_length;
+use super::grid_display::paint_grids;
 use super::grid_tool::add_grid;
 use super::hit_test::nearest_within;
 use super::line_hit::segment_at;
@@ -53,7 +53,6 @@ const SELECTION_PADDING: f32 = 8.0;
 const RESIZE_HANDLE_SIZE: f32 = 10.0;
 /// How close (in screen points) the pointer must be to a resize handle to grab it.
 const RESIZE_HANDLE_GRAB_RADIUS: f32 = 8.0;
-const GRID_LINE_WIDTH: f32 = 1.0;
 const HIGHLIGHT_STROKE: Stroke = Stroke {
     width: 5.0,
     color: Color32::from_rgba_premultiplied(255, 220, 0, 200),
@@ -574,31 +573,6 @@ fn paint_scale_point(
         number.to_string(),
         SCALE_STROKE.color,
     );
-}
-
-/// Draws every grid's lines in its colour and opacity.
-fn paint_grids(
-    painter: &egui::Painter,
-    transform: DocumentTransform,
-    document: &Document,
-    selection: &Selection,
-) {
-    for stored in document.grids() {
-        let grid = selection.displayed_grid(stored.id(), stored);
-        let Ok(lines) = grid.lines(document) else {
-            continue;
-        };
-        let stroke = Stroke::new(GRID_LINE_WIDTH, with_opacity(grid.color(), grid.opacity()));
-        for (start, end) in lines {
-            painter.line_segment(
-                [
-                    transform.image_to_screen(start),
-                    transform.image_to_screen(end),
-                ],
-                stroke,
-            );
-        }
-    }
 }
 
 /// The image-space ends of a grid alignment source as currently displayed.

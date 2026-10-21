@@ -10,6 +10,7 @@ use gridtool::object::ObjectId;
 use super::color::{from_color32, to_color32};
 use super::commit_field::CommitField;
 use super::format::{format_length, parse_number};
+use super::grid_display;
 use super::selection::Selection;
 use super::unit_picker;
 
@@ -23,12 +24,13 @@ pub struct GridBar {
 
 impl GridBar {
     /// Shows the row if the active object is a grid, returning the action the user
-    /// completed, if any.
+    /// completed, if any. `zoom` is the canvas zoom, used to explain a hidden grid.
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
         document: &Document,
         selection: &mut Selection,
+        zoom: f32,
     ) -> Option<Action> {
         let id = selection.active()?;
         let index = document.grid_index(id)?;
@@ -48,7 +50,8 @@ impl GridBar {
                     actions.extend(color_picker(ui, id, index, stored, selection));
                     ui.separator();
                     actions.extend(opacity_slider(ui, id, index, stored, selection));
-                    if let Err(reason) = selection.displayed_grid(id, stored).lines(document) {
+                    let displayed = selection.displayed_grid(id, stored);
+                    if let Err(reason) = grid_display::visibility(&displayed, document, zoom) {
                         ui.separator();
                         ui.weak(format!("Grid not shown: {reason}"));
                     }

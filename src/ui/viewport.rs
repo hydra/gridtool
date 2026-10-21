@@ -2,13 +2,13 @@
 //! is part of the document itself.
 
 use eframe::egui::emath::Rot2;
-use eframe::egui::{Pos2, Vec2};
+use eframe::egui::{Pos2, Rect, Vec2};
 use gridtool::geometry::{Bounds, Point};
 
 use super::angle::normalize_degrees;
 
 const MIN_ZOOM: f32 = 0.02;
-const MAX_ZOOM: f32 = 64.0;
+const MAX_ZOOM: f32 = 1024.0;
 
 /// User-controlled camera over the document. The document's center is drawn at
 /// `view_center + pan`, scaled by `zoom` and rotated clockwise by the view rotation.
@@ -45,6 +45,11 @@ impl Viewport {
 
     pub fn set_rotation_radians(&mut self, radians: f32) {
         self.set_rotation_degrees(radians.to_degrees());
+    }
+
+    /// Screen points per image pixel.
+    pub fn zoom(&self) -> f32 {
+        self.zoom
     }
 
     /// Moves the document by `delta` screen points.
@@ -146,6 +151,28 @@ impl DocumentTransform {
         f64::from(length / self.zoom)
     }
 
+    /// Screen points per image pixel.
+    pub fn zoom(self) -> f32 {
+        self.zoom
+    }
+
+    /// The smallest image-space box containing everything drawn inside screen `rect`
+    /// (larger than `rect` itself when the view is rotated).
+    pub fn image_bounds_of(self, rect: Rect) -> Bounds {
+        let [first, rest @ ..] = [
+            rect.left_top(),
+            rect.right_top(),
+            rect.right_bottom(),
+            rect.left_bottom(),
+        ]
+        .map(|corner| self.screen_to_image(corner));
+        rest.into_iter()
+            .fold(Bounds::around(first, first), |bounds, p| Bounds {
+                min: Point::new(bounds.min.x.min(p.x), bounds.min.y.min(p.y)),
+                max: Point::new(bounds.max.x.max(p.x), bounds.max.y.max(p.y)),
+            })
+    }
+
     fn center_offset_to_screen(self, from_center: Vec2) -> Pos2 {
         self.center + self.rotation * (from_center * self.zoom)
     }
@@ -201,6 +228,24 @@ mod tests {
             corners[2],
             Pos2::new(400.0 - 40.0 + 8.0, 300.0 - 10.0 + 8.0),
         );
+    }
+
+    #[test]
+    fn image_bounds_of_a_screen_rect_follow_zoom_and_rotation() {
+        let mut viewport = Viewport::default();
+        viewport.zoom_about(VIEW_CENTER, VIEW_CENTER, 2.0);
+        let rect = Rect::from_center_size(VIEW_CENTER, Vec2::new(40.0, 20.0));
+
+        // Document centre (50, 25) is at the view centre; 40 × 20 screen is 20 × 10 image.
+        let bounds = transform(&viewport).image_bounds_of(rect);
+        assert!((bounds.min.x - 40.0).abs() < 1e-3 && (bounds.max.x - 60.0).abs() < 1e-3);
+        assert!((bounds.min.y - 20.0).abs() < 1e-3 && (bounds.max.y - 30.0).abs() < 1e-3);
+
+        // Rotated a quarter turn, the box swaps its width and height.
+        viewport.set_rotation_degrees(90.0);
+        let bounds = transform(&viewport).image_bounds_of(rect);
+        assert!((bounds.min.x - 45.0).abs() < 1e-3 && (bounds.max.x - 55.0).abs() < 1e-3);
+        assert!((bounds.min.y - 15.0).abs() < 1e-3 && (bounds.max.y - 35.0).abs() < 1e-3);
     }
 
     #[test]

@@ -43,6 +43,14 @@ impl Document {
         self.height
     }
 
+    /// The document rectangle, from the origin to (width, height).
+    pub fn bounds(&self) -> Bounds {
+        Bounds::around(
+            Point::new(0.0, 0.0),
+            Point::new(f64::from(self.width), f64::from(self.height)),
+        )
+    }
+
     /// Whether `point` lies within the document (edges included).
     pub fn contains(&self, point: Point) -> bool {
         (0.0..=f64::from(self.width)).contains(&point.x)
