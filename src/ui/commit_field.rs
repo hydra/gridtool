@@ -18,7 +18,8 @@ pub struct CommitField {
 }
 
 impl CommitField {
-    /// Shows the field. Returns its response, plus the edited text if editing ended this
+    /// Shows the field, `width` points wide even where the layout offers less (e.g. a grid
+    /// column sized by an earlier, narrower frame). Returns its response, plus the edited text if editing ended this
     /// frame and the text differs from what was shown when editing began.
     pub fn show(
         &mut self,
@@ -33,7 +34,12 @@ impl CommitField {
             Some(edit) => &mut edit.text,
             None => &mut scratch,
         };
-        let response = ui.add(egui::TextEdit::singleline(text).id(id).desired_width(width));
+        let response = ui.add(
+            egui::TextEdit::singleline(text)
+                .id(id)
+                .desired_width(width)
+                .min_size(egui::vec2(width, 0.0)),
+        );
 
         let mut committed = None;
         if response.lost_focus() {

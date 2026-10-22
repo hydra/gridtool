@@ -94,22 +94,35 @@ and has one header row followed by one row per measurement in list order (`MEAS-
 | Column header | Contents |
 |---|---|
 | "`#`" | The 1-based measurement number |
-| "`x1, y1`" | Two editable fields, start x then start y (`MEAS-12`) |
-| "`x2, y2`" | Two editable fields, end x then end y (`MEAS-12`) |
+| "`x1`" | An editable field for the start's x (`MEAS-12`) |
+| "`y1`" | An editable field for the start's y (`MEAS-12`) |
+| "`x2`" | An editable field for the end's x (`MEAS-12`) |
+| "`y2`" | An editable field for the end's y (`MEAS-12`) |
 | "`Distance`" | The calculated distance (`MEAS-3`), formatted by `FMT-7` and without a unit, or a weak "`—`" if unavailable. Hovering the "`—`" shows "`Scale: <reason>`" (`SCALE-18`) |
 | "`Units`" | A unit drop-down, 50 px wide, with the tooltip "`Units of this measurement`" (`MEAS-13`) |
 | "`Color`" | A colour swatch, 28 × 14 px, filled with the measurement's colour, with the tooltip "`Choose the colour of this measurement`" (`MEAS-15`) |
 | (blank) | A delete button with a trash-can icon (`delete`, `SHELL-6`) at the inline icon size, and the tooltip "`Delete measurement`" (`MEAS-14`) |
 
 **MEAS-12 — Editing coordinates.** Each coordinate field is a commit-on-blur field
-(`FMT-9`), 55 px wide:
-- It displays the coordinate formatted by `FMT-6`, using the live position while the
-  measurement is being dragged (`OBJ-9`, `OBJ-15`).
-- When editing ends with changed text, the text is parsed with `FMT-8`. The edited
-  coordinate replaces the stored one, and the other coordinate of that point is kept.
-  If the result is a valid number, lies inside the document (`DOC-4`) and differs from
-  the stored point, one **Move measurement point** action is committed.
-- Otherwise nothing is committed, and the field goes back to the stored value.
+(`FMT-9`) in its own column (`MEAS-11`).
+- **Width.** All four coordinate fields have the same width:
+  - **Minimum:** wide enough to show "`9999.99`" (six digits and a decimal point) in
+    full, inside the field's padding. Narrower than that, the table scrolls
+    horizontally instead.
+  - **Growing:** any width the table leaves unused in its section is shared equally
+    between the four fields, so they widen when the panel is widened and shrink back
+    (down to the minimum) when it is narrowed. Other columns keep their natural width.
+  - **Steady.** Once the panel stops changing width, the fields stop changing width
+    and the table stays still: it is never redrawn at alternating positions. A
+    difference of less than 2 px between the table and the section is left alone.
+- **Contents.**
+  - It displays the coordinate formatted by `FMT-6`, using the live position while the
+    measurement is being dragged (`OBJ-9`, `OBJ-15`).
+  - When editing ends with changed text, the text is parsed with `FMT-8`. The edited
+    coordinate replaces the stored one, and the other coordinate of that point is kept.
+    If the result is a valid number, lies inside the document (`DOC-4`) and differs
+    from the stored point, one **Move measurement point** action is committed.
+  - Otherwise nothing is committed, and the field goes back to the stored value.
 
 **MEAS-13 — Changing a measurement's unit.** Choosing a unit different from the row's
 current unit commits one **Set measurement unit** action for that row. The calibration
@@ -127,6 +140,13 @@ picker (opaque colours only) below it:
 
 ## Acceptance criteria
 
+- Coordinate field width (`MEAS-12`): fields start at the minimum. With 100 points
+  unused by the table, each of the four fields grows by 25; with the table 40 points too
+  wide, each shrinks by 10, but never below the minimum. The minimum fits "`9999.99`" and
+  the field's padding.
+- With the grid placing its columns by the previous frame.s widths, the fields reach the
+  width that fills the section and then stay at it; a table drawn repeatedly in an
+  unchanging panel settles on one layout.
 - Unit conversion: 150 cm = 1.5 m, 2.5 m = 250 cm, and same-unit conversion is the
   identity.
 - With sx = 0.5 and sy = 0.25 cm/px, the line (0,0)→(60,160) measures 50 cm, or 0.5 m.
