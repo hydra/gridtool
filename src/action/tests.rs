@@ -1,5 +1,6 @@
 use super::*;
 use crate::calibration::CalibrationMethod;
+use crate::document::Outline;
 
 fn three_points() -> ScalePoints {
     ScalePoints::new(
@@ -962,6 +963,53 @@ fn the_focus_point_of_an_area_is_its_centre() {
         document.object_focus_point(id),
         Some(document.areas()[0].center())
     );
+}
+
+#[test]
+fn the_outline_of_an_area_is_its_closed_points() {
+    let document = document_with_areas(1);
+    let area = &document.areas()[0];
+
+    assert_eq!(
+        document.object_outline(area.id()),
+        Some(Outline {
+            points: area.points().to_vec(),
+            closed: true,
+        })
+    );
+}
+
+#[test]
+fn the_outline_of_a_measurement_is_its_open_line() {
+    let mut document = Document::new(100, 50);
+    let added = measurement(1.0, 2.0);
+    Action::AddMeasurement(added.clone())
+        .apply(&mut document)
+        .unwrap();
+
+    assert_eq!(
+        document.object_outline(document.measurements()[0].id()),
+        Some(Outline {
+            points: vec![added.start(), added.end()],
+            closed: false,
+        })
+    );
+}
+
+#[test]
+fn the_outline_of_a_grid_is_its_alignment_line() {
+    let document = document_with_grid();
+    let grid = &document.grids()[0];
+    let (start, end) = grid.source_line(&document).unwrap();
+
+    assert_eq!(
+        document.object_outline(grid.id()),
+        Some(Outline {
+            points: vec![start, end],
+            closed: false,
+        })
+    );
+    assert_eq!(document.object_outline(ObjectId::new(999)), None);
 }
 
 #[test]

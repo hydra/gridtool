@@ -24,6 +24,7 @@ pub mod measurements_panel;
 mod object_drag;
 pub mod object_tree;
 pub mod placeholder;
+pub mod reveal;
 mod rotate_handle;
 pub mod rotation_bar;
 pub mod scale_bar;

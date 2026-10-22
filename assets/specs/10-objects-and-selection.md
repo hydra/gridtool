@@ -63,8 +63,15 @@ Document
 
 **OBJ-5 — Clicking an object in the tree.** When the user selects an object leaf:
 1. That object becomes the **active object** (`OBJ-6`).
-2. The view pans so that the object's **focus point** is at the centre of the canvas
-   area. Zoom and view rotation are unchanged (`VIEW-17`). The focus point is:
+2. The object is brought into view (`OBJ-5a`). This uses the object's **outline** and
+   **focus point**.
+
+   The outline is:
+   - for a measurement, its line
+   - for an area, its closed outline, including the area inside it
+   - for a grid, its alignment line
+
+   The focus point is:
    - for a measurement, the centre of its bounding box (the midpoint of the line)
    - for an area, the centre of its area (`AREA-8`)
    - for a grid, the midpoint of its alignment line. If that line no longer exists, the
@@ -72,6 +79,19 @@ Document
 
 Selecting a non-object node ("`Document`", "`Measurements`", "`Point-to-point`", "`Area`"
 or "`Grids`") clears the active object.
+
+**OBJ-5a — Bringing an object into view.** The canvas is the screen area of the canvas as
+last drawn. View rotation is never changed.
+1. **Already in view.** If any part of the outline is on the canvas, the view does not
+   move. This covers a point on the canvas, part of a line or edge crossing it, or the
+   canvas being inside an area.
+2. **Pan.** Otherwise the view pans so that the focus point is at the centre of the
+   canvas (`VIEW-17`). The zoom is not changed yet.
+3. **Zoom out to fit.** If, after the pan, any point of the outline is closer than
+   **16 px** to an edge of the canvas, or beyond it, the view zooms out about the canvas
+   centre. It uses the largest zoom at which every point is at least 16 px inside, so
+   the focus point stays at the centre. The zoom is never increased, and stays within the
+   zoom limits (`VIEW-10`).
 
 **OBJ-6 — Tree reflects the active object.** The tree always shows the active object's
 leaf as selected:
@@ -227,6 +247,19 @@ the active object can be dragged: a measurement's two endpoints, or an area's po
 
 ## Acceptance criteria
 
+- Bringing into view (`OBJ-5a`), with an 800 × 600 canvas, a 4000 × 3000 document at
+  zoom 1 and no rotation (image region (1600, 1200)–(2400, 1800) visible):
+  - These do not move the view: a line with one end on screen, a line crossing the
+    screen with both ends off it, an area whose edges cross the screen with no point on
+    it, and an area surrounding the whole screen.
+  - The line (3000, 2500)–(3200, 2500) is centred, at zoom 1.
+  - The line (500, 2600)–(2500, 2600) is centred at zoom 768 / 2000, with its ends 16 px
+    from the left and right edges.
+  - Rotated 90°, the line (100, 100)–(1100, 100) is drawn upright and fitted to the
+    canvas height, at zoom 568 / 1000. The rotation stays 90°.
+  - A triangle beside the canvas, whose bounding box overlaps it, counts as off screen.
+- The outline of a measurement is its two ends (open); of an area, its points (closed);
+  of a grid, its alignment line (open).
 - Object tool bar:
   - Both buttons are disabled with no active object (and with no document open).
   - With an active measurement, area or grid, both buttons are enabled and target it by

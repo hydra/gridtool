@@ -13,6 +13,7 @@ use crate::open_image::OpenedImage;
 use crate::ui::canvas;
 use crate::ui::document_view::DocumentView;
 use crate::ui::object_tree::TreePick;
+use crate::ui::reveal;
 
 pub struct OpenDocument {
     pub editor: Editor,
@@ -111,16 +112,20 @@ impl OpenDocument {
     }
 
     /// Applies what the user picked in the object tree: an object becomes the active
-    /// object and the view is centred on it.
+    /// object and, if none of it is on the canvas, is brought into view.
     pub fn pick(&mut self, pick: TreePick) {
         let selection = &mut self.view.selection;
         match pick {
             TreePick::Object(id) => {
                 selection.select(Some(id));
                 let document = self.editor.document();
-                if let Some(focus) = document.object_focus_point(id) {
+                if let (Some(outline), Some(focus), Some(canvas)) = (
+                    document.object_outline(id),
+                    document.object_focus_point(id),
+                    self.view.canvas_rect,
+                ) {
                     let size = egui::Vec2::new(document.width() as f32, document.height() as f32);
-                    self.view.viewport.center_on(focus, size);
+                    reveal::reveal(&mut self.view.viewport, &outline, focus, size, canvas);
                 }
             }
             TreePick::NoObject => selection.select(None),

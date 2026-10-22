@@ -1,4 +1,4 @@
-use eframe::egui::TextureHandle;
+use eframe::egui::{Rect, TextureHandle};
 use egui_ltreeview::TreeViewState;
 
 use super::area_tool::AreaTool;
@@ -21,6 +21,8 @@ pub struct DocumentView {
     pub grid_tool: GridTool,
     pub is_dragging_rotate_handle: bool,
     pub tree_state: TreeViewState<TreeNode>,
+    /// Where the canvas was drawn last frame, in screen points; `None` before it first is.
+    pub canvas_rect: Option<Rect>,
 }
 
 impl DocumentView {
@@ -35,6 +37,7 @@ impl DocumentView {
             grid_tool: GridTool::default(),
             is_dragging_rotate_handle: false,
             tree_state: TreeViewState::default(),
+            canvas_rect: None,
         }
     }
 

@@ -150,8 +150,9 @@ Clicks that do not hover a candidate add nothing.
   - "`measurement <m>`", where `m` is the measurement's current 1-based position
   - "`alignment line missing`"
 
-Selecting a grid leaf makes it the active object. The view then centres on the midpoint
-of its alignment line, if that line exists (`OBJ-5`, `VIEW-17`).
+Selecting a grid leaf makes it the active object. If its alignment line exists and none
+of it is on screen, the view centres on the line's midpoint, zooming out if the line
+does not fit (`OBJ-5`, `OBJ-5a`).
 
 **GRID-12 — Selection.** A grid covers the whole document, so it has **no selection box
 and no resize handles** (an exception to `OBJ-8` and `OBJ-9`). While a grid is the active

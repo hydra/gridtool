@@ -6,6 +6,15 @@ use crate::imaging::DecodedImage;
 use crate::measurement::Measurement;
 use crate::object::{Identified, ObjectId};
 
+/// The image-space shape an object is drawn as, e.g. to tell whether it is in view.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Outline {
+    /// The outline's points, in order.
+    pub points: Vec<Point>,
+    /// Whether the last point joins the first, so that the outline encloses an area.
+    pub closed: bool,
+}
+
 /// Every object of a document, for [`Document::from_parts`].
 pub(crate) struct Objects {
     pub measurements: Vec<Identified<Measurement>>,
@@ -145,6 +154,31 @@ impl Document {
         let grid = &self.grids[self.grid_index(id)?];
         let (start, end) = grid.source_line(self).ok()?;
         Some(Bounds::around(start, end).center())
+    }
+
+    /// The shape of an object: a measurement's line, an area's closed outline, or a
+    /// grid's alignment line. `None` if the object (or a grid's alignment line) does not
+    /// exist.
+    pub fn object_outline(&self, id: ObjectId) -> Option<Outline> {
+        if let Some(index) = self.measurement_index(id) {
+            let measurement = &self.measurements[index];
+            return Some(Outline {
+                points: vec![measurement.start(), measurement.end()],
+                closed: false,
+            });
+        }
+        if let Some(index) = self.area_index(id) {
+            return Some(Outline {
+                points: self.areas[index].points().to_vec(),
+                closed: true,
+            });
+        }
+        let grid = &self.grids[self.grid_index(id)?];
+        let (start, end) = grid.source_line(self).ok()?;
+        Some(Outline {
+            points: vec![start, end],
+            closed: false,
+        })
     }
 
     /// The most recently added object, if it still exists.

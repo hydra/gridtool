@@ -76,7 +76,7 @@ reflects the current calibration:
 **AREA-8 — Centre.** An area's centre is the centroid (centre of mass) of the enclosed
 area. If the outline encloses no area, it is the centre of the bounding box (`OBJ-2`). The
 centre is where the label is drawn (`AREA-9`), and where the view pans to when the area is
-picked in the object tree (`OBJ-5`). The zoom is not changed.
+picked in the object tree while it is off screen (`OBJ-5`, `OBJ-5a`).
 
 ## Drawing
 
@@ -144,8 +144,9 @@ that row.
 ## Editing
 
 **AREA-15 — Editing an area.** An area is an object (`OBJ`), so:
-- picking it in the object tree makes it the active object and pans the view to its
-  centre (`OBJ-5`, `AREA-8`)
+- picking it in the object tree makes it the active object and, if none of it is on
+  screen, pans the view to its centre and zooms out if it does not fit (`OBJ-5`,
+  `OBJ-5a`, `AREA-8`)
 - while active, it shows a selection box whose handles stretch every point (`OBJ-8`,
   `OBJ-9`, `OBJ-9b`), and each of its points can be dragged (`OBJ-15`)
 - it can be duplicated and deleted with the object tool bar (`OBJ-12`, `OBJ-13`)

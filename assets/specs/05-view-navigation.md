@@ -117,8 +117,8 @@ arrow itself keeps its fixed length.
 
 **VIEW-17 — Centre on a point.** The view can be panned so that a given image point is
 drawn at the centre of the canvas, keeping zoom and rotation. From `VIEW-3`:
-`pan = −R(rotation)·((p − size/2)·zoom)`. Used when an object is picked in the object
-tree (`OBJ-5`).
+`pan = −R(rotation)·((p − size/2)·zoom)`. Used when an object picked in the object tree
+is off screen (`OBJ-5a`).
 
 ## Rotate view mode
 

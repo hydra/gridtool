@@ -103,6 +103,7 @@ pub fn show(
     document: &Document,
 ) -> Option<Action> {
     let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
+    view.canvas_rect = Some(response.rect);
     let view_center = response.rect.center();
     let document_size = Vec2::new(document.width() as f32, document.height() as f32);
 
