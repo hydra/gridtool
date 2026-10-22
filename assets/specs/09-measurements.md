@@ -1,13 +1,17 @@
 # 09 — Distance Measurements
 
 The user adds measurement lines to the document. Each line's real-world length is
-calculated from the document's scale calibration (`SCALE-17`).
+calculated from the document's scale calibration (`SCALE-17`). In the UI these are
+called **point-to-point** measurements, to tell them apart from area measurements
+(`AREA`).
 
 ## Data
 
 **MEAS-1 — Measurement.** A measurement consists of:
 - **start point** and **end point**, in image coordinates (`DOC-3`)
 - **unit**: the length unit its distance is reported in (`SCALE-2`)
+- **colour**: an RGB colour it is drawn in; **blue** (`#0000FF`) for a new measurement
+  (`MEAS-15`)
 
 Each measurement's unit is independent of the calibration unit and of every other
 measurement's unit.
@@ -48,36 +52,38 @@ Additional rules:
   pending.
 - Clicks outside the document are ignored.
 - The cursor is a crosshair while hovering over the canvas, except over the active
-  object's resize handles (`OBJ-9`).
+  object's points and resize handles (`OBJ-9`, `OBJ-15`).
 - The pending start is discarded when the user presses Escape or leaves Measure mode
   (`SHELL-10a`).
-- A primary drag in Measure mode does nothing, unless it starts on a resize handle
-  (`OBJ-9`). In particular, it does not pan.
+- A primary drag in Measure mode does nothing, unless it starts on one of the active
+  object's points or resize handles (`OBJ-9`, `OBJ-15`). In particular, it does not pan.
 
 **MEAS-7 — Withdrawn.** Measurement endpoints used to be draggable directly in Measure
 mode. Overlapping endpoints made it hard to grab the right one, so this was replaced by
-object selection and bounding-box resizing (`OBJ-5` – `OBJ-11`).
+object selection and bounding-box resizing (`OBJ-5` – `OBJ-11`). The active
+measurement's endpoints can now be dragged again (`OBJ-15`).
 
 ## Drawing
 
 **MEAS-8 — Visibility.** Measurements are drawn in **every** tool mode, above the image
-and its outline. Their end markers cannot be interacted with (`OBJ-11`).
+and its outline, and above areas (`AREA-9`). Only the active measurement's end markers
+can be dragged (`OBJ-15`).
 
-**MEAS-9 — Appearance.** Everything is drawn in **blue** (`#0000FF`):
+**MEAS-9 — Appearance.** Everything is drawn in the measurement's colour (`MEAS-1`):
 - **Line.** A 2 px line from the start marker to the end marker.
-- **End markers.** A filled circle with a 5 px radius at each end. They are purely
-  visual.
+- **End markers.** A filled circle with a 5 px radius at each end.
 - **Label.** Drawn in a 14 px proportional font, centred at the line's midpoint and
   offset 12 px along the perpendicular (the line direction rotated 90°). The text is
   "`<n>: <distance> <unit symbol>`", with the distance formatted by `FMT-7`, or just
   "`<n>`" when the distance is unavailable.
-- **Pending start.** Drawn as an end marker. While the pointer is over the canvas, a blue
-  2 px dashed line (6 px dashes, 4 px gaps) runs from the pending start to the pointer.
+- **Pending start.** Drawn as an end marker in the default colour, blue. While the
+  pointer is over the canvas, a blue 2 px dashed line (6 px dashes, 4 px gaps) runs
+  from the pending start to the pointer.
 
 ## Measurements table
 
-**MEAS-10 — Location.** The table is in the upper section of the right-hand side panel
-(`SHELL-11`). The section has the heading "`Measurements`" followed by a separator.
+**MEAS-10 — Location.** The table is in the top section of the right-hand side panel
+(`SHELL-11`). The section has the heading "`Point-to-point`" followed by a separator.
 - With no document open, the section shows "`No document open`" in weak text.
 - With a document that has no measurements, it shows
   "`No measurements yet. Use the Measure distance tool to add one.`" in weak text.
@@ -92,12 +98,13 @@ and has one header row followed by one row per measurement in list order (`MEAS-
 | "`x2, y2`" | Two editable fields, end x then end y (`MEAS-12`) |
 | "`Distance`" | The calculated distance (`MEAS-3`), formatted by `FMT-7` and without a unit, or a weak "`—`" if unavailable. Hovering the "`—`" shows "`Scale: <reason>`" (`SCALE-18`) |
 | "`Units`" | A unit drop-down, 50 px wide, with the tooltip "`Units of this measurement`" (`MEAS-13`) |
+| "`Color`" | A colour swatch, 28 × 14 px, filled with the measurement's colour, with the tooltip "`Choose the colour of this measurement`" (`MEAS-15`) |
 | (blank) | A delete button with a trash-can icon (`delete`, `SHELL-6`) at the inline icon size, and the tooltip "`Delete measurement`" (`MEAS-14`) |
 
 **MEAS-12 — Editing coordinates.** Each coordinate field is a commit-on-blur field
 (`FMT-9`), 55 px wide:
 - It displays the coordinate formatted by `FMT-6`, using the live position while the
-  measurement is being resized (`OBJ-9`).
+  measurement is being dragged (`OBJ-9`, `OBJ-15`).
 - When editing ends with changed text, the text is parsed with `FMT-8`. The edited
   coordinate replaces the stored one, and the other coordinate of that point is kept.
   If the result is a valid number, lies inside the document (`DOC-4`) and differs from
@@ -111,6 +118,13 @@ unit and the other measurements are not affected.
 **MEAS-14 — Deleting.** Clicking the delete button commits one **Delete measurement**
 action for that row.
 
+**MEAS-15 — Changing a measurement's colour.** Clicking the colour swatch opens a colour
+picker (opaque colours only) below it:
+- While it is open, the swatch shows the colour being chosen.
+- It closes when the user clicks outside it. If the chosen colour differs from the
+  measurement's colour, one **Set measurement colour** action is committed for that row.
+- Each time it opens, it starts from the measurement's current colour.
+
 ## Acceptance criteria
 
 - Unit conversion: 150 cm = 1.5 m, 2.5 m = 250 cm, and same-unit conversion is the
@@ -123,6 +137,8 @@ action for that row.
 - Moving an endpoint changes only that endpoint. Moving it outside the document is
   rejected.
 - Setting a measurement's unit changes only that measurement.
+- A new measurement is blue. Setting a measurement's colour changes only that
+  measurement, and duplicating keeps the colour.
 - Deleting the middle of three measurements leaves the first and third, in order.
 - Move, set-unit and delete with an index that does not exist are rejected, and the
   document is unchanged.
@@ -130,9 +146,11 @@ action for that row.
   - Two clicks produce exactly one Add action, with the given unit.
   - Clicking the start again is ignored.
   - Cancel clears the pending start.
-  - Endpoints cannot be dragged directly (see `10`).
+  - The endpoints of an inactive measurement cannot be dragged; those of the active
+    measurement can (see `10`).
 - Coordinate edit:
   - Editing y keeps x.
   - Non-numeric, out-of-bounds or unchanged values produce no action.
   - A row that does not exist produces no action.
 - In the tool bar, Measure distance comes directly after Scale.
+- Labels: "`Set measurement 2 color to #FF0000`".

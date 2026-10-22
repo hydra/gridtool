@@ -4,6 +4,7 @@
 use std::fmt;
 
 use crate::calibration::{Line, ScaleError};
+use crate::color::Rgb;
 use crate::document::Document;
 use crate::geometry::{Bounds, Point};
 use crate::object::ObjectId;
@@ -11,7 +12,7 @@ use crate::units::LengthUnit;
 
 /// The initial cell size, in the grid's unit.
 pub const DEFAULT_CELL_SIZE: f64 = 10.0;
-pub const DEFAULT_COLOR: Rgb = Rgb::new(0, 255, 0);
+pub const DEFAULT_COLOR: Rgb = Rgb::GREEN;
 pub const DEFAULT_OPACITY: f32 = 0.5;
 /// A safety limit: a request for more lines than this within one region is refused.
 pub const MAX_LINES: usize = 10_000;
@@ -63,26 +64,6 @@ impl fmt::Display for CellDimension {
             CellDimension::A => "A",
             CellDimension::B => "B",
         })
-    }
-}
-
-/// An opaque 8-bit-per-channel colour.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Rgb {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-}
-
-impl Rgb {
-    pub const fn new(r: u8, g: u8, b: u8) -> Self {
-        Self { r, g, b }
-    }
-}
-
-impl fmt::Display for Rgb {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "#{:02X}{:02X}{:02X}", self.r, self.g, self.b)
     }
 }
 
@@ -785,10 +766,5 @@ mod tests {
             grid.line_spacing(&no_scale),
             Err(GridError::NoScale(_))
         ));
-    }
-
-    #[test]
-    fn displays_colours_as_hex() {
-        assert_eq!(Rgb::new(0, 255, 16).to_string(), "#00FF10");
     }
 }

@@ -1,9 +1,17 @@
+use crate::area::Area;
 use crate::calibration::Calibration;
 use crate::geometry::{Bounds, Point};
 use crate::grid::Grid;
 use crate::imaging::DecodedImage;
 use crate::measurement::Measurement;
 use crate::object::{Identified, ObjectId};
+
+/// Every object of a document, for [`Document::from_parts`].
+pub(crate) struct Objects {
+    pub measurements: Vec<Identified<Measurement>>,
+    pub areas: Vec<Identified<Area>>,
+    pub grids: Vec<Identified<Grid>>,
+}
 
 /// The thing being edited. Modified only through [`crate::action::Action`]s.
 #[derive(Debug, Clone, PartialEq)]
@@ -12,6 +20,7 @@ pub struct Document {
     height: u32,
     calibration: Calibration,
     measurements: Vec<Identified<Measurement>>,
+    areas: Vec<Identified<Area>>,
     grids: Vec<Identified<Grid>>,
     /// The image's origin: the point the view rotates about. Always inside the document.
     origin: Point,
@@ -27,6 +36,7 @@ impl Document {
             height,
             calibration: Calibration::default(),
             measurements: Vec::new(),
+            areas: Vec::new(),
             grids: Vec::new(),
             origin: Point::new(f64::from(width) / 2.0, f64::from(height) / 2.0),
             next_object_id: 1,
@@ -95,6 +105,16 @@ impl Document {
         self.measurements.iter().position(|m| m.id() == id)
     }
 
+    /// Area measurements, in the order they were added.
+    pub fn areas(&self) -> &[Identified<Area>] {
+        &self.areas
+    }
+
+    /// List position of the area with `id`, if it exists.
+    pub fn area_index(&self, id: ObjectId) -> Option<usize> {
+        self.areas.iter().position(|area| area.id() == id)
+    }
+
     /// Grids, in the order they were added.
     pub fn grids(&self) -> &[Identified<Grid>] {
         &self.grids
@@ -107,15 +127,20 @@ impl Document {
 
     /// Whether any object with `id` exists.
     pub fn contains_object(&self, id: ObjectId) -> bool {
-        self.measurement_index(id).is_some() || self.grid_index(id).is_some()
+        self.measurement_index(id).is_some()
+            || self.area_index(id).is_some()
+            || self.grid_index(id).is_some()
     }
 
     /// The image point to bring into view for an object: the centre of a measurement's
-    /// bounding box, or the midpoint of a grid's alignment line. `None` if the object
-    /// (or a grid's alignment line) does not exist.
+    /// bounding box, the centre of an area ([`Area::center`]), or the midpoint of a grid's
+    /// alignment line. `None` if the object (or a grid's alignment line) does not exist.
     pub fn object_focus_point(&self, id: ObjectId) -> Option<Point> {
         if let Some(index) = self.measurement_index(id) {
             return Some(self.measurements[index].bounds().center());
+        }
+        if let Some(index) = self.area_index(id) {
+            return Some(self.areas[index].center());
         }
         let grid = &self.grids[self.grid_index(id)?];
         let (start, end) = grid.source_line(self).ok()?;
@@ -130,6 +155,10 @@ impl Document {
 
     pub(crate) fn measurements_mut(&mut self) -> &mut Vec<Identified<Measurement>> {
         &mut self.measurements
+    }
+
+    pub(crate) fn areas_mut(&mut self) -> &mut Vec<Identified<Area>> {
+        &mut self.areas
     }
 
     pub(crate) fn grids_mut(&mut self) -> &mut Vec<Identified<Grid>> {
@@ -147,8 +176,7 @@ impl Document {
         width: u32,
         height: u32,
         calibration: Calibration,
-        measurements: Vec<Identified<Measurement>>,
-        grids: Vec<Identified<Grid>>,
+        objects: Objects,
         origin: Point,
         next_object_id: u64,
     ) -> Self {
@@ -156,8 +184,9 @@ impl Document {
             width,
             height,
             calibration,
-            measurements,
-            grids,
+            measurements: objects.measurements,
+            areas: objects.areas,
+            grids: objects.grids,
             origin,
             next_object_id,
         }

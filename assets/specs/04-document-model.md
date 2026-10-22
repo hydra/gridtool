@@ -7,6 +7,8 @@
 - **calibration**: the scale calibration data (see `SCALE-20`)
 - **measurements**: an ordered list of distance measurements (see `MEAS-1`, `MEAS-2`).
   Their distances are derived from the calibration, not stored (`MEAS-3`).
+- **areas**: an ordered list of area measurements (see `AREA-6`). Their areas are derived
+  from the calibration, not stored (`AREA-7`).
 - **grids**: an ordered list of grids, with all their display properties (see `GRID-1`,
   `GRID-2`).
 - **origin**: a point inside the document that the view rotates about. It defaults to the

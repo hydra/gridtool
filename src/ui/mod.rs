@@ -2,12 +2,14 @@
 //! modifies the document directly.
 
 mod angle;
+mod area_tool;
+pub mod areas_panel;
 pub mod canvas;
 mod color;
+mod color_swatch;
 mod commit_field;
 pub mod dialog;
 pub mod document_view;
-pub mod escape_key;
 mod format;
 pub mod grid_bar;
 mod grid_display;
@@ -19,6 +21,7 @@ mod icons;
 mod line_hit;
 mod measure_tool;
 pub mod measurements_panel;
+mod object_drag;
 pub mod object_tree;
 pub mod placeholder;
 mod rotate_handle;
@@ -27,7 +30,9 @@ pub mod scale_bar;
 mod scale_tool;
 mod selection;
 pub mod side_panel;
+pub mod tool_keys;
 pub mod tool_mode;
 pub mod top_panel;
 mod unit_picker;
+mod vertical_split;
 mod viewport;

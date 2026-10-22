@@ -5,7 +5,9 @@
 //! from unit tests or a command-line front end.
 
 pub mod action;
+pub mod area;
 pub mod calibration;
+pub mod color;
 pub mod document;
 pub mod document_file;
 pub mod editor;
@@ -14,4 +16,5 @@ pub mod grid;
 pub mod imaging;
 pub mod measurement;
 pub mod object;
+pub mod polygon;
 pub mod units;

@@ -9,7 +9,9 @@ completely, so loading it re-creates the exact document state (`DOC-1`).
 - the image reference (`FILE-3`) and the image size in pixels
 - the origin (`ORIGIN-1`)
 - the calibration (`SCALE-20`): the point set and method, both distances and the unit
-- every measurement (`MEAS-1`), in list order, with its object id, endpoints and unit
+- every measurement (`MEAS-1`), in list order, with its object id, endpoints, unit and
+  colour
+- every area (`AREA-6`), in list order, with its object id, points, unit and colour
 - every grid (`GRID-1`), in list order, with its object id, alignment source (a scale
   line, or a measurement by object id, which may refer to a deleted measurement), shape,
   sizes A and B (both, even for square cells), unit, colour and opacity
@@ -37,16 +39,17 @@ failed save never leaves a half-written document.
 **FILE-5 — Versioned description, separate from runtime state.** The file holds a
 *description* of the document in a versioned format. It is not a dump of the runtime
 data structures:
-- **Tagged.** The top level names its version, for example `V1(( … ))`.
+- **Tagged.** The top level names its version, for example `V2(( … ))`.
 - **Converted on save.** Saving converts the runtime document to the current version's
   description.
 - **Converted on load.** Loading converts a description of **any** supported version back
-  to the runtime document.
+  to the runtime document. An older version is first migrated, version by version, to the
+  current one (`FILE-6a`).
 - **Never edited.** A released version's description never changes. Format changes add a
   new version, and the loader keeps accepting every earlier version. The automated tests
   MUST include a literal sample of each released version that must still load.
 
-**FILE-6 — Version 1.** Version 1 is a record with these fields:
+**FILE-6 — Version 1.** Version 1 is a record with these fields: (no longer written; still loaded)
 - `image`: string (`FILE-3`)
 - `width`, `height`: whole numbers
 - `origin`: `(x, y)`
@@ -60,11 +63,20 @@ data structures:
   - `shape` is `Square|Rectangle`
 - `next_object_id`: a whole number
 
+**FILE-6a — Version 2 (current).** Version 2 is version 1 with these changes:
+- `measurements`: a list of `(id, start, end, unit, color: (r, g, b))`
+- `areas`, after `measurements`: a list of `(id, points: [(x, y), …], unit, color: (r, g, b))`
+
+Every other field is exactly as in version 1. A version 1 file is migrated to version 2
+by giving every measurement the default colour, blue (`MEAS-1`), and adding no areas.
+
 **FILE-7 — Validation on load.** A loaded description is checked as strictly as actions
 check their inputs (`HIST-2`), so a hand-edited or damaged file cannot produce an invalid
 document. Loading fails when:
 - the size is zero
-- a point (scale point, measurement endpoint or origin) is outside the document
+- a point (scale point, measurement endpoint, area point or origin) is outside the
+  document
+- an area has fewer than 3 points
 - the number of scale points does not match the method
 - a distance or cell size is not finite and > 0
 - an opacity is outside [0, 1]
@@ -179,11 +191,17 @@ and shows the dialogs.
   - a rectangle grid with every property changed
   - a grid aligned to a deleted measurement
   - a moved origin
+  - a measurement with a changed colour, and areas with a changed unit and colour and a
+    gap in their ids
 
   Duplicating a grid then gives the same next id in both.
-- The written text starts with `V1(`.
-- A literal version 1 sample loads with the expected values.
-- Each `FILE-7` failure is rejected with its reason.
+- The written text starts with `V2(`.
+- A literal version 1 sample loads with the expected values; its measurements are blue and
+  it has no areas.
+- A literal version 2 sample loads with the expected values, including a measurement's
+  colour and an area's points, unit and colour.
+- Each `FILE-7` failure is rejected with its reason. This includes an area with 2 points, an area point outside
+  the document, and an area reusing a measurement's id.
 - Image references:
   - `a.png` beside the document is stored as `a.png`
   - an image in `images/` below it is stored as `images/b.png`

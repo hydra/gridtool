@@ -4,20 +4,18 @@
 //! from the runtime types: once released, a version's types never change, so files
 //! written by older versions of the application can always be read. A new format gets
 //! a new module and a new [`super::DocumentFile`] variant.
-
-use std::collections::HashSet;
+//!
+//! Version 1 files are loaded by migrating them to version 2 ([`super::v2`]), which also
+//! reuses the version 1 types that did not change.
 
 use serde::{Deserialize, Serialize};
 
-use crate::calibration::{Calibration, CalibrationMethod, Line, ScalePoints};
-use crate::document::Document;
+use crate::calibration::{CalibrationMethod, Line};
+use crate::color::Rgb;
 use crate::geometry::Point;
-use crate::grid::{CellDimension, CellShape, Grid, GridSource, Rgb};
-use crate::measurement::Measurement;
-use crate::object::{Identified, ObjectId};
+use crate::grid::{CellShape, GridSource};
+use crate::object::ObjectId;
 use crate::units::LengthUnit;
-
-use super::InvalidDocument;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DocumentV1 {
@@ -105,145 +103,6 @@ pub struct ColorV1 {
     pub r: u8,
     pub g: u8,
     pub b: u8,
-}
-
-impl DocumentV1 {
-    /// Describes `document`, whose image is referred to as `image`.
-    pub fn describe(document: &Document, image: String) -> Self {
-        let calibration = document.calibration();
-        Self {
-            image,
-            width: document.width(),
-            height: document.height(),
-            origin: document.origin().into(),
-            calibration: CalibrationV1 {
-                points: calibration.points().map(|points| ScalePointsV1 {
-                    method: points.method().into(),
-                    points: points.points().iter().map(|&p| p.into()).collect(),
-                }),
-                distance_a: calibration.distance(Line::A),
-                distance_b: calibration.distance(Line::B),
-                unit: calibration.unit().into(),
-            },
-            measurements: document
-                .measurements()
-                .iter()
-                .map(|measurement| MeasurementV1 {
-                    id: measurement.id().raw(),
-                    start: measurement.start().into(),
-                    end: measurement.end().into(),
-                    unit: measurement.unit().into(),
-                })
-                .collect(),
-            grids: document
-                .grids()
-                .iter()
-                .map(|grid| GridV1 {
-                    id: grid.id().raw(),
-                    source: grid.source().into(),
-                    shape: grid.shape().into(),
-                    size_a: grid.size(CellDimension::A),
-                    size_b: grid.size(CellDimension::B),
-                    unit: grid.unit().into(),
-                    color: grid.color().into(),
-                    opacity: grid.opacity(),
-                })
-                .collect(),
-            next_object_id: document.next_object_id(),
-        }
-    }
-
-    /// Re-creates the runtime document, checking everything an action would have
-    /// checked, so a hand-edited or corrupt file cannot produce an invalid document.
-    pub fn to_document(&self) -> Result<Document, InvalidDocument> {
-        if self.width == 0 || self.height == 0 {
-            return Err(InvalidDocument::EmptySize);
-        }
-        let blank = Document::new(self.width, self.height);
-        let inside = |point: PointV1| -> Result<Point, InvalidDocument> {
-            let point = Point::from(point);
-            if blank.contains(point) {
-                Ok(point)
-            } else {
-                Err(InvalidDocument::PointOutside(point))
-            }
-        };
-
-        let mut calibration = Calibration::default();
-        if let Some(stored) = &self.calibration.points {
-            let points = stored
-                .points
-                .iter()
-                .map(|&point| inside(point))
-                .collect::<Result<Vec<_>, _>>()?;
-            let points = ScalePoints::new(stored.method.into(), points)
-                .map_err(|_| InvalidDocument::WrongScalePointCount)?;
-            calibration.set_points(points);
-        }
-        for (line, distance) in [
-            (Line::A, self.calibration.distance_a),
-            (Line::B, self.calibration.distance_b),
-        ] {
-            if let Some(value) = distance {
-                ensure_positive(value)?;
-            }
-            calibration.set_distance(line, distance);
-        }
-        calibration.set_unit(self.calibration.unit.into());
-
-        let mut ids = HashSet::new();
-        let mut claim = |id: u64| {
-            if id == 0 || id >= self.next_object_id || !ids.insert(id) {
-                Err(InvalidDocument::BadObjectId(id))
-            } else {
-                Ok(ObjectId::new(id))
-            }
-        };
-
-        let mut measurements = Vec::with_capacity(self.measurements.len());
-        for stored in &self.measurements {
-            let measurement = Measurement::new(
-                inside(stored.start)?,
-                inside(stored.end)?,
-                stored.unit.into(),
-            );
-            measurements.push(Identified::new(claim(stored.id)?, measurement));
-        }
-
-        let mut grids = Vec::with_capacity(self.grids.len());
-        for stored in &self.grids {
-            ensure_positive(stored.size_a)?;
-            ensure_positive(stored.size_b)?;
-            if !(0.0..=1.0).contains(&stored.opacity) {
-                return Err(InvalidDocument::BadOpacity(stored.opacity));
-            }
-            let mut grid = Grid::new(stored.source.into(), stored.unit.into());
-            grid.set_shape(stored.shape.into());
-            grid.set_size(CellDimension::A, stored.size_a);
-            grid.set_size(CellDimension::B, stored.size_b);
-            grid.set_color(stored.color.into());
-            grid.set_opacity(stored.opacity);
-            grids.push(Identified::new(claim(stored.id)?, grid));
-        }
-
-        Ok(Document::from_parts(
-            self.width,
-            self.height,
-            calibration,
-            measurements,
-            grids,
-            inside(self.origin)?,
-            self.next_object_id,
-        ))
-    }
-}
-
-fn ensure_positive(value: f64) -> Result<(), InvalidDocument> {
-    if value.is_finite() && value > 0.0 {
-        Ok(())
-    } else {
-        Err(InvalidDocument::NotPositive(value))
-    }
 }
 
 // Conversions between runtime values and their stored form.

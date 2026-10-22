@@ -4,6 +4,7 @@
 use std::fmt;
 
 use crate::calibration::{Calibration, ScaleError};
+use crate::color::Rgb;
 use crate::geometry::{Bounds, BoundsHandle, Edge, Point};
 use crate::units::LengthUnit;
 
@@ -27,17 +28,33 @@ impl fmt::Display for Endpoint {
     }
 }
 
-/// A measured line with its own display unit, independent of the calibration unit.
+/// The colour of a new measurement.
+pub const DEFAULT_COLOR: Rgb = Rgb::BLUE;
+
+/// A measured line with its own display unit, independent of the calibration unit, and
+/// its own colour.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Measurement {
     start: Point,
     end: Point,
     unit: LengthUnit,
+    color: Rgb,
 }
 
 impl Measurement {
+    /// A measurement from `start` to `end`, reported in `unit` and drawn in the default
+    /// colour.
     pub fn new(start: Point, end: Point, unit: LengthUnit) -> Self {
-        Self { start, end, unit }
+        Self {
+            start,
+            end,
+            unit,
+            color: DEFAULT_COLOR,
+        }
+    }
+
+    pub fn color(&self) -> Rgb {
+        self.color
     }
 
     pub fn point(&self, endpoint: Endpoint) -> Point {
@@ -108,7 +125,23 @@ impl Measurement {
                 follow(self.end.x, start_x_edge.opposite(), moved_x, dx),
                 follow(self.end.y, start_y_edge.opposite(), moved_y, dy),
             ),
-            unit: self.unit,
+            ..self.clone()
+        }
+    }
+
+    /// The measurement with `endpoint` moved to `to`.
+    pub fn with_point(&self, endpoint: Endpoint, to: Point) -> Measurement {
+        let mut moved = self.clone();
+        moved.set_point(endpoint, to);
+        moved
+    }
+
+    /// The measurement with both points passed through `map`.
+    pub fn map_points(&self, map: impl Fn(Point) -> Point) -> Measurement {
+        Measurement {
+            start: map(self.start),
+            end: map(self.end),
+            ..self.clone()
         }
     }
 
@@ -126,6 +159,10 @@ impl Measurement {
 
     pub(crate) fn set_unit(&mut self, unit: LengthUnit) {
         self.unit = unit;
+    }
+
+    pub(crate) fn set_color(&mut self, color: Rgb) {
+        self.color = color;
     }
 }
 

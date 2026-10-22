@@ -16,6 +16,8 @@ pub const ROTATE: MaterialIcon = material::ICON_ROTATE_RIGHT;
 /// A ruler.
 pub const SCALE: MaterialIcon = material::ICON_STRAIGHTEN;
 pub const MEASURE: MaterialIcon = material::ICON_MEASURING_TAPE;
+/// A polygon outline.
+pub const AREA: MaterialIcon = material::ICON_PENTAGON;
 pub const GRID: MaterialIcon = material::ICON_GRID_ON;
 /// A crosshair.
 pub const ORIGIN: MaterialIcon = material::ICON_MY_LOCATION;
@@ -25,9 +27,9 @@ pub const DELETE: MaterialIcon = material::ICON_DELETE;
 pub const DUPLICATE: MaterialIcon = material::ICON_CONTENT_COPY;
 
 #[cfg(test)]
-pub const ALL: [MaterialIcon; 15] = [
-    NEW, LOAD, SAVE, SAVE_AS, OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, GRID, ORIGIN, UNDO, REDO,
-    DELETE, DUPLICATE,
+pub const ALL: [MaterialIcon; 16] = [
+    NEW, LOAD, SAVE, SAVE_AS, OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, AREA, GRID, ORIGIN, UNDO,
+    REDO, DELETE, DUPLICATE,
 ];
 
 #[cfg(test)]

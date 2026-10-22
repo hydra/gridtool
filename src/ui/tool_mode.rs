@@ -14,6 +14,8 @@ pub enum ToolMode {
     Scale,
     /// Add measurement lines by clicking their two ends.
     Measure,
+    /// Add area measurements by clicking the corners of their outline.
+    Area,
     /// Add grids aligned to a scale line or a measurement line.
     Grid,
     /// Click on the image to move the document origin (the rotation centre).
@@ -22,11 +24,12 @@ pub enum ToolMode {
 
 impl ToolMode {
     /// Every mode, in tool bar order.
-    pub const ALL: [ToolMode; 6] = [
+    pub const ALL: [ToolMode; 7] = [
         ToolMode::Pan,
         ToolMode::Rotate,
         ToolMode::Scale,
         ToolMode::Measure,
+        ToolMode::Area,
         ToolMode::Grid,
         ToolMode::Origin,
     ];
@@ -37,6 +40,7 @@ impl ToolMode {
             ToolMode::Rotate => icons::ROTATE,
             ToolMode::Scale => icons::SCALE,
             ToolMode::Measure => icons::MEASURE,
+            ToolMode::Area => icons::AREA,
             ToolMode::Grid => icons::GRID,
             ToolMode::Origin => icons::ORIGIN,
         }
@@ -48,6 +52,7 @@ impl ToolMode {
             ToolMode::Rotate => "Rotate view",
             ToolMode::Scale => "Scale",
             ToolMode::Measure => "Measure distance",
+            ToolMode::Area => "Measure area",
             ToolMode::Grid => "Grid",
             ToolMode::Origin => "Origin",
         }
@@ -73,11 +78,11 @@ mod tests {
     }
 
     #[test]
-    fn grid_follows_measure_in_the_tool_bar() {
-        let measure = ToolMode::ALL.iter().position(|&m| m == ToolMode::Measure);
-        let grid = ToolMode::ALL.iter().position(|&m| m == ToolMode::Grid);
+    fn area_follows_measure_and_grid_follows_area_in_the_tool_bar() {
+        let position = |mode| ToolMode::ALL.iter().position(|&m| m == mode).unwrap();
 
-        assert_eq!(grid, measure.map(|index| index + 1));
+        assert_eq!(position(ToolMode::Area), position(ToolMode::Measure) + 1);
+        assert_eq!(position(ToolMode::Grid), position(ToolMode::Area) + 1);
     }
 
     #[test]

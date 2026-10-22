@@ -1,5 +1,5 @@
-//! Table of the document's measurements, in document order, with editable coordinates,
-//! per-measurement units and delete buttons.
+//! The Point-to-point table: the document's distance measurements, in document order,
+//! with editable coordinates, per-measurement units and colours, and delete buttons.
 
 use eframe::egui;
 use egui_material_icons::MaterialIcon;
@@ -8,6 +8,7 @@ use gridtool::document::Document;
 use gridtool::geometry::Point;
 use gridtool::measurement::{Endpoint, Measurement};
 
+use super::color_swatch;
 use super::commit_field::CommitField;
 use super::format::{format_coordinate, format_length, parse_number};
 use super::icon_button::inline_icon_text;
@@ -17,7 +18,7 @@ use super::unit_picker;
 
 const COORDINATE_FIELD_WIDTH: f32 = 55.0;
 const DELETE_ICON: MaterialIcon = icons::DELETE;
-const COLUMN_HEADERS: [&str; 6] = ["#", "x1, y1", "x2, y2", "Distance", "Units", ""];
+const COLUMN_HEADERS: [&str; 7] = ["#", "x1, y1", "x2, y2", "Distance", "Units", "Color", ""];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Axis {
@@ -43,6 +44,9 @@ impl Axis {
     }
 }
 
+/// The panel's title.
+pub const HEADING: &str = "Point-to-point";
+
 #[derive(Default)]
 pub struct MeasurementsPanel {
     coordinate_fields: CommitField,
@@ -56,7 +60,7 @@ impl MeasurementsPanel {
         document: &Document,
         selection: &Selection,
     ) -> Option<Action> {
-        ui.heading("Measurements");
+        ui.heading(HEADING);
         ui.separator();
         if document.measurements().is_empty() {
             ui.weak("No measurements yet. Use the Measure distance tool to add one.");
@@ -140,6 +144,18 @@ impl MeasurementsPanel {
                 "Units of this measurement",
             )
             .map(|unit| Action::SetMeasurementUnit { index, unit }),
+        );
+
+        actions.extend(
+            color_swatch::show(
+                ui,
+                egui::Id::unique(("measurement_color", index)),
+                measurement.color(),
+                color_swatch::ROW_SWATCH_SIZE,
+                "Choose the colour of this measurement",
+            )
+            .committed
+            .map(|color| Action::SetMeasurementColor { index, color }),
         );
 
         if ui

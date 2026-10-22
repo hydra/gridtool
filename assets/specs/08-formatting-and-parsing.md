@@ -21,7 +21,8 @@ place, as "`(<x>, <y>)`": (12, 3.456) → "`(12.0, 3.5)`".
 up to 2 decimals (`FMT-1`): 12.34567 → "`12.35`", 40 → "`40`".
 
 **FMT-7 — Measured lengths.** A measured real-world length is formatted with up to 3
-decimals (`FMT-1`): 12.34567 → "`12.346`".
+decimals (`FMT-1`): 12.34567 → "`12.346`". Measured real-world areas (`AREA-7`) are
+formatted the same way.
 
 ## Parsing
 

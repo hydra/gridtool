@@ -11,8 +11,11 @@ use gridtool::document::Document;
 use gridtool::geometry::{Bounds, BoundsHandle, Point};
 use gridtool::grid::GridSource;
 use gridtool::imaging::DecodedImage;
-use gridtool::measurement::Endpoint;
+use gridtool::measurement::{self, Endpoint};
+use gridtool::polygon;
 
+use super::area_tool::{AreaTool, PointHit};
+use super::color::{to_color32, with_opacity};
 use super::document_view::DocumentView;
 use super::format::format_length;
 use super::grid_display::paint_grids;
@@ -20,6 +23,7 @@ use super::grid_tool::add_grid;
 use super::hit_test::nearest_within;
 use super::line_hit::segment_at;
 use super::measure_tool::MeasureTool;
+use super::object_drag::Grip;
 use super::rotate_handle;
 use super::scale_tool::ScaleTool;
 use super::selection::Selection;
@@ -38,10 +42,10 @@ const SCALE_STROKE: Stroke = Stroke {
     width: 1.5,
     color: Color32::RED,
 };
-const MEASUREMENT_STROKE: Stroke = Stroke {
-    width: 2.0,
-    color: Color32::BLUE,
-};
+/// Measurement lines and area outlines, drawn in the object's colour.
+const OBJECT_LINE_WIDTH: f32 = 2.0;
+/// How opaque an area's fill is, over its own colour.
+const AREA_FILL_OPACITY: f32 = 0.25;
 const SELECTION_COLOR: Color32 = Color32::from_rgb(128, 0, 128);
 const SELECTION_STROKE: Stroke = Stroke {
     width: 1.5,
@@ -63,7 +67,10 @@ const LINE_HOVER_TOLERANCE: f32 = 5.0;
 /// which are not part of the line's hover area.
 const LINE_END_EXCLUSION: f32 = 8.0;
 const SCALE_MARKER_RADIUS: f32 = 6.0;
-const MEASUREMENT_HANDLE_RADIUS: f32 = 5.0;
+/// Measurement ends and area corners.
+const POINT_HANDLE_RADIUS: f32 = 5.0;
+/// The ring around the first point of an outline being placed, once it can be closed.
+const CLOSE_TARGET_RADIUS: f32 = 9.0;
 const CROSSHAIR_HALF_LENGTH: f32 = 11.0;
 const ORIGIN_STROKE: Stroke = Stroke {
     width: 2.0,
@@ -101,11 +108,11 @@ pub fn show(
 
     handle_zoom(ui, &response, view_center, &mut view.viewport);
     let transform = view.viewport.transform(view_center, document_size);
-    // The active object's resize handles take priority over every tool.
+    // The active object's points and resize handles take priority over every tool.
     let selection_input = handle_selection(ui, &response, transform, document, &mut view.selection);
     let action = match selection_input {
-        SelectionInput::Resizing(action) => action,
-        SelectionInput::NotResizing => match mode {
+        SelectionInput::Dragging(action) => action,
+        SelectionInput::NotDragging => match mode {
             ToolMode::Pan => {
                 handle_pan(ui, &response, &mut view.viewport);
                 None
@@ -120,6 +127,7 @@ pub fn show(
             ToolMode::Measure => {
                 handle_measure(ui, &response, transform, document, &mut view.measure_tool)
             }
+            ToolMode::Area => handle_area(ui, &response, transform, document, &mut view.area_tool),
             ToolMode::Grid => handle_grid(ui, &response, transform, document, view),
             ToolMode::Origin => handle_origin(ui, &response, transform, document),
         },
@@ -127,18 +135,23 @@ pub fn show(
     if mode != ToolMode::Grid {
         view.grid_tool.set_hovered(None);
     }
-    if !view.selection.is_resizing()
-        && hovered_resize_handle(&response, transform, document, &view.selection).is_some()
+    if !view.selection.is_dragging()
+        && response
+            .hover_pos()
+            .and_then(|pointer| grip_at(transform, document, &view.selection, pointer))
+            .is_some()
     {
         ui.set_cursor_icon(CursorIcon::Grab);
     }
     // In every mode the secondary button pans. Done after the tool so its cursor wins.
     drag_pan(ui, &response, &mut view.viewport, PointerButton::Secondary);
 
-    // Drawing order: image, grids, then the lines grids align to, then tool overlays.
+    // Drawing order: image, grids, areas, then the lines grids align to, then tool
+    // overlays.
     let transform = view.viewport.transform(view_center, document_size);
     paint_document(&painter, transform, &view.texture);
     paint_grids(&painter, transform, document, &view.selection);
+    paint_areas(&painter, transform, document, &view.selection);
     paint_measurements(&painter, transform, document, &view.selection);
     match mode {
         ToolMode::Scale => {
@@ -150,7 +163,11 @@ pub fn show(
                 paint_scale_markers(&painter, transform, points.points(), points.method());
             }
         }
-        ToolMode::Pan | ToolMode::Rotate | ToolMode::Measure | ToolMode::Origin => {}
+        ToolMode::Pan
+        | ToolMode::Rotate
+        | ToolMode::Measure
+        | ToolMode::Area
+        | ToolMode::Origin => {}
     }
     paint_active_grid_source(&painter, transform, document, &view.selection);
     match mode {
@@ -166,6 +183,9 @@ pub fn show(
             if let Some(start) = view.measure_tool.pending_start() {
                 paint_pending_measurement(&painter, transform, start, response.hover_pos());
             }
+        }
+        ToolMode::Area => {
+            paint_pending_area(&painter, transform, &view.area_tool, response.hover_pos());
         }
         ToolMode::Grid => {
             if let Some(source) = view.grid_tool.hovered() {
@@ -221,15 +241,16 @@ fn handle_grid(
     add_grid(document, source_at(clicked)?)
 }
 
-/// Whether the active object's resize handles are handling the primary button.
+/// Whether the active object's grips are handling the primary button.
 enum SelectionInput {
-    /// A resize is in progress (or just ended, with its action); tools must ignore input.
-    Resizing(Option<Action>),
-    NotResizing,
+    /// A drag of a point or resize handle is in progress (or just ended, with its
+    /// action); tools must ignore input.
+    Dragging(Option<Action>),
+    NotDragging,
 }
 
-/// Resizing via the active object's handles, and clearing the selection when the user
-/// clicks outside its bounding box. Runs in every tool mode.
+/// Dragging the active object's points or resize handles, and clearing the selection
+/// when the user clicks outside its bounding box. Runs in every tool mode.
 fn handle_selection(
     ui: &egui::Ui,
     response: &Response,
@@ -238,7 +259,7 @@ fn handle_selection(
     selection: &mut Selection,
 ) -> SelectionInput {
     if selection.active().is_none() {
-        return SelectionInput::NotResizing;
+        return SelectionInput::NotDragging;
     }
     let Some(bounds) = selection.active_bounds(document) else {
         // Objects without a selection box (grids cover the whole document): any click
@@ -246,28 +267,28 @@ fn handle_selection(
         if response.clicked() {
             selection.select(None);
         }
-        return SelectionInput::NotResizing;
+        return SelectionInput::NotDragging;
     };
 
     if response.drag_started_by(PointerButton::Primary)
         && let Some(origin) = press_origin(ui)
-        && let Some(handle) = resize_handle_at(transform, bounds, origin)
+        && let Some(grip) = grip_at(transform, document, selection, origin)
     {
-        selection.begin_resize(document, handle, transform.screen_to_image(origin));
+        selection.begin_drag(document, grip, transform.screen_to_image(origin));
     }
 
-    if selection.is_resizing() {
+    if selection.is_dragging() {
         if response.dragged_by(PointerButton::Primary)
             && let Some(pointer) = response.interact_pointer_pos()
         {
-            selection.resize_to(document, transform.screen_to_image(pointer));
+            selection.drag_to(document, transform.screen_to_image(pointer));
         }
         ui.set_cursor_icon(CursorIcon::Grabbing);
         let action = response
             .drag_stopped_by(PointerButton::Primary)
-            .then(|| selection.end_resize(document))
+            .then(|| selection.end_drag(document))
             .flatten();
-        return SelectionInput::Resizing(action);
+        return SelectionInput::Dragging(action);
     }
 
     if response.clicked()
@@ -281,28 +302,44 @@ fn handle_selection(
             selection.select(None);
         }
     }
-    SelectionInput::NotResizing
+    SelectionInput::NotDragging
 }
 
-fn hovered_resize_handle(
-    response: &Response,
+/// The grip of the active object under screen `position`: the nearer of its nearest
+/// point (within [`POINT_GRAB_RADIUS`]) and its nearest resize handle (within
+/// [`RESIZE_HANDLE_GRAB_RADIUS`]).
+fn grip_at(
     transform: DocumentTransform,
     document: &Document,
     selection: &Selection,
-) -> Option<BoundsHandle> {
+    position: Pos2,
+) -> Option<Grip> {
     let bounds = selection.active_bounds(document)?;
-    resize_handle_at(transform, bounds, response.hover_pos()?)
+    let points: Vec<Pos2> = selection
+        .active_points(document)
+        .into_iter()
+        .map(|point| transform.image_to_screen(point))
+        .collect();
+    let point = nearest_within(&points, position, POINT_GRAB_RADIUS)
+        .map(|index| (Grip::Point(index), points[index].distance(position)));
+    let handle = resize_handle_at(transform, bounds, position)
+        .map(|(handle, at)| (Grip::Bounds(handle), at.distance(position)));
+    [point, handle]
+        .into_iter()
+        .flatten()
+        .min_by(|(_, a), (_, b)| a.total_cmp(b))
+        .map(|(grip, _)| grip)
 }
 
-/// The resize handle of `bounds` under screen `position`, if any.
+/// The resize handle of `bounds` under screen `position`, if any, with its position.
 fn resize_handle_at(
     transform: DocumentTransform,
     bounds: Bounds,
     position: Pos2,
-) -> Option<BoundsHandle> {
+) -> Option<(BoundsHandle, Pos2)> {
     let handles = resize_handle_positions(transform.bounds_corners(bounds, SELECTION_PADDING));
     let positions = handles.map(|(_, position)| position);
-    nearest_within(&positions, position, RESIZE_HANDLE_GRAB_RADIUS).map(|index| handles[index].0)
+    nearest_within(&positions, position, RESIZE_HANDLE_GRAB_RADIUS).map(|index| handles[index])
 }
 
 /// Screen positions of the eight resize handles of a selection box with the given
@@ -525,6 +562,36 @@ fn handle_measure(
     None
 }
 
+/// Each click places the next corner of an area. Clicking the first point closes the
+/// outline (once it has three points); clicking the last point removes it.
+fn handle_area(
+    ui: &egui::Ui,
+    response: &Response,
+    transform: DocumentTransform,
+    document: &Document,
+    tool: &mut AreaTool,
+) -> Option<Action> {
+    let on_screen = to_screen(transform, tool.points());
+    let hit_at = |position| AreaTool::hit_at(&on_screen, position, POINT_GRAB_RADIUS);
+    match response.hover_pos().and_then(hit_at) {
+        Some(PointHit::Last) => ui.set_cursor_icon(CursorIcon::PointingHand),
+        Some(PointHit::First) if tool.can_close() => ui.set_cursor_icon(CursorIcon::PointingHand),
+        _ if response.hovered() => ui.set_cursor_icon(CursorIcon::Crosshair),
+        _ => {}
+    }
+
+    let clicked = response
+        .clicked()
+        .then(|| response.interact_pointer_pos())
+        .flatten()?;
+    let hit = hit_at(clicked);
+    let point = transform.screen_to_image(clicked);
+    if hit.is_none() && !document.contains(point) {
+        return None;
+    }
+    tool.click(point, hit, document.calibration().unit())
+}
+
 /// A click anywhere on the image moves the document origin there.
 fn handle_origin(
     ui: &egui::Ui,
@@ -700,7 +767,7 @@ fn paint_highlighted_source(
     }
 }
 
-/// Draws every measurement as a labelled line with a handle at each end.
+/// Draws every measurement as a labelled line with a handle at each end, in its colour.
 fn paint_measurements(
     painter: &egui::Painter,
     transform: DocumentTransform,
@@ -720,9 +787,16 @@ fn paint_measurements(
             ),
             Err(_) => (index + 1).to_string(),
         };
-        paint_labelled_line(painter, start, end, MEASUREMENT_STROKE, label);
+        let color = to_color32(measurement.color());
+        paint_labelled_line(
+            painter,
+            start,
+            end,
+            Stroke::new(OBJECT_LINE_WIDTH, color),
+            label,
+        );
         for position in [start, end] {
-            paint_measurement_handle(painter, position);
+            paint_point_handle(painter, position, color);
         }
     }
 }
@@ -734,24 +808,128 @@ fn paint_pending_measurement(
     start: Point,
     pointer: Option<Pos2>,
 ) {
+    let color = to_color32(measurement::DEFAULT_COLOR);
     let start = transform.image_to_screen(start);
     if let Some(pointer) = pointer {
         painter.extend(Shape::dashed_line(
             &[start, pointer],
-            MEASUREMENT_STROKE,
+            Stroke::new(OBJECT_LINE_WIDTH, color),
             DASH_LENGTH,
             DASH_GAP,
         ));
     }
-    paint_measurement_handle(painter, start);
+    paint_point_handle(painter, start, color);
 }
 
-fn paint_measurement_handle(painter: &egui::Painter, position: Pos2) {
-    painter.circle_filled(
-        position,
-        MEASUREMENT_HANDLE_RADIUS,
-        MEASUREMENT_STROKE.color,
-    );
+/// Draws every area as a filled outline with a handle at each corner and its area
+/// written at its centre, in its colour.
+fn paint_areas(
+    painter: &egui::Painter,
+    transform: DocumentTransform,
+    document: &Document,
+    selection: &Selection,
+) {
+    for (index, stored) in document.areas().iter().enumerate() {
+        let area = selection.displayed_area(stored.id(), stored);
+        let color = to_color32(area.color());
+        let on_screen = to_screen(transform, area.points());
+        paint_filled_outline(painter, area.points(), &on_screen, area.color());
+        for &position in &on_screen {
+            paint_point_handle(painter, position, color);
+        }
+        let label = match area.area(document.calibration()) {
+            Ok(value) => format!(
+                "{}: {} {}",
+                index + 1,
+                format_length(value),
+                area.unit().area_symbol()
+            ),
+            Err(_) => (index + 1).to_string(),
+        };
+        paint_label(
+            painter,
+            transform.image_to_screen(area.center()),
+            label,
+            color,
+        );
+    }
+}
+
+/// Draws the outline being placed: the points so far joined by solid lines, and a dashed
+/// line on to the pointer. Over the first point, once the outline can be closed, the
+/// dashed line closes the outline and the area is shown filled.
+fn paint_pending_area(
+    painter: &egui::Painter,
+    transform: DocumentTransform,
+    tool: &AreaTool,
+    pointer: Option<Pos2>,
+) {
+    let points = tool.points();
+    let on_screen = to_screen(transform, points);
+    let (Some(&first), Some(&last)) = (on_screen.first(), on_screen.last()) else {
+        return;
+    };
+    let rgb = gridtool::area::DEFAULT_COLOR;
+    let stroke = Stroke::new(OBJECT_LINE_WIDTH, to_color32(rgb));
+    let closing = tool.can_close()
+        && pointer.and_then(|pointer| AreaTool::hit_at(&on_screen, pointer, POINT_GRAB_RADIUS))
+            == Some(PointHit::First);
+
+    if closing {
+        paint_filled_outline(painter, points, &on_screen, rgb);
+    } else {
+        painter.add(Shape::line(on_screen.clone(), stroke));
+        if let Some(pointer) = pointer {
+            painter.extend(Shape::dashed_line(
+                &[last, pointer],
+                stroke,
+                DASH_LENGTH,
+                DASH_GAP,
+            ));
+        }
+    }
+    for &position in &on_screen {
+        paint_point_handle(painter, position, stroke.color);
+    }
+    if tool.can_close() {
+        painter.circle_stroke(first, CLOSE_TARGET_RADIUS, stroke);
+    }
+}
+
+/// Fills the outline through `points` (image coordinates, drawn at `on_screen`) with a
+/// translucent `color`, then strokes its edges. Concave outlines are triangulated.
+fn paint_filled_outline(
+    painter: &egui::Painter,
+    points: &[Point],
+    on_screen: &[Pos2],
+    color: gridtool::color::Rgb,
+) {
+    let fill = with_opacity(color, AREA_FILL_OPACITY);
+    let mut mesh = egui::Mesh::default();
+    for &position in on_screen {
+        mesh.colored_vertex(position, fill);
+    }
+    for triangle in polygon::triangulate(points) {
+        let [a, b, c] = triangle.map(|index| index as u32);
+        mesh.add_triangle(a, b, c);
+    }
+    painter.add(mesh);
+    painter.add(Shape::closed_line(
+        on_screen.to_vec(),
+        Stroke::new(OBJECT_LINE_WIDTH, to_color32(color)),
+    ));
+}
+
+fn to_screen(transform: DocumentTransform, points: &[Point]) -> Vec<Pos2> {
+    points
+        .iter()
+        .map(|&point| transform.image_to_screen(point))
+        .collect()
+}
+
+/// A measurement end or area corner.
+fn paint_point_handle(painter: &egui::Painter, position: Pos2, color: Color32) {
+    painter.circle_filled(position, POINT_HANDLE_RADIUS, color);
 }
 
 /// Draws a line with `label` beside its midpoint.
@@ -822,6 +1000,14 @@ mod tests {
     /// The selection box's right-edge handle: the end, pushed out by the padding.
     const RIGHT_RESIZE_HANDLE: Pos2 = Pos2::new(450.0 + SELECTION_PADDING, 300.0);
     const EMPTY_SPOT: Pos2 = Pos2::new(600.0, 500.0);
+    /// Image points of a test triangle, and where they are drawn at the default view (the
+    /// document's top-left corner is at (300, 250) on screen).
+    const TRIANGLE: [(f64, f64); 3] = [(20.0, 20.0), (60.0, 20.0), (40.0, 60.0)];
+    const TRIANGLE_ON_SCREEN: [Pos2; 3] = [
+        Pos2::new(320.0, 270.0),
+        Pos2::new(360.0, 270.0),
+        Pos2::new(340.0, 310.0),
+    ];
     const DRAG_BY: Vec2 = Vec2::new(40.0, 25.0);
 
     struct Harness {
@@ -906,6 +1092,22 @@ mod tests {
 
         fn select_measurement(&mut self) {
             let id = self.document.measurements()[0].id();
+            self.view.selection.select(Some(id));
+        }
+
+        /// Adds the triangle (20, 20), (60, 20), (40, 60) and makes it the active object.
+        /// On screen its corners are at [`TRIANGLE_ON_SCREEN`].
+        fn select_new_area(&mut self) {
+            Action::AddArea(
+                gridtool::area::Area::new(
+                    TRIANGLE.iter().map(|&(x, y)| Point::new(x, y)).collect(),
+                    LengthUnit::Centimetre,
+                )
+                .unwrap(),
+            )
+            .apply(&mut self.document)
+            .unwrap();
+            let id = self.document.areas()[0].id();
             self.view.selection.select(Some(id));
         }
 
@@ -1049,7 +1251,7 @@ mod tests {
     }
 
     #[test]
-    fn measurement_ends_can_no_longer_be_dragged_directly() {
+    fn the_ends_of_an_inactive_measurement_cannot_be_dragged() {
         for mode in ToolMode::ALL {
             let mut harness = Harness::new(mode);
 
@@ -1221,6 +1423,117 @@ mod tests {
             assert!(
                 (now - cursor).length() < 1e-2,
                 "{mode:?} moved the point under the cursor to {now:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn clicking_corners_then_the_first_point_adds_an_area() {
+        let mut harness = Harness::new(ToolMode::Area);
+        for corner in TRIANGLE_ON_SCREEN {
+            harness.click(corner);
+        }
+        assert!(harness.actions.is_empty());
+        assert_eq!(harness.view.area_tool.points().len(), 3);
+
+        // Within reach of the first point, not exactly on it.
+        harness.click(TRIANGLE_ON_SCREEN[0] + Vec2::new(4.0, -3.0));
+
+        let expected = gridtool::area::Area::new(
+            TRIANGLE.iter().map(|&(x, y)| Point::new(x, y)).collect(),
+            LengthUnit::Centimetre,
+        )
+        .unwrap();
+        assert_eq!(harness.actions, [Action::AddArea(expected)]);
+        assert!(harness.view.area_tool.points().is_empty());
+    }
+
+    #[test]
+    fn clicking_the_last_point_removes_it_and_clicks_outside_are_ignored() {
+        let mut harness = Harness::new(ToolMode::Area);
+        harness.click(TRIANGLE_ON_SCREEN[0]);
+        harness.click(TRIANGLE_ON_SCREEN[1]);
+
+        harness.click(TRIANGLE_ON_SCREEN[1] + Vec2::new(2.0, 2.0));
+        assert_eq!(harness.view.area_tool.points(), [Point::new(20.0, 20.0)]);
+
+        harness.click(EMPTY_SPOT);
+        assert_eq!(harness.view.area_tool.points().len(), 1);
+        assert!(harness.actions.is_empty());
+    }
+
+    #[test]
+    fn the_first_point_does_not_close_fewer_than_three_points() {
+        let mut harness = Harness::new(ToolMode::Area);
+        harness.click(TRIANGLE_ON_SCREEN[0]);
+        harness.click(TRIANGLE_ON_SCREEN[1]);
+
+        harness.click(TRIANGLE_ON_SCREEN[0]);
+
+        assert_eq!(harness.view.area_tool.points().len(), 2);
+        assert!(harness.actions.is_empty());
+    }
+
+    #[test]
+    fn the_active_areas_points_can_be_dragged_in_every_mode() {
+        for mode in ToolMode::ALL {
+            let mut harness = Harness::new(mode);
+            harness.select_new_area();
+
+            harness.drag(PointerButton::Primary, TRIANGLE_ON_SCREEN[2], DRAG_BY);
+
+            assert_eq!(
+                harness.actions,
+                [Action::MoveAreaPoint {
+                    index: 0,
+                    point: 2,
+                    to: Point::new(80.0, 85.0),
+                }],
+                "{mode:?}"
+            );
+            assert_eq!(harness.pan(), Vec2::ZERO, "{mode:?} should not pan");
+        }
+    }
+
+    #[test]
+    fn the_active_areas_box_handles_stretch_it() {
+        let mut harness = Harness::new(ToolMode::Pan);
+        harness.select_new_area();
+        // The right edge handle: the triangle's right edge (x = 60), pushed out by the
+        // padding, halfway down (y = 40).
+        let right_handle = Pos2::new(360.0 + SELECTION_PADDING, 290.0);
+
+        harness.drag(PointerButton::Primary, right_handle, Vec2::new(40.0, 0.0));
+
+        assert_eq!(
+            harness.actions,
+            [Action::ResizeArea {
+                index: 0,
+                points: vec![
+                    Point::new(20.0, 20.0),
+                    Point::new(100.0, 20.0),
+                    Point::new(60.0, 60.0),
+                ],
+            }]
+        );
+    }
+
+    #[test]
+    fn the_active_measurements_ends_can_be_dragged_in_every_mode() {
+        for mode in ToolMode::ALL {
+            let mut harness = Harness::new(mode);
+            harness.select_measurement();
+
+            harness.drag(PointerButton::Primary, MEASUREMENT_START_ON_SCREEN, DRAG_BY);
+
+            assert_eq!(
+                harness.actions,
+                [Action::MoveMeasurementPoint {
+                    index: 0,
+                    endpoint: Endpoint::Start,
+                    to: Point::new(90.0, 75.0),
+                }],
+                "{mode:?}"
             );
         }
     }

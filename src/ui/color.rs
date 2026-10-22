@@ -1,7 +1,7 @@
 //! Conversions between the document's colour type and egui's.
 
 use eframe::egui::Color32;
-use gridtool::grid::Rgb;
+use gridtool::color::Rgb;
 
 pub fn to_color32(rgb: Rgb) -> Color32 {
     Color32::from_rgb(rgb.r, rgb.g, rgb.b)

@@ -6,6 +6,7 @@
 //! relative to the document file when the image is in the same folder or below it.
 
 mod v1;
+mod v2;
 
 use std::fmt;
 use std::fs;
@@ -20,6 +21,7 @@ use crate::geometry::Point;
 use crate::imaging::{DecodedImage, ImageLoadError, decode_file};
 
 pub use v1::DocumentV1;
+pub use v2::DocumentV2;
 
 /// The extension of document files, without the dot.
 pub const EXTENSION: &str = "ron";
@@ -29,25 +31,28 @@ pub const EXTENSION: &str = "ron";
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DocumentFile {
     V1(DocumentV1),
+    V2(DocumentV2),
 }
 
 impl DocumentFile {
     /// Describes `document` in the current format version.
     pub fn describe(document: &Document, image: String) -> Self {
-        Self::V1(DocumentV1::describe(document, image))
+        Self::V2(DocumentV2::describe(document, image))
     }
 
     /// The stored image reference.
     pub fn image(&self) -> &str {
         match self {
             Self::V1(file) => &file.image,
+            Self::V2(file) => &file.image,
         }
     }
 
-    /// Re-creates the runtime document.
+    /// Re-creates the runtime document, migrating older versions first.
     pub fn to_document(&self) -> Result<Document, InvalidDocument> {
         match self {
-            Self::V1(file) => file.to_document(),
+            Self::V1(file) => DocumentV2::from(file.clone()).to_document(),
+            Self::V2(file) => file.to_document(),
         }
     }
 
@@ -163,6 +168,7 @@ pub enum InvalidDocument {
     EmptySize,
     PointOutside(Point),
     WrongScalePointCount,
+    TooFewAreaPoints(usize),
     NotPositive(f64),
     BadOpacity(f32),
     /// Zero, duplicated, or not below the stored next object id.
@@ -176,6 +182,9 @@ impl fmt::Display for InvalidDocument {
             Self::PointOutside(point) => write!(f, "point {point} is outside the document"),
             Self::WrongScalePointCount => {
                 f.write_str("the number of scale points does not match the method")
+            }
+            Self::TooFewAreaPoints(count) => {
+                write!(f, "an area has {count} points, but needs at least 3")
             }
             Self::NotPositive(value) => write!(f, "{value} should be a positive number"),
             Self::BadOpacity(value) => write!(f, "opacity {value} is not between 0 and 1"),

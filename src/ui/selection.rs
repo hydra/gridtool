@@ -1,27 +1,22 @@
-//! The active object and resizing it through its bounding-box handles.
+//! The active object, and dragging its points or bounding-box handles.
 //!
 //! Selection is presentation state: it is not part of the document and is not undoable.
-//! Resizing produces a document [`Action`] when the drag ends.
+//! A drag produces a document [`Action`] when it ends.
 
 use gridtool::action::Action;
+use gridtool::area::Area;
 use gridtool::document::Document;
-use gridtool::geometry::{Bounds, BoundsHandle, Point};
+use gridtool::geometry::{Bounds, Point};
 use gridtool::grid::Grid;
 use gridtool::measurement::Measurement;
 use gridtool::object::ObjectId;
 
-#[derive(Debug, Clone, PartialEq)]
-struct Resize {
-    handle: BoundsHandle,
-    press: Point,
-    original: Measurement,
-    preview: Measurement,
-}
+use super::object_drag::{Grip, ObjectDrag, Shape};
 
 #[derive(Debug, Default)]
 pub struct Selection {
     active: Option<ObjectId>,
-    resize: Option<Resize>,
+    drag: Option<ObjectDrag>,
     /// Uncommitted style edits (colour, opacity) of the active grid, shown live while
     /// the user is still choosing.
     grid_preview: Option<Grid>,
@@ -32,29 +27,29 @@ impl Selection {
         self.active
     }
 
-    /// Makes `id` the active object (or clears it with `None`), abandoning any resize or
+    /// Makes `id` the active object (or clears it with `None`), abandoning any drag or
     /// preview.
     pub fn select(&mut self, id: Option<ObjectId>) {
         if self.active != id {
-            self.resize = None;
+            self.drag = None;
             self.grid_preview = None;
         }
         self.active = id;
     }
 
     /// Re-aligns with the document after it changed (an action, undo or redo): drops a
-    /// selection whose object no longer exists and abandons any resize or preview.
+    /// selection whose object no longer exists and abandons any drag or preview.
     pub fn sync_to(&mut self, document: &Document) {
         if self.active.is_some_and(|id| !document.contains_object(id)) {
             self.active = None;
         }
-        self.resize = None;
+        self.drag = None;
         self.grid_preview = None;
     }
 
-    /// Abandons a resize in progress, without committing anything.
-    pub fn cancel_resize(&mut self) {
-        self.resize = None;
+    /// Abandons a drag in progress, without committing anything.
+    pub fn cancel_drag(&mut self) {
+        self.drag = None;
     }
 
     /// How to display the grid with `id`: the preview if it is the active grid and has
@@ -77,86 +72,87 @@ impl Selection {
         self.grid_preview = None;
     }
 
-    /// How to display the measurement with `id`: the resize preview if it is being
-    /// resized, otherwise the measurement itself.
+    /// The drag preview of the object with `id`, if it is being dragged.
+    fn previewed(&self, id: ObjectId) -> Option<&Shape> {
+        self.drag
+            .as_ref()
+            .filter(|_| self.active == Some(id))
+            .map(ObjectDrag::preview)
+    }
+
+    /// How to display the measurement with `id`: the drag preview if it is being
+    /// dragged, otherwise the measurement itself.
     pub fn displayed(&self, id: ObjectId, measurement: &Measurement) -> Measurement {
-        match &self.resize {
-            Some(resize) if self.active == Some(id) => resize.preview.clone(),
+        match self.previewed(id) {
+            Some(Shape::Measurement(preview)) => preview.clone(),
             _ => measurement.clone(),
+        }
+    }
+
+    /// How to display the area with `id`: the drag preview if it is being dragged,
+    /// otherwise the area itself.
+    pub fn displayed_area(&self, id: ObjectId, area: &Area) -> Area {
+        match self.previewed(id) {
+            Some(Shape::Area(preview)) => preview.clone(),
+            _ => area.clone(),
+        }
+    }
+
+    /// The active object's shape as currently displayed, if it has one (measurements and
+    /// areas do; grids do not).
+    fn active_shape(&self, document: &Document) -> Option<Shape> {
+        let id = self.active?;
+        match self.previewed(id) {
+            Some(preview) => Some(preview.clone()),
+            None => Shape::of(document, id),
         }
     }
 
     /// Bounding box of the active object as currently displayed.
     pub fn active_bounds(&self, document: &Document) -> Option<Bounds> {
-        let (id, measurement) = self.active_measurement(document)?;
-        Some(self.displayed(id, measurement).bounds())
+        self.active_shape(document).map(|shape| shape.bounds())
     }
 
-    /// Starts resizing the active object by `handle`, with the pointer pressed at image
-    /// point `press`. Returns `false` if there is no active object.
-    pub fn begin_resize(
-        &mut self,
-        document: &Document,
-        handle: BoundsHandle,
-        press: Point,
-    ) -> bool {
-        let Some((_, measurement)) = self.active_measurement(document) else {
+    /// The active object's draggable points as currently displayed; empty if it has none.
+    pub fn active_points(&self, document: &Document) -> Vec<Point> {
+        self.active_shape(document)
+            .map(|shape| shape.points())
+            .unwrap_or_default()
+    }
+
+    /// Starts dragging `grip` of the active object, with the pointer pressed at image
+    /// point `press`. Returns `false` if there is no active object with a shape.
+    pub fn begin_drag(&mut self, document: &Document, grip: Grip, press: Point) -> bool {
+        let Some(shape) = self.active.and_then(|id| Shape::of(document, id)) else {
             return false;
         };
-        self.resize = Some(Resize {
-            handle,
-            press,
-            original: measurement.clone(),
-            preview: measurement.clone(),
-        });
+        self.drag = Some(ObjectDrag::new(shape, grip, press));
         true
     }
 
-    pub fn is_resizing(&self) -> bool {
-        self.resize.is_some()
+    pub fn is_dragging(&self) -> bool {
+        self.drag.is_some()
     }
 
-    /// Updates the preview for the pointer at image point `pointer`. The grabbed edges
-    /// move by the pointer's movement since the press; endpoints stay inside the document.
-    pub fn resize_to(&mut self, document: &Document, pointer: Point) {
-        if let Some(resize) = &mut self.resize {
-            let resized = resize.original.resized(
-                resize.handle,
-                pointer.x - resize.press.x,
-                pointer.y - resize.press.y,
-            );
-            resize.preview = Measurement::new(
-                document.clamp(resized.start()),
-                document.clamp(resized.end()),
-                resized.unit(),
-            );
+    /// Updates the preview for the pointer at image point `pointer`. Points stay inside
+    /// the document.
+    pub fn drag_to(&mut self, document: &Document, pointer: Point) {
+        if let Some(drag) = &mut self.drag {
+            drag.drag_to(document, pointer);
         }
     }
 
-    /// Finishes the resize, returning the action if the measurement actually changed.
-    pub fn end_resize(&mut self, document: &Document) -> Option<Action> {
-        let resize = self.resize.take()?;
-        let index = document.measurement_index(self.active?)?;
-        (resize.preview != resize.original).then(|| Action::ResizeMeasurement {
-            index,
-            start: resize.preview.start(),
-            end: resize.preview.end(),
-        })
-    }
-
-    fn active_measurement<'a>(
-        &self,
-        document: &'a Document,
-    ) -> Option<(ObjectId, &'a Measurement)> {
-        let id = self.active?;
-        let index = document.measurement_index(id)?;
-        Some((id, &document.measurements()[index]))
+    /// Finishes the drag, returning the action if the object actually changed.
+    pub fn end_drag(&mut self, document: &Document) -> Option<Action> {
+        let drag = self.drag.take()?;
+        drag.finish(document, self.active?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gridtool::geometry::BoundsHandle;
     use gridtool::units::LengthUnit;
 
     fn document_with_two_measurements() -> Document {
@@ -205,18 +201,71 @@ mod tests {
     }
 
     #[test]
+    fn an_active_area_has_bounds_and_points_that_follow_a_drag() {
+        let mut document = document_with_two_measurements();
+        Action::AddArea(
+            Area::new(
+                vec![
+                    Point::new(10.0, 50.0),
+                    Point::new(30.0, 50.0),
+                    Point::new(20.0, 70.0),
+                ],
+                gridtool::units::LengthUnit::Metre,
+            )
+            .unwrap(),
+        )
+        .apply(&mut document)
+        .unwrap();
+        let stored = &document.areas()[0];
+        let mut selection = Selection::default();
+        selection.select(Some(stored.id()));
+        assert_eq!(selection.active_points(&document), stored.points());
+
+        assert!(selection.begin_drag(&document, Grip::Point(1), Point::new(30.0, 50.0)));
+        selection.drag_to(&document, Point::new(40.0, 45.0));
+
+        assert_eq!(
+            selection.displayed_area(stored.id(), stored).points()[1],
+            Point::new(40.0, 45.0)
+        );
+        assert_eq!(
+            selection.active_points(&document)[1],
+            Point::new(40.0, 45.0)
+        );
+        assert_eq!(
+            selection.active_bounds(&document),
+            Some(Bounds::around(
+                Point::new(10.0, 45.0),
+                Point::new(40.0, 70.0)
+            ))
+        );
+        assert_eq!(
+            selection.end_drag(&document),
+            Some(Action::MoveAreaPoint {
+                index: 0,
+                point: 1,
+                to: Point::new(40.0, 45.0),
+            })
+        );
+    }
+
+    #[test]
     fn cancelling_a_resize_commits_nothing_and_keeps_the_selection() {
         let document = document_with_two_measurements();
         let mut selection = Selection::default();
         let id = id_of(&document, 0);
         selection.select(Some(id));
-        selection.begin_resize(&document, BoundsHandle::BottomRight, Point::new(40.0, 30.0));
-        selection.resize_to(&document, Point::new(45.0, 38.0));
+        selection.begin_drag(
+            &document,
+            Grip::Bounds(BoundsHandle::BottomRight),
+            Point::new(40.0, 30.0),
+        );
+        selection.drag_to(&document, Point::new(45.0, 38.0));
 
-        selection.cancel_resize();
+        selection.cancel_drag();
 
-        assert!(!selection.is_resizing());
-        assert_eq!(selection.end_resize(&document), None);
+        assert!(!selection.is_dragging());
+        assert_eq!(selection.end_drag(&document), None);
         let measurement = &document.measurements()[0];
         assert_eq!(selection.displayed(id, measurement), **measurement);
         assert_eq!(selection.active(), Some(id));
@@ -229,24 +278,24 @@ mod tests {
         let id = id_of(&document, 0);
         selection.select(Some(id));
 
-        assert!(selection.begin_resize(
+        assert!(selection.begin_drag(
             &document,
-            BoundsHandle::BottomRight,
+            Grip::Bounds(BoundsHandle::BottomRight),
             Point::new(40.0, 30.0)
         ));
-        selection.resize_to(&document, Point::new(45.0, 38.0));
+        selection.drag_to(&document, Point::new(45.0, 38.0));
 
         let preview = selection.displayed(id, &document.measurements()[0]);
         assert_eq!(preview.end(), Point::new(45.0, 38.0));
         assert_eq!(
-            selection.end_resize(&document),
+            selection.end_drag(&document),
             Some(Action::ResizeMeasurement {
                 index: 0,
                 start: Point::new(10.0, 10.0),
                 end: Point::new(45.0, 38.0),
             })
         );
-        assert!(!selection.is_resizing());
+        assert!(!selection.is_dragging());
     }
 
     #[test]
@@ -254,11 +303,15 @@ mod tests {
         let document = document_with_two_measurements();
         let mut selection = Selection::default();
         selection.select(Some(id_of(&document, 0)));
-        selection.begin_resize(&document, BoundsHandle::Left, Point::new(10.0, 20.0));
+        selection.begin_drag(
+            &document,
+            Grip::Bounds(BoundsHandle::Left),
+            Point::new(10.0, 20.0),
+        );
 
-        selection.resize_to(&document, Point::new(-500.0, 20.0));
+        selection.drag_to(&document, Point::new(-500.0, 20.0));
 
-        let Some(Action::ResizeMeasurement { start, .. }) = selection.end_resize(&document) else {
+        let Some(Action::ResizeMeasurement { start, .. }) = selection.end_drag(&document) else {
             panic!("expected a resize action");
         };
         assert_eq!(start, Point::new(0.0, 10.0));
@@ -269,18 +322,22 @@ mod tests {
         let document = document_with_two_measurements();
         let mut selection = Selection::default();
         selection.select(Some(id_of(&document, 0)));
-        selection.begin_resize(&document, BoundsHandle::Top, Point::new(25.0, 10.0));
+        selection.begin_drag(
+            &document,
+            Grip::Bounds(BoundsHandle::Top),
+            Point::new(25.0, 10.0),
+        );
 
-        assert_eq!(selection.end_resize(&document), None);
+        assert_eq!(selection.end_drag(&document), None);
     }
 
     #[test]
     fn cannot_resize_without_an_active_object() {
         let mut selection = Selection::default();
 
-        assert!(!selection.begin_resize(
+        assert!(!selection.begin_drag(
             &document_with_two_measurements(),
-            BoundsHandle::Top,
+            Grip::Bounds(BoundsHandle::Top),
             Point::default()
         ));
     }
@@ -290,8 +347,12 @@ mod tests {
         let document = document_with_two_measurements();
         let mut selection = Selection::default();
         selection.select(Some(id_of(&document, 0)));
-        selection.begin_resize(&document, BoundsHandle::Right, Point::new(40.0, 20.0));
-        selection.resize_to(&document, Point::new(70.0, 20.0));
+        selection.begin_drag(
+            &document,
+            Grip::Bounds(BoundsHandle::Right),
+            Point::new(40.0, 20.0),
+        );
+        selection.drag_to(&document, Point::new(70.0, 20.0));
 
         let other = &document.measurements()[1];
         assert_eq!(selection.displayed(other.id(), other), **other);
@@ -303,11 +364,11 @@ mod tests {
         let mut selection = Selection::default();
         let id = id_of(&document, 1);
         selection.select(Some(id));
-        selection.begin_resize(&document, BoundsHandle::Top, Point::default());
+        selection.begin_drag(&document, Grip::Bounds(BoundsHandle::Top), Point::default());
 
         selection.sync_to(&document);
         assert_eq!(selection.active(), Some(id));
-        assert!(!selection.is_resizing());
+        assert!(!selection.is_dragging());
 
         Action::DeleteMeasurement { index: 1 }
             .apply(&mut document)
@@ -355,12 +416,16 @@ mod tests {
         selection.select(Some(id));
 
         assert_eq!(selection.active_bounds(&document), None);
-        assert!(!selection.begin_resize(&document, BoundsHandle::Top, Point::default()));
+        assert!(!selection.begin_drag(
+            &document,
+            Grip::Bounds(BoundsHandle::Top),
+            Point::default()
+        ));
     }
 
     #[test]
     fn grid_preview_shows_only_for_the_active_grid_until_cleared() {
-        use gridtool::grid::Rgb;
+        use gridtool::color::Rgb;
 
         let (document, id) = document_with_grid();
         let stored = &document.grids()[0];

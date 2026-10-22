@@ -21,6 +21,14 @@ view change (pan, zoom, rotation).
 | **Move measurement point** | index (0-based), endpoint (start/end), new position | Moves one end of one measurement | The index exists and the position is inside the document | "`Move measurement <index+1> <start\|end> to (<x>, <y>)`", e.g. "`Move measurement 2 end to (3.0, 4.0)`" |
 | **Resize measurement** | index, new start, new end | Replaces both ends of one measurement at once; its id and unit are kept (`OBJ-9`) | The index exists and both points are inside the document | "`Resize measurement <index+1> to (<x1>, <y1>) - (<x2>, <y2>)`", with coordinates to 1 decimal place |
 | **Set measurement unit** | index, unit | Changes the unit of one measurement only | The index exists | "`Set measurement <index+1> units to <symbol>`" |
+| **Set measurement colour** | index, RGB colour | Changes the colour of one measurement (`MEAS-15`) | The index exists | "`Set measurement <index+1> color to #RRGGBB`", in upper-case hex |
+| **Add area** | the points (3 or more, in order), unit | Appends an area to the end of the area list (`AREA-6`), in the default colour cyan, and gives it the next object id (`OBJ-1`) | Every point is inside the document | "`Add area with <count> points`" |
+| **Move area point** | index, point number (0-based), new position | Moves one point of one area (`OBJ-15`) | The index and the point exist, and the position is inside the document | "`Move area <index+1> point <point+1> to (<x>, <y>)`", with coordinates to 1 decimal place |
+| **Resize area** | index, the new points | Replaces every point of one area at once; its id, unit and colour are kept (`OBJ-9`) | The index exists, the number of points is unchanged, and every point is inside the document | "`Resize area <index+1>`" |
+| **Set area unit** | index, unit | Changes the unit one area is reported in (`AREA-13`) | The index exists | "`Set area <index+1> units to <symbol>`", where the symbol is the length unit's (`cm`, `m`) |
+| **Set area colour** | index, RGB colour | Changes the colour of one area (`AREA-13`) | The index exists | "`Set area <index+1> color to #RRGGBB`", in upper-case hex |
+| **Delete area** | index | Removes one area; later ones move up | The index exists | "`Delete area <index+1>`" |
+| **Duplicate area** | index | Appends an exact copy (every point, the unit and the colour) to the end of the area list, with the next object id (`OBJ-12`) | The index exists | "`Duplicate area <index+1>`" |
 | **Add grid** | grid (source and properties) | Appends a grid to the end of the list (`GRID-2`) and gives it the next object id | The source exists, both cell sizes are finite and > 0, and the opacity is in [0, 1] | "`Add grid aligned to scale line <A\|B>`", or "`Add grid aligned to a measurement`" |
 | **Set grid cell shape** | index, shape | Changes the cell shape | The index exists | "`Set grid <index+1> cell shape to <Square\|Rectangle>`" |
 | **Set grid cell size** | index, dimension (L/A/B), size | Sets A (A), B (B), or both (L) | The index exists and the size is finite and > 0 | "`Set grid <index+1> size <L\|A\|B> to <value>`", with the value written as for **Set distance** |
@@ -28,7 +36,7 @@ view change (pan, zoom, rotation).
 | **Set grid colour** | index, RGB colour | Changes the line colour | The index exists | "`Set grid <index+1> color to #RRGGBB`", in upper-case hex |
 | **Set grid opacity** | index, opacity | Changes the opacity | The index exists and the opacity is in [0, 1] | "`Set grid <index+1> opacity to <percent>%`", rounded to a whole percent |
 | **Delete measurement** | index | Removes one measurement; later ones move up. Grids aligned to it remain, without an alignment line (`GRID-4`) | The index exists | "`Delete measurement <index+1>`" |
-| **Duplicate measurement** | index | Appends an exact copy (both endpoints and the unit) to the end of the list, with the next object id (`OBJ-12`) | The index exists | "`Duplicate measurement <index+1>`" |
+| **Duplicate measurement** | index | Appends an exact copy (both endpoints, the unit and the colour) to the end of the list, with the next object id (`OBJ-12`) | The index exists | "`Duplicate measurement <index+1>`" |
 | **Duplicate grid** | index | Appends an exact copy (alignment source, shape, both cell sizes, unit, colour and opacity) to the end of the list, with the next object id (`OBJ-12`). A grid whose alignment line is missing can still be duplicated | The index exists | "`Duplicate grid <index+1>`" |
 | **Delete grid** | index | Removes one grid; later ones move up | The index exists | "`Delete grid <index+1>`" |
 
@@ -74,7 +82,7 @@ never saved (`FILE-2`). Saving is not an action and does not change the history.
 - Every user-facing action MUST be undoable and redoable through these buttons.
 
 **HIST-10 — History panel.**
-- The history list is the lower section of the side panel (`SHELL-11`).
+- The history list is the bottom section of the side panel (`SHELL-11`).
 - It has the heading "`History`", then a separator, then a list that scrolls **both
   vertically and horizontally**. Rows do not wrap, so long labels scroll horizontally.
 - With no document open, the list shows "`No document open`" in weak text.

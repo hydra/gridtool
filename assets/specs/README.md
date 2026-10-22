@@ -24,6 +24,7 @@ must satisfy them.
 | [11-grids.md](11-grids.md) | Grid tool, grid geometry, grid properties row | `GRID` |
 | [12-origin.md](12-origin.md) | Document origin (rotation centre), Origin mode and marker | `ORIGIN` |
 | [13-files.md](13-files.md) | New, Load, Save, Save as; unsaved changes; closing the window; closing the window; the `.ron` file format | `FILE` |
+| [14-areas.md](14-areas.md) | Measure area tool, area measurements, Areas table | `AREA` |
 
 ## Conventions
 
@@ -43,7 +44,7 @@ must satisfy them.
 
 | Term | Meaning |
 |---|---|
-| **Document** | The thing being edited: an image-sized rectangle plus its calibration data, measurements, grids and origin. |
+| **Document** | The thing being edited: an image-sized rectangle plus its calibration data, measurements, areas, grids and origin. |
 | **Document file** | A `.ron` file describing a document in a versioned format, referring to its image by path (`FILE`). |
 | **Unsaved changes** | The open document differs from the document as last loaded or saved, or it has never been saved. |
 | **Image coordinates** | Pixel coordinates on the un-rotated image. The origin is at the top-left corner, x increases to the right and y increases downwards. Values may be fractional. |
@@ -53,9 +54,10 @@ must satisfy them.
 | **Tool mode** | The active tool. It decides what mouse input on the canvas does. |
 | **Calibration points** | Points placed on the image that define two reference lines, A and B. |
 | **Scale** | The real-world length of one image pixel along the image's X axis and along its Y axis. |
-| **Measurement** | A line on the document, with a start and an end point, whose real-world length is derived from the scale. |
-| **Object** | Something the user places on the document and can select: currently measurements and grids; later area measurements. Each has a stable object id. |
-| **Active object** | The single selected object. Measurements show a purple selection box with resize handles; grids show their properties row. It is presentation state, not part of the document. |
+| **Measurement** | A line on the document, with a start and an end point, whose real-world length is derived from the scale. Called a **point-to-point** measurement in the UI. |
+| **Area** | An area measurement: a closed outline through 3 or more points on the document, whose real-world area is derived from the scale. |
+| **Object** | Something the user places on the document and can select: measurements, areas and grids. Each has a stable object id. |
+| **Active object** | The single selected object. Measurements and areas show a purple selection box with resize handles, and their points can be dragged; grids show their properties row. It is presentation state, not part of the document. |
 | **Grid** | Regularly spaced lines over the whole document, aligned to a scale line or measurement line, with cells sized in real-world units. |
 | **Origin** | A point on the image, stored in the document, that the view rotates about. It defaults to the image centre. |
 | **Alignment source** | The scale line or measurement line a grid is aligned to. |
@@ -81,3 +83,4 @@ must satisfy them.
 | 2026-10-21 | Icons are now Google Material Symbols (Rounded, filled) in a bundled icon font, named by their Material Symbols names (`SHELL-6`). This replaces the emoji glyphs and the delete button's "x" fallback. Measure distance now uses a tape measure (`measuring_tape`). Implemented with the `egui_material_icons` crate. |
 | 2026-10-21 | Closing the window with unsaved changes now asks with the Unsaved changes dialog (`FILE-17`, `FILE-11`). The window title shows the document's file name, or "`unsaved document`", before the application name (`SHELL-1`). |
 | 2026-10-21 | Added cancelling a tool operation (`SHELL-10a`): Escape abandons pending scale points, a pending measurement start, a scale point drag, a resize and a rotate-handle drag, exactly as switching tool mode now does. Switching mode now also discards pending scale points (`SCALE-10a`, `MEAS-5`). |
+| 2026-10-22 | Added area measurements (`14`): the Measure area tool and button (`SHELL-5`), placing, removing (Backspace, `SHELL-10b`) and finishing outlines, filled convex and concave areas, the Area tree folder, the Areas table, and seven area actions (`HIST-2`). Measurements gained a colour, with a colour column in their table (`MEAS-1`, `MEAS-15`) and a Set measurement colour action. The measurements table is now headed "`Point-to-point`", and the tree has "`Point-to-point`" and "`Area`" folders inside "`Measurements`" (`OBJ-4`). The active measurement's or area's points can be dragged (`OBJ-15`), replacing `OBJ-11`, and an area's handles stretch it (`OBJ-9b`). The side panel now has three sections sharing the height 33 / 34 / 33 %, with dividers that move height between neighbours (`SHELL-11`). Files are now saved as version 2, and version 1 files are migrated (`FILE-6a`). |

@@ -105,10 +105,11 @@ arrow itself keeps its fixed length.
   button pans the view by the pointer's movement, exactly as in `VIEW-11`.
 - The cursor is a grabbing hand while right-dragging.
 - A right-drag never triggers a tool action, even when it starts on a calibration point,
-  a measurement handle or the rotate arrow. It is never recorded in the history.
+  a point or resize handle of the active object, or the rotate arrow. It is never
+  recorded in the history.
 - All tool gestures use the **primary** button only: placing points, dragging points or
-  handles, and dragging the rotate arrow (`SCALE-5`, `SCALE-7`, `MEAS-6`, `MEAS-7`,
-  `VIEW-14`).
+  handles, and dragging the rotate arrow (`SCALE-5`, `SCALE-7`, `MEAS-6`, `AREA-2`,
+  `OBJ-9`, `OBJ-15`, `VIEW-14`).
 - Together with wheel zoom (`VIEW-8`), this means the view can always be navigated
   without changing tool.
 - The active object's resize handles take priority over every tool's primary-button
@@ -166,9 +167,10 @@ A circle with a 12 px radius, drawn in the same stroke, marks the arrow tip.
 - These canvas input scenarios are simulated with real pointer events and no window:
   - A right-drag pans by exactly the pointer's movement in every mode, and records no
     action.
-  - A right-drag that starts on a measurement handle pans and leaves the handle where it
-    was.
-  - A left-drag on a measurement handle moves it, records one action, and does not pan.
+  - A right-drag that starts on a resize handle of the active object pans and leaves the
+    object where it was.
+  - A left-drag on a point or resize handle of the active object moves it, records one
+    action, and does not pan.
   - A left-drag on empty canvas pans only in Pan & zoom mode.
   - Scrolling the wheel up zooms in, in every mode.
 - Zooming by 2.5 about an arbitrary pointer keeps the image point under that pointer

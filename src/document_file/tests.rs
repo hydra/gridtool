@@ -1,13 +1,15 @@
 use super::*;
 use crate::action::Action;
+use crate::area::Area;
 use crate::calibration::{CalibrationMethod, Line, ScalePoints};
-use crate::grid::{CellDimension, CellShape, Grid, GridSource, Rgb};
+use crate::color::Rgb;
+use crate::grid::{CellDimension, CellShape, Grid, GridSource};
 use crate::measurement::Measurement;
 use crate::units::LengthUnit;
 
-/// A document using every feature: calibration, measurements with a gap in their ids,
-/// grids with every property changed (one aligned to a deleted measurement), a moved
-/// origin.
+/// A document using every feature: calibration, measurements with a gap in their ids and
+/// a changed colour, areas with every property changed, grids with every property
+/// changed (one aligned to a deleted measurement), a moved origin.
 fn rich_document() -> Document {
     let mut document = Document::new(200, 100);
     let measurement = |x: f64| {
@@ -46,6 +48,32 @@ fn rich_document() -> Document {
             index: 2,
             unit: LengthUnit::Metre,
         },
+        Action::SetMeasurementColor {
+            index: 0,
+            color: Rgb::new(200, 100, 0),
+        },
+        Action::AddArea(
+            Area::new(
+                vec![
+                    Point::new(10.0, 10.0),
+                    Point::new(60.0, 15.5),
+                    Point::new(30.0, 40.0),
+                    Point::new(20.0, 25.0),
+                ],
+                LengthUnit::Centimetre,
+            )
+            .unwrap(),
+        ),
+        Action::DuplicateArea { index: 0 },
+        Action::SetAreaUnit {
+            index: 1,
+            unit: LengthUnit::Metre,
+        },
+        Action::SetAreaColor {
+            index: 1,
+            color: Rgb::new(1, 2, 3),
+        },
+        Action::DeleteArea { index: 0 },
         Action::AddGrid(Grid::new(GridSource::ScaleLine(Line::B), LengthUnit::Metre)),
         Action::SetGridShape {
             index: 0,
@@ -117,7 +145,7 @@ fn files_are_tagged_with_their_format_version() {
         .to_ron()
         .unwrap();
 
-    assert!(text.starts_with("V1("), "{text}");
+    assert!(text.starts_with("V2("), "{text}");
 }
 
 /// A version 1 file exactly as the first release writes it. It must always load.
@@ -165,12 +193,66 @@ fn version_1_files_load() {
     assert_eq!(document.next_object_id(), 4);
 }
 
+/// A version 2 file exactly as the release that added areas writes it. It must always
+/// load.
+const VERSION_2_SAMPLE: &str = r#"V2((
+    image: "photo.png",
+    width: 200,
+    height: 100,
+    origin: (x: 100.0, y: 50.0),
+    calibration: (
+        points: None,
+        distance_a: None,
+        distance_b: None,
+        unit: Centimetre,
+    ),
+    measurements: [(id: 1, start: (x: 1.0, y: 2.0), end: (x: 3.0, y: 4.0), unit: Metre, color: (r: 255, g: 0, b: 0))],
+    areas: [(
+        id: 2,
+        points: [(x: 10.0, y: 10.0), (x: 50.0, y: 10.0), (x: 50.0, y: 40.0)],
+        unit: Metre,
+        color: (r: 0, g: 255, b: 255),
+    )],
+    grids: [],
+    next_object_id: 3,
+))"#;
+
+#[test]
+fn version_1_files_get_default_colours_and_no_areas() {
+    let document = DocumentFile::from_ron(VERSION_1_SAMPLE)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    assert_eq!(document.measurements()[0].color(), Rgb::BLUE);
+    assert!(document.areas().is_empty());
+}
+
+#[test]
+fn version_2_files_load() {
+    let document = DocumentFile::from_ron(VERSION_2_SAMPLE)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    let measurement = &document.measurements()[0];
+    assert_eq!(measurement.color(), Rgb::new(255, 0, 0));
+    assert_eq!(measurement.unit(), LengthUnit::Metre);
+    let area = &document.areas()[0];
+    assert_eq!(area.points().len(), 3);
+    assert_eq!(area.points()[1], Point::new(50.0, 10.0));
+    assert_eq!(area.unit(), LengthUnit::Metre);
+    assert_eq!(area.color(), Rgb::CYAN);
+    assert_eq!(document.next_object_id(), 3);
+}
+
 #[test]
 fn invalid_contents_are_rejected() {
     let valid = || match DocumentFile::from_ron(VERSION_1_SAMPLE).unwrap() {
-        DocumentFile::V1(file) => file,
+        DocumentFile::V1(file) => DocumentV2::from(file),
+        DocumentFile::V2(_) => unreachable!("the sample is version 1"),
     };
-    type Corruption = fn(&mut DocumentV1);
+    type Corruption = fn(&mut DocumentV2);
     let cases: [(Corruption, InvalidDocument); 7] = [
         (|f| f.width = 0, InvalidDocument::EmptySize),
         (
@@ -332,4 +414,33 @@ fn loading_reports_what_went_wrong() {
             ..
         })
     ));
+}
+
+#[test]
+fn invalid_areas_are_rejected() {
+    let valid = || match DocumentFile::from_ron(VERSION_2_SAMPLE).unwrap() {
+        DocumentFile::V2(file) => file,
+        DocumentFile::V1(_) => unreachable!("the sample is version 2"),
+    };
+
+    let mut two_points = valid();
+    two_points.areas[0].points.pop();
+    assert_eq!(
+        two_points.to_document(),
+        Err(InvalidDocument::TooFewAreaPoints(2))
+    );
+
+    let mut outside = valid();
+    outside.areas[0].points[0].y = -1.0;
+    assert_eq!(
+        outside.to_document(),
+        Err(InvalidDocument::PointOutside(Point::new(10.0, -1.0)))
+    );
+
+    let mut reused_id = valid();
+    reused_id.areas[0].id = 1;
+    assert_eq!(
+        reused_id.to_document(),
+        Err(InvalidDocument::BadObjectId(1))
+    );
 }

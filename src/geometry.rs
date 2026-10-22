@@ -36,6 +36,18 @@ impl Bounds {
         }
     }
 
+    /// The smallest bounds containing every point, or `None` if there are none.
+    pub fn enclosing(points: impl IntoIterator<Item = Point>) -> Option<Self> {
+        let mut points = points.into_iter();
+        let first = points.next()?;
+        Some(
+            points.fold(Self::around(first, first), |bounds, point| Self {
+                min: Point::new(bounds.min.x.min(point.x), bounds.min.y.min(point.y)),
+                max: Point::new(bounds.max.x.max(point.x), bounds.max.y.max(point.y)),
+            }),
+        )
+    }
+
     pub fn center(&self) -> Point {
         Point::new(
             (self.min.x + self.max.x) / 2.0,
@@ -56,6 +68,18 @@ impl Bounds {
         (self.min.x..=self.max.x).contains(&point.x) && (self.min.y..=self.max.y).contains(&point.y)
     }
 
+    /// Where `point` moves to when `handle` is dragged by `(dx, dy)` and everything inside
+    /// the bounds stretches with it. The edges opposite the grabbed ones stay put, and
+    /// dragging an edge past its opposite edge mirrors the points. Along an axis where the
+    /// bounds have no size, points move with the grabbed edge instead.
+    pub fn stretch(&self, handle: BoundsHandle, dx: f64, dy: f64, point: Point) -> Point {
+        let (x_edge, y_edge) = handle.edges();
+        Point::new(
+            stretch_axis(point.x, self.min.x, self.max.x, x_edge, dx),
+            stretch_axis(point.y, self.min.y, self.max.y, y_edge, dy),
+        )
+    }
+
     /// Image position of a resize handle.
     pub fn handle_point(&self, handle: BoundsHandle) -> Point {
         let center = self.center();
@@ -71,6 +95,18 @@ impl Bounds {
             None => center.y,
         };
         Point::new(x, y)
+    }
+}
+
+/// One axis of [`Bounds::stretch`]: `value` lies between `min` and `max`, and the `moved`
+/// edge (if any) moves by `delta`.
+fn stretch_axis(value: f64, min: f64, max: f64, moved: Option<Edge>, delta: f64) -> f64 {
+    let size = max - min;
+    match moved {
+        None => value,
+        Some(_) if size == 0.0 => value + delta,
+        Some(Edge::Min) => max + (value - max) * (size - delta) / size,
+        Some(Edge::Max) => min + (value - min) * (size + delta) / size,
     }
 }
 
@@ -177,6 +213,57 @@ mod tests {
         assert_eq!(
             bounds.handle_point(BoundsHandle::BottomLeft),
             Point::new(0.0, 20.0)
+        );
+    }
+
+    #[test]
+    fn enclosing_bounds_cover_every_point() {
+        let bounds = Bounds::enclosing([
+            Point::new(3.0, 9.0),
+            Point::new(-1.0, 4.0),
+            Point::new(5.0, 6.0),
+        ]);
+
+        assert_eq!(
+            bounds,
+            Some(Bounds::around(Point::new(-1.0, 4.0), Point::new(5.0, 9.0)))
+        );
+        assert_eq!(Bounds::enclosing([]), None);
+    }
+
+    #[test]
+    fn stretching_scales_points_away_from_the_fixed_edges() {
+        let bounds = Bounds::around(Point::new(10.0, 10.0), Point::new(20.0, 30.0));
+        let middle = Point::new(15.0, 20.0);
+
+        // Right edge 20 -> 30 doubles the width from the left edge.
+        assert_eq!(
+            bounds.stretch(BoundsHandle::Right, 10.0, 99.0, middle),
+            Point::new(20.0, 20.0)
+        );
+        // Top-left corner by (5, 10) halves both sizes towards the bottom-right.
+        assert_eq!(
+            bounds.stretch(BoundsHandle::TopLeft, 5.0, 10.0, middle),
+            Point::new(17.5, 25.0)
+        );
+        assert_eq!(
+            bounds.stretch(BoundsHandle::TopLeft, 5.0, 10.0, bounds.max),
+            bounds.max
+        );
+        // Past the opposite edge mirrors.
+        assert_eq!(
+            bounds.stretch(BoundsHandle::Left, 20.0, 0.0, bounds.min),
+            Point::new(30.0, 10.0)
+        );
+    }
+
+    #[test]
+    fn stretching_a_flat_axis_moves_points_with_the_edge() {
+        let flat = Bounds::around(Point::new(0.0, 5.0), Point::new(10.0, 5.0));
+
+        assert_eq!(
+            flat.stretch(BoundsHandle::Bottom, 0.0, 3.0, Point::new(4.0, 5.0)),
+            Point::new(4.0, 8.0)
         );
     }
 

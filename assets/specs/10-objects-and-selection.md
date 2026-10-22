@@ -1,9 +1,9 @@
 # 10 — Objects, Object Tree and Selection
 
-The document holds **objects** that the user places: straight-line measurements (`MEAS`)
-and grids (`GRID`). Area measurements will be added later and MUST fit the same model:
+The document holds **objects** that the user places: point-to-point measurements
+(`MEAS`), area measurements (`AREA`) and grids (`GRID`). Every kind fits the same model:
 identity, an entry in the tree, duplicate and delete, and, where it makes sense, a
-bounding box and a resize behaviour.
+bounding box, a resize behaviour and draggable points.
 
 ## Object identity
 
@@ -19,7 +19,8 @@ life:
 
 **OBJ-2 — Bounding box.** Every object has an axis-aligned bounding box in image
 coordinates. For a measurement it is the smallest box containing both endpoints, so it
-may have zero width or height.
+may have zero width or height. For an area it is the smallest box containing all of its
+points.
 
 ## Object tree
 
@@ -35,17 +36,25 @@ may have zero width or height.
 ```
 Document
 ├─ Measurements
-│  ├─ Measurement 1 (12.5 cm)
-│  ├─ Measurement 2
-│  └─ …
+│  ├─ Point-to-point
+│  │  ├─ Measurement 1 (12.5 cm)
+│  │  ├─ Measurement 2
+│  │  └─ …
+│  └─ Area
+│     ├─ Area 1 (3.25 m²)
+│     └─ …
 └─ Grids
    ├─ Grid 1 (scale line A)
    └─ …
 ```
 
 - **Root node:** "`Document`".
-- **Folders:** "`Measurements`", then "`Grids`" (`GRID-11`), under the root.
-- **Measurements:** one leaf per measurement, in list order (`MEAS-2`) and never sorted.
+- **Folders:** "`Measurements`", then "`Grids`" (`GRID-11`), under the root. Inside
+  "`Measurements`": "`Point-to-point`", then "`Area`".
+- **Point-to-point measurements:** one leaf per measurement, in list order (`MEAS-2`)
+  and never sorted, in the "`Point-to-point`" folder.
+- **Areas:** one leaf per area, in list order (`AREA-6`), in the "`Area`" folder,
+  labelled as `AREA-11` says.
 - **Leaf label:** "`Measurement <n> (<distance> <unit symbol>)`", where `n` is the 1-based
   list position and the distance is formatted by `FMT-7`. When the distance is
   unavailable, the label is "`Measurement <n>`".
@@ -57,11 +66,12 @@ Document
 2. The view pans so that the object's **focus point** is at the centre of the canvas
    area. Zoom and view rotation are unchanged (`VIEW-17`). The focus point is:
    - for a measurement, the centre of its bounding box (the midpoint of the line)
+   - for an area, the centre of its area (`AREA-8`)
    - for a grid, the midpoint of its alignment line. If that line no longer exists, the
      view does not move.
 
-Selecting a non-object node ("`Document`", "`Measurements`" or "`Grids`") clears the
-active object.
+Selecting a non-object node ("`Document`", "`Measurements`", "`Point-to-point`", "`Area`"
+or "`Grids`") clears the active object.
 
 **OBJ-6 — Tree reflects the active object.** The tree always shows the active object's
 leaf as selected:
@@ -77,12 +87,13 @@ leaf as selected:
 - It is presentation state: not part of the document, not an action, and not affected by
   undo/redo except as below.
 - After **any** document change (an action, undo or redo), if the active object no
-  longer exists, the active object is cleared. Any resize in progress is abandoned.
+  longer exists, the active object is cleared. Any drag of its points or resize handles
+  in progress is abandoned.
 - Because selection uses ids, deleting an *earlier* measurement leaves the same
   measurement active, even though its list position changes.
 
 **OBJ-8 — Selection box.** While there is an active object that has a bounding box
-(currently measurements; grids do not, see `GRID-12`), the canvas draws the following on
+(measurements and areas; grids do not, see `GRID-12`), the canvas draws the following on
 top of everything else, in every tool mode:
 - **Box.** A **dashed purple** (`#800080`) box, 1.5 px wide, with 6 px dashes and 4 px
   gaps, around the object's bounding box.
@@ -92,22 +103,25 @@ top of everything else, in every tool mode:
 - **Rotation.** The box rotates with the view, like the document.
 - **Resize handles.** Eight filled purple squares, each **10 × 10 px** and axis-aligned
   on screen, centred on the box's four corners and the midpoints of its four edges.
-- **Live updates.** During a resize, the box, the object and the measurements table all
-  show the live preview.
+- **Live updates.** During a resize or a point drag (`OBJ-15`), the box, the object and
+  its table row all show the live preview.
 
 ## Resizing
 
 **OBJ-9 — Resizing with the handles.** In **every** tool mode, the active object's
-handles take priority over the tool:
+handles, and its points (`OBJ-15`), take priority over the tool:
 - **Starting.** A primary-button drag that *starts* within 8 px of a handle's centre
-  resizes the object. If several handles are in range, the nearest one is used.
+  resizes the object. If several handles are in range, the nearest one is used. If a
+  point of the object is also in range (`OBJ-15`), whichever of the two is nearer to the
+  press wins.
 - **No tool input.** While resizing, the tool receives no primary-button input: Pan &
   zoom mode does not pan, and the scale and measure tools do not react.
 - **Panning.** A secondary-button drag on a handle pans as usual (`VIEW-11a`).
-- **Cursor.** An open hand while hovering over a handle, and a grabbing hand while
-  resizing.
+- **Cursor.** An open hand while hovering over a handle or a point, and a grabbing hand
+  while dragging.
 - **Committing.** When the drag ends, one **Resize measurement** action (`HIST-2`) is
-  committed with both new endpoints. If nothing changed, no action is committed.
+  committed with both new endpoints, or for an area one **Resize area** action with all
+  of its new points (`OBJ-9b`). If nothing changed, no action is committed.
 
 **OBJ-9a — How a handle moves a measurement.** Let `(dx, dy)` be the pointer's movement in
 image pixels since the drag started. A handle grabs the bounding-box edges it sits on:
@@ -136,6 +150,17 @@ The endpoints follow the edges like this:
   - Dragging an edge past the opposite edge simply flips the line.
 - **Clamping.** Each endpoint is clamped to the document (`DOC-5`).
 
+**OBJ-9b — How a handle stretches an area.** Let the bounding box run from `min` to `max`
+along an axis, and let the grabbed edge on that axis move by `d` (`dx` or `dy`). The
+opposite edge stays put and every point stretches proportionally between them:
+- grabbing the max edge: `v' = min + (v − min) × (size + d) / size`
+- grabbing the min edge: `v' = max + (v − max) × (size − d) / size`
+
+where `size = max − min`. An axis the handle does not grab is unchanged. Dragging an
+edge past the opposite edge mirrors the points. Along an axis where the box has no size,
+every point moves by `d` instead. Each point is then clamped to the document (`DOC-5`).
+The unit and colour are kept.
+
 **OBJ-10 — Clearing the selection.** In every tool mode, a primary click (press and
 release without dragging) whose position lies **outside** the selection box clears the
 active object. An active object without a selection box (a grid) is cleared by any
@@ -145,10 +170,9 @@ every side (padding plus half a handle).
 - The click is still passed to the active tool. In Measure mode, for example, it also
   places a point.
 
-**OBJ-11 — No direct endpoint dragging.** Measurement endpoints cannot be dragged
-directly in any mode. They change only through the resize handles (`OBJ-9`) or the
-coordinate fields in the measurements table (`MEAS-12`). This replaces the withdrawn
-`MEAS-7`.
+**OBJ-11 — Withdrawn.** Measurement endpoints could not be dragged directly in any mode.
+This is replaced by dragging the active object's points (`OBJ-15`); the endpoints of a
+measurement that is not active still cannot be dragged.
 
 ## Object tool bar
 
@@ -162,22 +186,23 @@ are disabled (`SHELL-7`).
 | 2 | Delete button | trash can (`delete`), the same icon as the measurements table (`MEAS-11`) | "`Delete`" |
 
 **OBJ-12 — Duplicate.** The Duplicate button is enabled exactly when there is an active
-object and that kind of object can be duplicated. Measurements and grids can both be
-duplicated. Clicking it:
-1. Commits one **Duplicate measurement** or **Duplicate grid** action (`HIST-2`) for the
-   active object.
+object and that kind of object can be duplicated. Measurements, areas and grids can all
+be duplicated. Clicking it:
+1. Commits one **Duplicate measurement**, **Duplicate area** or **Duplicate grid** action
+   (`HIST-2`) for the active object.
 2. The copy has **exactly the same properties** as the original, and only its object id
    differs (a new id, `OBJ-1`):
-   - measurement: both endpoints and the unit
+   - measurement: both endpoints, the unit and the colour
+   - area: every point, the unit and the colour
    - grid: alignment source, cell shape, both cell sizes, unit, colour and opacity
 3. The copy is appended to the end of its list, so it is the last leaf of its tree folder.
 4. The copy becomes the **active object**. Because it lies exactly on top of the
    original, its selection box (if any) is in the same place.
 
 **OBJ-13 — Delete.** The Delete button is enabled exactly when there is an active object
-and that kind of object can be deleted. Measurements and grids can both be deleted.
-Clicking it commits one **Delete measurement** or **Delete grid** action (`HIST-2`) for
-the active object. The object no longer exists, so the active object is cleared
+and that kind of object can be deleted. Measurements, areas and grids can all be deleted.
+Clicking it commits one **Delete measurement**, **Delete area** or **Delete grid** action
+(`HIST-2`) for the active object. The object no longer exists, so the active object is cleared
 (`OBJ-7`). Grids aligned to a deleted measurement remain but are not drawn (`GRID-4`).
 
 **OBJ-14 — Undo.** Duplicating and deleting are document actions, so they can be undone
@@ -185,14 +210,30 @@ and redone (`HIST-6`, `HIST-7`). Undo of a delete restores the object with its o
 id. Undo of a duplicate removes the copy; if the copy was active, the active object is
 cleared (`OBJ-7`).
 
+**OBJ-15 — Dragging the active object's points.** In **every** tool mode, the points of
+the active object can be dragged: a measurement's two endpoints, or an area's points.
+- **Starting.** A primary-button drag that *starts* within 10 px of a point's screen
+  position drags that point. If several points are in range, the nearest one is used.
+  Against the resize handles, the nearer of the two wins (`OBJ-9`).
+- **Moving.** The point moves by the pointer's movement since the press (in image
+  pixels), so it does not jump to the pointer when grabbed off-centre. It is clamped to
+  the document (`DOC-5`).
+- **No tool input.** As for resizing, the tool receives no primary-button input while a
+  point is dragged, and a secondary-button drag pans as usual.
+- **Committing.** When the drag ends, one **Move measurement point** or **Move area
+  point** action (`HIST-2`) is committed. If nothing changed, no action is committed.
+- Only the active object's points can be dragged. The points of other objects cannot be
+  grabbed.
+
 ## Acceptance criteria
 
 - Object tool bar:
   - Both buttons are disabled with no active object (and with no document open).
-  - With an active measurement or grid, both buttons are enabled and target it by its
-    current list position.
-  - Duplicating a measurement or a grid appends a copy equal to the original in every
-    property, with a new id; the copy is the document's newest object and becomes active.
+  - With an active measurement, area or grid, both buttons are enabled and target it by
+    its current list position.
+  - Duplicating a measurement, an area or a grid appends a copy equal to the original in
+    every property, with a new id; the copy is the document's newest object and becomes
+    active.
   - Deleting a grid keeps the order of the others. Duplicate and delete with a missing
     index are rejected and change nothing.
   - Duplicate then delete, undone twice, restores each earlier document exactly; redone
@@ -226,11 +267,28 @@ cleared (`OBJ-7`).
   - Only a single object node counts as picking an object.
 - View: centring on an image point puts it at the view centre at any zoom, rotation and
   previous pan, and leaves zoom and rotation unchanged.
+- Area stretching (`OBJ-9b`), with the box (10, 10)–(20, 30):
+  - the right edge by 10 maps (15, 20) to (20, 20)
+  - the top-left corner by (5, 10) maps (15, 20) to (17.5, 25) and keeps (20, 30)
+  - the left edge by 20 mirrors (10, 10) to (30, 10)
+  - a box with no height, dragged by the bottom edge by 3, moves (4, 5) to (4, 8)
+- Point drags (`OBJ-15`):
+  - grabbing a measurement's end 2 px off-centre and moving by (10, 5) moves the end by
+    exactly (10, 5)
+  - moving an area's point past the document edge clamps it; the other points stay
+  - the bottom edge of the triangle (50, 50), (90, 50), (70, 90) moved up by 20 gives
+    (50, 50), (90, 50), (70, 70)
+  - a drag that ends where it started commits nothing
+  - an active area's bounding box and points follow the drag preview
 - Canvas, simulated with pointer events:
   - Dragging the right handle by (40, 25) in **every** mode commits exactly one resize,
     moving the end's x by 40 (y unchanged), with no pan.
   - Right-dragging a handle pans and does not resize.
-  - Dragging a measurement endpoint directly does nothing in every mode.
+  - Dragging an endpoint of a measurement that is not active does nothing in every
+    mode.
+  - Dragging a point of the active measurement or area by (40, 25) commits one move
+    action for that point in every mode, with no pan.
+  - Dragging the active area's right handle by 40 stretches it to the right.
   - Clicking inside the box keeps the selection, and clicking outside clears it, in every
     mode.
   - The handle positions are the 4 corners and 4 edge midpoints.

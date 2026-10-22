@@ -1,6 +1,7 @@
 use eframe::egui::TextureHandle;
 use egui_ltreeview::TreeViewState;
 
+use super::area_tool::AreaTool;
 use super::grid_tool::GridTool;
 use super::measure_tool::MeasureTool;
 use super::object_tree::TreeNode;
@@ -16,6 +17,7 @@ pub struct DocumentView {
     pub selection: Selection,
     pub scale_tool: ScaleTool,
     pub measure_tool: MeasureTool,
+    pub area_tool: AreaTool,
     pub grid_tool: GridTool,
     pub is_dragging_rotate_handle: bool,
     pub tree_state: TreeViewState<TreeNode>,
@@ -29,6 +31,7 @@ impl DocumentView {
             selection: Selection::default(),
             scale_tool: ScaleTool::default(),
             measure_tool: MeasureTool::default(),
+            area_tool: AreaTool::default(),
             grid_tool: GridTool::default(),
             is_dragging_rotate_handle: false,
             tree_state: TreeViewState::default(),
@@ -36,13 +39,19 @@ impl DocumentView {
     }
 
     /// Abandons whatever a tool is part-way through, without committing anything:
-    /// pending scale or measurement points, a scale point drag, a resize, and a
-    /// rotate-handle drag. Used by Escape and when switching tool mode.
+    /// pending scale, measurement or area points, a scale point drag, a drag of the active
+    /// object, and a rotate-handle drag. Used by Escape and when switching tool mode.
     pub fn cancel_tool(&mut self) {
         self.scale_tool.cancel();
         self.measure_tool.cancel();
-        self.selection.cancel_resize();
+        self.area_tool.cancel();
+        self.selection.cancel_drag();
         self.is_dragging_rotate_handle = false;
+    }
+
+    /// Removes the most recently placed point of the area being placed (Backspace).
+    pub fn remove_last_point(&mut self) {
+        self.area_tool.remove_last_point();
     }
 }
 

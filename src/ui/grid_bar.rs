@@ -1,13 +1,13 @@
 //! Properties row for the active grid: cell shape, cell size and units, colour and
 //! opacity.
 
-use eframe::egui::{self, Popup, PopupCloseBehavior};
+use eframe::egui;
 use gridtool::action::Action;
 use gridtool::document::Document;
 use gridtool::grid::{CellDimension, CellShape, Grid};
 use gridtool::object::ObjectId;
 
-use super::color::{from_color32, to_color32};
+use super::color_swatch;
 use super::commit_field::CommitField;
 use super::format::{format_length, parse_number};
 use super::grid_display;
@@ -122,8 +122,8 @@ fn shape_buttons(ui: &mut egui::Ui, index: usize, grid: &Grid) -> Option<Action>
     action
 }
 
-/// A colour swatch that opens a colour picker. The colour previews live while the picker
-/// is open and is committed as one action when it closes.
+/// A colour swatch that opens a colour picker. The colour previews live on the canvas
+/// while the picker is open and is committed as one action when it closes.
 fn color_picker(
     ui: &mut egui::Ui,
     id: ObjectId,
@@ -132,41 +132,22 @@ fn color_picker(
     selection: &mut Selection,
 ) -> Option<Action> {
     ui.label("Color:");
-    let popup_id = egui::Id::unique(("grid_color_popup", id));
-    let was_open = Popup::is_id_open(ui.ctx(), popup_id);
-    let displayed = selection.displayed_grid(id, stored);
-    let mut color = to_color32(displayed.color());
-
-    let swatch = ui
-        .add(
-            egui::Button::new("")
-                .fill(color)
-                .min_size(COLOR_SWATCH_SIZE),
-        )
-        .on_hover_text("Choose the grid colour");
-    Popup::menu(&swatch)
-        .id(popup_id)
-        .close_behavior(PopupCloseBehavior::CloseOnClickOutside)
-        .show(|ui| {
-            if egui::color_picker::color_picker_color32(
-                ui,
-                &mut color,
-                egui::color_picker::Alpha::Opaque,
-            ) {
-                selection.preview_grid(displayed.with_color(from_color32(color)));
-            }
-        });
-
-    let closed = was_open && !Popup::is_id_open(ui.ctx(), popup_id);
-    if !closed {
-        return None;
+    let edit = color_swatch::show(
+        ui,
+        egui::Id::unique(("grid_color", id)),
+        stored.color(),
+        COLOR_SWATCH_SIZE,
+        "Choose the grid colour",
+    );
+    if let Some(color) = edit.preview {
+        let displayed = selection.displayed_grid(id, stored);
+        selection.preview_grid(displayed.with_color(color));
     }
-    let chosen = selection.displayed_grid(id, stored).color();
-    selection.clear_grid_preview();
-    (chosen != stored.color()).then_some(Action::SetGridColor {
-        index,
-        color: chosen,
-    })
+    if edit.closed {
+        selection.clear_grid_preview();
+    }
+    edit.committed
+        .map(|color| Action::SetGridColor { index, color })
 }
 
 /// A 0–100 % slider. Dragging previews live and commits one action on release; clicks

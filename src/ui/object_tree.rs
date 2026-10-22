@@ -1,5 +1,6 @@
-//! Left-hand panel: a tree of the document's objects (Document > Measurements / Grids >
-//! each object, in document order). Clicking an object makes it the active object.
+//! Left-hand panel: a tree of the document's objects (Document > Measurements >
+//! Point-to-point / Area, and Document > Grids, then each object in document order).
+//! Clicking an object makes it the active object.
 
 use eframe::egui;
 use egui_ltreeview::{Action as TreeAction, TreeView};
@@ -21,6 +22,8 @@ const DEFAULT_WIDTH: f32 = 220.0;
 pub enum TreeNode {
     Document,
     Measurements,
+    PointToPoint,
+    Areas,
     Grids,
     Object(ObjectId),
 }
@@ -132,6 +135,7 @@ fn show_tree(
         .show_state(ui, state, |builder| {
             builder.dir(TreeNode::Document, "Document");
             builder.dir(TreeNode::Measurements, "Measurements");
+            builder.dir(TreeNode::PointToPoint, "Point-to-point");
             for (index, measurement) in document.measurements().iter().enumerate() {
                 let label = match measurement.distance(document.calibration()) {
                     Ok(distance) => format!(
@@ -145,6 +149,12 @@ fn show_tree(
                 builder.leaf(TreeNode::Object(measurement.id()), label);
             }
             builder.close_dir();
+            builder.dir(TreeNode::Areas, "Area");
+            for (index, area) in document.areas().iter().enumerate() {
+                builder.leaf(TreeNode::Object(area.id()), area_label(document, index));
+            }
+            builder.close_dir();
+            builder.close_dir();
             builder.dir(TreeNode::Grids, "Grids");
             for (index, grid) in document.grids().iter().enumerate() {
                 let label = format!("Grid {} ({})", index + 1, source_label(document, grid));
@@ -157,6 +167,20 @@ fn show_tree(
         TreeAction::SetSelected(nodes) => Some(pick_from(&nodes)),
         _ => None,
     })
+}
+
+/// "Area <n> (<area> <unit>²)", or "Area <n>" when the area cannot be calculated.
+fn area_label(document: &Document, index: usize) -> String {
+    let area = &document.areas()[index];
+    match area.area(document.calibration()) {
+        Ok(value) => format!(
+            "Area {} ({} {})",
+            index + 1,
+            format_length(value),
+            area.unit().area_symbol()
+        ),
+        Err(_) => format!("Area {}", index + 1),
+    }
 }
 
 /// Describes what a grid is aligned to, e.g. "scale line A" or "measurement 2".
@@ -293,6 +317,8 @@ mod tests {
         assert_eq!(pick_from(&[TreeNode::Object(a)]), TreePick::Object(a));
         assert_eq!(pick_from(&[TreeNode::Measurements]), TreePick::NoObject);
         assert_eq!(pick_from(&[TreeNode::Grids]), TreePick::NoObject);
+        assert_eq!(pick_from(&[TreeNode::PointToPoint]), TreePick::NoObject);
+        assert_eq!(pick_from(&[TreeNode::Areas]), TreePick::NoObject);
         assert_eq!(pick_from(&[TreeNode::Document]), TreePick::NoObject);
         assert_eq!(pick_from(&[]), TreePick::NoObject);
     }
