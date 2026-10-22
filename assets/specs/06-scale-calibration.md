@@ -85,8 +85,9 @@ no action is committed.
   set, if there is one.
 - Pending points and any drag in progress are discarded.
 
-**SCALE-10a — Leaving Scale mode.** Switching to another tool mode cancels any point
-drag in progress, without committing an action.
+**SCALE-10a — Cancelling.** Pressing Escape, or switching to another tool mode, discards
+any pending points and cancels any point drag in progress, without committing an action
+(`SHELL-10a`).
 
 ## Drawing (Scale mode only)
 

@@ -5,6 +5,7 @@ use crate::file_picker::{RfdDocumentPicker, RfdImagePicker};
 use crate::open_document::OpenDocument;
 use crate::session::{Content, Replacement, Session};
 use crate::ui::canvas;
+use crate::ui::escape_key::EscapeKey;
 use crate::ui::grid_bar::GridBar;
 use crate::ui::measurements_panel::MeasurementsPanel;
 use crate::ui::object_tree;
@@ -22,6 +23,7 @@ pub struct GridToolApp {
     scale_bar: ScaleBar,
     grid_bar: GridBar,
     measurements_panel: MeasurementsPanel,
+    escape_key: EscapeKey,
     /// The window title last sent to the window.
     title: String,
 }
@@ -35,6 +37,7 @@ impl GridToolApp {
             scale_bar: ScaleBar::default(),
             grid_bar: GridBar::default(),
             measurements_panel: MeasurementsPanel::default(),
+            escape_key: EscapeKey::default(),
             title: crate::APP_NAME.to_owned(),
         }
     }
@@ -96,6 +99,13 @@ impl GridToolApp {
         )
     }
 
+    /// Escape and switching tool mode both abandon what the tool was part-way through.
+    fn cancel_tool_if(&mut self, cancel: bool) {
+        if cancel && let Some(open) = self.session.document_mut() {
+            open.view.cancel_tool();
+        }
+    }
+
     /// Keeps the window open while the session asks about unsaved changes.
     fn handle_close_request(&mut self, ctx: &egui::Context) {
         if ctx.input(|input| input.viewport().close_requested()) && !self.session.request_close(ctx)
@@ -134,9 +144,13 @@ impl eframe::App for GridToolApp {
         let ctx = ui.ctx().clone();
         self.handle_close_request(&ctx);
         let state = self.tool_bar_state();
+        // A dialog answers Escape itself.
+        let escape = self.session.dialog().is_none() && self.escape_key.cancels_tool(&ctx);
+        let previous_mode = self.mode;
         if let Some(action) = top_panel::show(ui, &mut self.mode, state) {
             self.handle(&ctx, action);
         }
+        self.cancel_tool_if(escape || self.mode != previous_mode);
 
         let mut actions: Vec<Action> = self.show_tool_options(ui).into_iter().collect();
         actions.extend(self.show_object_properties(ui));
@@ -188,5 +202,6 @@ impl eframe::App for GridToolApp {
 
         self.show_dialog(&ctx);
         self.update_title(&ctx);
+        self.escape_key.end_frame(&ctx);
     }
 }

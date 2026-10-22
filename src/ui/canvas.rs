@@ -100,12 +100,6 @@ pub fn show(
     let document_size = Vec2::new(document.width() as f32, document.height() as f32);
 
     handle_zoom(ui, &response, view_center, &mut view.viewport);
-    if mode != ToolMode::Scale {
-        view.scale_tool.cancel_drag();
-    }
-    if mode != ToolMode::Measure {
-        view.measure_tool.cancel();
-    }
     let transform = view.viewport.transform(view_center, document_size);
     // The active object's resize handles take priority over every tool.
     let selection_input = handle_selection(ui, &response, transform, document, &mut view.selection);

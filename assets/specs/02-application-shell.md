@@ -90,6 +90,22 @@ application state and stays the same when a different image is opened.
 **SHELL-10.** New modes will be added later. The list of modes MUST be defined in one
 place, so that adding a mode needs no duplicated tool bar code.
 
+**SHELL-10a — Cancelling a tool operation.** Pressing **Escape**, or switching to another
+tool mode, abandons whatever the tool is part-way through, without committing an action
+or changing the document:
+- the pending scale points while placing (`SCALE-4`), and any scale point drag
+- the pending start point of a measurement (`MEAS-5`)
+- a resize of the active object in progress (`OBJ-9`); the object keeps its size and
+  stays active
+- a rotate-handle drag in progress (`VIEW-13`); the view keeps the rotation it reached
+
+Escape and switching mode cancel exactly the same things. The tool mode does not change,
+and neither does the active object. Escape does **not** cancel the tool when it is meant
+for something else:
+- while a dialog is open, Escape answers the dialog (`FILE-11`)
+- while a widget such as a text field has keyboard focus, Escape only takes the focus
+  away from it; a further Escape then cancels the tool
+
 ## Side panel
 
 **SHELL-11.** The side panel is docked on the right of the window:
@@ -106,3 +122,11 @@ place, so that adding a mode needs no duplicated tool bar code.
 - The default tool mode is Pan & zoom.
 - Every mode has a distinct icon and a distinct name.
 - In the tool bar, Measure distance comes directly after Scale.
+- Cancelling (`SHELL-10a`):
+  - Escape with nothing focused cancels; Escape in a focused text field does not, and
+    the next Escape does.
+  - Cancelling drops pending scale points and a scale point drag, committing nothing,
+    and the document's points are unchanged.
+  - Cancelling drops a pending measurement start.
+  - Cancelling a resize commits nothing, shows the object unchanged and keeps it active.
+  - Cancelling stops a rotate-handle drag.

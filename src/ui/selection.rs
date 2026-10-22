@@ -52,6 +52,11 @@ impl Selection {
         self.grid_preview = None;
     }
 
+    /// Abandons a resize in progress, without committing anything.
+    pub fn cancel_resize(&mut self) {
+        self.resize = None;
+    }
+
     /// How to display the grid with `id`: the preview if it is the active grid and has
     /// uncommitted edits, otherwise the grid itself.
     pub fn displayed_grid(&self, id: ObjectId, grid: &Grid) -> Grid {
@@ -197,6 +202,24 @@ mod tests {
                 Point::new(60.0, 90.0)
             ))
         );
+    }
+
+    #[test]
+    fn cancelling_a_resize_commits_nothing_and_keeps_the_selection() {
+        let document = document_with_two_measurements();
+        let mut selection = Selection::default();
+        let id = id_of(&document, 0);
+        selection.select(Some(id));
+        selection.begin_resize(&document, BoundsHandle::BottomRight, Point::new(40.0, 30.0));
+        selection.resize_to(&document, Point::new(45.0, 38.0));
+
+        selection.cancel_resize();
+
+        assert!(!selection.is_resizing());
+        assert_eq!(selection.end_resize(&document), None);
+        let measurement = &document.measurements()[0];
+        assert_eq!(selection.displayed(id, measurement), **measurement);
+        assert_eq!(selection.active(), Some(id));
     }
 
     #[test]

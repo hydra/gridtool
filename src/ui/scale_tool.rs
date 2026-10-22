@@ -115,7 +115,9 @@ impl ScaleTool {
         })
     }
 
-    pub fn cancel_drag(&mut self) {
+    /// Abandons a placement or drag in progress, without committing anything.
+    pub fn cancel(&mut self) {
+        self.pending.clear();
         self.drag = None;
     }
 
@@ -277,5 +279,22 @@ mod tests {
 
         assert_eq!(tool.method(), CalibrationMethod::FourPoint);
         assert_eq!(tool.points(document.calibration()).len(), 4);
+    }
+
+    #[test]
+    fn cancel_drops_pending_points_and_any_drag() {
+        let mut document = Document::new(100, 100);
+        let mut tool = ScaleTool::default();
+        tool.place(document.calibration(), point(1.0));
+        tool.cancel();
+        assert!(tool.points(document.calibration()).is_empty());
+
+        place_all(&mut tool, &mut document);
+        assert!(tool.begin_drag(document.calibration(), 0));
+        tool.drag_to(point(50.0));
+        tool.cancel();
+        assert!(!tool.is_dragging());
+        assert_eq!(tool.end_drag(), None, "nothing is committed");
+        assert_eq!(tool.points(document.calibration())[0], point(0.0));
     }
 }

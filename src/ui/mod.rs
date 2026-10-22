@@ -7,6 +7,7 @@ mod color;
 mod commit_field;
 pub mod dialog;
 pub mod document_view;
+pub mod escape_key;
 mod format;
 pub mod grid_bar;
 mod grid_display;

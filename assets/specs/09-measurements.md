@@ -49,7 +49,8 @@ Additional rules:
 - Clicks outside the document are ignored.
 - The cursor is a crosshair while hovering over the canvas, except over the active
   object's resize handles (`OBJ-9`).
-- The pending start is discarded when the user leaves Measure mode.
+- The pending start is discarded when the user presses Escape or leaves Measure mode
+  (`SHELL-10a`).
 - A primary drag in Measure mode does nothing, unless it starts on a resize handle
   (`OBJ-9`). In particular, it does not pan.
 
