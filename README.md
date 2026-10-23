@@ -11,6 +11,18 @@ or measurement line. Every change can be undone, and documents can be saved and 
 
 <a href="assets/screenshots/Screenshot%202026-10-21%20173320.png"><img src="assets/screenshots/Screenshot%202026-10-21%20173320.png" width="800" alt="GridTool showing a calibrated site plan with measurements and two grids"></a>
 
+## Features
+
+- **Open images**: PNG, JPEG and BMP plans, drawings and photos.
+- **Scale calibration**: from two lines of known length, using 3 or 4 points, with separate horizontal and vertical scales.
+- **Point-to-point measurements**: real-world distances, with editable coordinates, per-measurement units (cm or m) and colours.
+- **Area measurements**: convex or concave outlines with 3 or more points, filled and labelled with their area in cm² or m².
+- **Grids**: real-world grids with square or rectangular cells of any size, aligned to a scale or measurement line, with adjustable colour and opacity.
+- **Editing**: select objects on the canvas or in the object tree, drag their points, stretch them with a bounding box, duplicate and delete them.
+- **View**: pan, zoom about the cursor, and rotate the view about a movable origin, without changing the document.
+- **Undo and redo**: every change is recorded in a history panel.
+- **Documents**: save and load your work, with a prompt to save unsaved changes.
+
 ## Authors
 
 * Dominic Clifton - Product owner and technical lead.
