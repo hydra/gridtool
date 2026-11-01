@@ -127,7 +127,8 @@ In Grid mode the canvas shows the document's scale lines and markers (the docume
 point set, whatever method the Scale tool has selected) and all measurement lines.
 
 **GRID-9 — Hover.** In Grid mode, the *candidate lines* depend on the alignment mode:
-- **Via scale:** scale lines A and B. There are none without scale points.
+- **Via scale:** the lines of the document's scale points: A, and B unless the method is 2-point
+  (`SCALE-1`). There are none without scale points.
 - **Via measurement:** every measurement line, using the live position during a resize.
 
 A candidate is **hovered** when the pointer is within **5 screen px** of the line segment.
@@ -260,7 +261,11 @@ discarded whenever the active object changes or the document changes (`OBJ-7`).
   - Labels match `HIST-2`.
 - Tool:
   - Via scale is the default.
-  - Via scale offers both scale lines, and none without scale points.
+  - Via scale offers both scale lines, only line A of a 2-point scale, and none without scale
+    points.
+  - A grid aligned to scale line B has no alignment line while the document's scale is 2-point,
+    and has one again when the scale has a line B. A grid cannot be added on line B of a 2-point
+    scale.
   - Via measurement offers every measurement.
   - A new grid takes its unit from its source.
 - Selection:

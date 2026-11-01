@@ -108,10 +108,14 @@ Every other field is exactly as in version 4. A version 4 file is migrated to ve
 how each object looks: each fill keeps its colour, and each fill angle has 90 added, within a half
 turn. An angle that was not valid stays invalid, so loading still rejects it (`FILE-7`).
 
-**FILE-6e — Version 6 (current).** Version 6 has the same fields as version 5, with one change:
+**FILE-6e — Version 6.** (no longer written; still loaded) Version 6 has the same fields as version 5, with one change:
 `fill_angle` may be from 0 up to but not including 360 (`DRAW-8`). A version 5 file is migrated to
 version 6 unchanged. Fill angles in files of version 5 and earlier are still limited as those
 versions say, so one of a half turn or more is rejected there (`FILE-7`).
+
+**FILE-6f — Version 7 (current).** Version 7 has the same fields as version 6, with one change: the
+point set's `method` may also be `TwoPoint`, with two points (`SCALE-1`). A version 6 file is migrated
+to version 7 unchanged. A file of version 6 or earlier with a `TwoPoint` method is rejected (`FILE-7`).
 
 **FILE-7 — Validation on load.** A loaded description is checked as strictly as actions
 check their inputs (`HIST-2`), so a hand-edited or damaged file cannot produce an invalid
@@ -123,6 +127,7 @@ document. Loading fails when:
   than 2
 - an open shape has a fill style other than `None`
 - the number of scale points does not match the method
+- the method is `TwoPoint` in a file of version 6 or earlier
 - a distance, cell size or fill spacing is not finite and > 0
 - an opacity is outside [0, 1]
 - a fill angle is not from 0 up to but not including 360 or, in a file of version 5 or earlier, 180
@@ -251,7 +256,10 @@ and shows the dialogs.
   - a styled open line, and a closed shape with every style changed
 
   Duplicating a grid then gives the same next id in both.
-- The written text starts with `V6(`.
+- The written text starts with `V7(`.
+- A 2-point scale survives saving and loading, is rejected from a version 5 or version 6 file, and
+  with the wrong number of points is rejected. A version 7 file otherwise reads as a version 6 file
+  does.
 - A literal version 1 sample loads with the expected values; its measurements are blue and
   it has no areas or shapes.
 - A literal version 2 sample loads with the expected values, including a measurement's

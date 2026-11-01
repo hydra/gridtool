@@ -20,7 +20,7 @@ use crate::shape::{self, DrawnShape};
 use crate::style::{FillAppearance, InvalidStyle, LineAppearance, ObjectStyle, Styled};
 
 use super::InvalidDocument;
-use super::v1::{CalibrationV1, ColorV1, GridV1, PointV1, ScalePointsV1, UnitV1};
+use super::v1::{CalibrationV1, ColorV1, GridV1, MethodV1, PointV1, ScalePointsV1, UnitV1};
 use super::v3::{FillStyleV3, LineStyleV3, ShapeV3};
 use super::v4::{AreaV4, DocumentV4, MeasurementV4};
 
@@ -164,8 +164,18 @@ impl DocumentV5 {
         let shapes = self.shapes.iter().map(|shape| shape.fill_angle);
         match areas.chain(shapes).find(|a| !is_within_half_turn(*a)) {
             Some(degrees) => Err(InvalidDocument::BadFillAngle(degrees)),
-            None => self.to_document(),
+            None => self.to_document_without_two_point(),
         }
+    }
+
+    /// Re-creates the runtime document from a file of version 6 or earlier, which is also not
+    /// valid with a 2-point scale.
+    pub fn to_document_without_two_point(&self) -> Result<Document, InvalidDocument> {
+        let method = self.calibration.points.as_ref().map(|points| points.method);
+        if method == Some(MethodV1::TwoPoint) {
+            return Err(InvalidDocument::TwoPointNotInVersion);
+        }
+        self.to_document()
     }
 
     /// Describes `document`, whose image is referred to as `image`.

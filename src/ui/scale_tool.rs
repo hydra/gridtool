@@ -190,6 +190,20 @@ mod tests {
     }
 
     #[test]
+    fn two_point_method_commits_on_the_second_point() {
+        let mut tool = ScaleTool::default();
+        tool.select_method(CalibrationMethod::TwoPoint);
+        let document = Document::new(100, 100);
+
+        assert_eq!(tool.place(document.calibration(), point(1.0)), None);
+        let action = tool.place(document.calibration(), point(2.0));
+
+        let expected =
+            ScalePoints::new(CalibrationMethod::TwoPoint, vec![point(1.0), point(2.0)]).unwrap();
+        assert_eq!(action, Some(Action::SetScalePoints(expected)));
+    }
+
+    #[test]
     fn switching_method_discards_pending_points() {
         let mut tool = ScaleTool::default();
         let document = Document::new(100, 100);

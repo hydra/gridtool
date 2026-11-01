@@ -1,20 +1,25 @@
 # 06 — Scale Calibration
 
-The user sets the document's real-world scale by placing calibration points that define
-two reference lines, **A** and **B**, and entering the real-world length of each line.
+The user sets the document's real-world scale by placing calibration points that define one
+or two reference lines, **A** and **B**, and entering the real-world length of each line.
 
 ## Calibration methods
 
-**SCALE-1 — Methods.** There are two methods:
+**SCALE-1 — Methods.** There are three methods:
 
 | Method | Points | Line A | Line B |
 |---|---|---|---|
+| **2-point** | 2 | point 1 → point 2 | none |
 | **3-point** | 3 | point 1 → point 2 | point 2 → point 3 (shares point 2) |
 | **4-point** | 4 | point 1 → point 2 | point 3 → point 4 (independent) |
 
 Points are numbered from 1 in the UI. The default method is **3-point**.
 
-**SCALE-2 — Units.** Real-world lengths use one unit, which applies to both lines. The
+**2-point** suits an image with a single scale bar, as is common on maps, where the image is
+known to have the same scale along both axes (`SCALE-17`). Use 3-point or 4-point when the X and
+Y scales may differ.
+
+**SCALE-2 — Units.** Real-world lengths use one unit, which applies to every line. The
 available units are **centimetres** (symbol `cm`, the default) and **metres** (symbol
 `m`).
 
@@ -24,16 +29,16 @@ available units are **centimetres** (symbol `cm`, the default) and **metres** (s
 row wraps onto more lines if there is not enough width. Groups are separated by vertical
 separators.
 
-1. **Method buttons.** Two toggle buttons, "`3-point`" and "`4-point`". The selected
+1. **Method buttons.** Three toggle buttons, "`2-point`", "`3-point`" and "`4-point`". The selected
    method is shown as selected (`SCALE-9`).
 2. **Point coordinates.** One label per point of the selected method, in the form
    "`<n>: (<x>, <y>)`". `n` counts from 1, and `x` and `y` are image coordinates with one
    decimal place. A point that has not been placed shows "`<n>: —`". The coordinates
    update live while a point is being dragged.
-3. **Distances.** The label "`A`" followed by a text field, then the label "`B`" followed
-   by a text field. Each field is 70 px wide (`SCALE-14`).
+3. **Distances.** For each line of the selected method, its label ("`A`", then "`B`")
+   followed by a text field. Each field is 70 px wide (`SCALE-14`). 2-point has no "`B`" field.
 4. **Units drop-down.** It shows the current unit symbol, lists `cm` and `m`, and has the
-   tooltip "`Units of distances A and B`" (`SCALE-16`).
+   tooltip "`Units of distances A and B`", or "`Units of distance A`" for 2-point (`SCALE-16`).
 5. **Result.** Either the calculated scale or the reason it is not available
    (`SCALE-18`, `SCALE-19`).
 
@@ -50,8 +55,8 @@ calibration has a point set for that method. Otherwise the tool is *placing*.
 - Pending points are presentation state (`ARCH-5`) and are drawn like placed points
   (`SCALE-11`).
 
-**SCALE-6 — Completing placement.** When the last point for the method is placed (3 or
-4), all points are committed together as **one** action, *Set scale points* (`HIST-2`).
+**SCALE-6 — Completing placement.** When the last point for the method is placed (2, 3
+or 4), all points are committed together as **one** action, *Set scale points* (`HIST-2`).
 This replaces any existing points. The pending list is then emptied.
 
 ## Dragging points
@@ -80,9 +85,12 @@ no action is committed.
   and the tool is placing (`SCALE-4`). Placing a full set for the new method replaces
   the document's points.
 
-**SCALE-10 — After undo/redo.**
-- After any undo or redo, the selected method becomes the method of the document's point
-  set, if there is one.
+- A distance for line B is kept, unused and not shown, while the method is 2-point, and is back
+  in its field when another method is selected.
+
+**SCALE-10 — After undo/redo, and on loading.**
+- After any undo or redo, and when a document is loaded, the selected method becomes the method
+  of the document's point set, if there is one.
 - Pending points and any drag in progress are discarded.
 
 **SCALE-10a — Cancelling.** Pressing Escape, or switching to another tool mode, discards
@@ -95,7 +103,7 @@ any pending points and cancels any point drag in progress, without committing an
 document's points for the selected method, with any drag in progress applied, or the
 pending points while placing.
 
-- **Lines.** For each line (A, B) where both endpoint points exist among the displayed
+- **Lines.** For each line of the method (A, and B unless 2-point) where both endpoint points exist among the displayed
   points, draw a **red** (`#FF0000`) segment 1.5 px wide between them. Draw the line's
   label ("`A`" or "`B`") in red, 14 px proportional font, centred at the segment's
   midpoint offset by 12 px along the segment's perpendicular. The perpendicular is the
@@ -138,7 +146,16 @@ pixel along X and along Y. Each line must satisfy:
 (dx·sx)² + (dy·sy)² = L²
 ```
 
-Write `u = sx²` and `v = sy²`. Lines A and B then give a 2×2 linear system:
+**2-point.** There is only line A, so X and Y have the same scale, `s`:
+
+```
+s = sx = sy = LA / √(dxA² + dyA²)
+```
+
+The line may be at any angle.
+
+**3-point and 4-point.** Write `u = sx²` and `v = sy²`. Lines A and B then give a 2×2 linear
+system:
 
 ```
 dxA²·u + dyA²·v = LA²
@@ -158,7 +175,8 @@ This allows different X and Y scales, and lines at any angle. When the lines are
 axis-aligned, it reduces to `sx = L/|dx|` and `sy = L/|dy|`.
 
 **SCALE-18 — Failure conditions.** Check these in order. The first that applies is the
-result.
+result. A 2-point set checks only the conditions on the points and on line A, as line B and its
+distance play no part.
 
 | Condition | Message |
 |---|---|
@@ -189,9 +207,13 @@ use 64-bit floating point.
 
 ## Acceptance criteria
 
-- 3-point lines are A = (1,2) and B = (2,3). 4-point lines are A = (1,2) and B = (3,4).
+- 2-point has the one line A = (1,2). 3-point lines are A = (1,2) and B = (2,3). 4-point lines
+  are A = (1,2) and B = (3,4).
 - A point set with the wrong number of points for its method is rejected.
 - Setting a point at an index that does not exist is rejected.
+- 2-point, horizontal: points (10,10), (110,10) with A = 50 give sx = sy = 0.5.
+- 2-point, diagonal: points (0,0), (30,40) with A = 100 give sx = sy = 2.
+- 2-point ignores a distance B, and reports a missing distance A and a zero-length line A.
 - 3-point, axis-aligned: points (10,10), (110,10), (110,210) with A = 50 and B = 50 give
   sx = 0.5 and sy = 0.25.
 - 4-point, diagonal: with known sx = 0.2 and sy = 0.5, lines (0,0)→(30,40) and
@@ -203,7 +225,7 @@ use 64-bit floating point.
 - Tool behaviour:
   - Placing produces exactly one action, after the final point. Before that, the
     pending points are displayed.
-  - 4-point needs 4 points.
+  - 2-point needs 2 points, and 4-point needs 4.
   - Switching method discards pending points.
   - A point set for another method is hidden.
   - Dragging shows a preview and ends with one move action. A drag that returns to its
@@ -211,6 +233,7 @@ use 64-bit floating point.
   - Points that have not been placed cannot be dragged.
   - After undo/redo, the selected method matches the document and pending state is
     cleared.
+  - A loaded document selects the method of its point set, whose points are shown.
 - Hit-testing picks the nearest point within the radius and ignores points outside it.
 - Distance parsing: "   " clears, " 12.5 " sets 12.5, and "abc", "0", "−3", "inf" and
   "NaN" are rejected. A missing distance formats as empty, and 50 formats as "50".

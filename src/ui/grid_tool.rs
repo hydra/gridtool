@@ -61,9 +61,9 @@ impl GridTool {
                 .map(|points| {
                     Line::ALL
                         .into_iter()
-                        .map(|line| {
-                            let (start, end) = points.line(line);
-                            (GridSource::ScaleLine(line), start, end)
+                        .filter_map(|line| {
+                            let (start, end) = points.line(line)?;
+                            Some((GridSource::ScaleLine(line), start, end))
                         })
                         .collect()
                 })
@@ -195,6 +195,18 @@ mod tests {
             lines[0].0,
             GridSource::Measurement(document.measurements()[0].id())
         );
+    }
+
+    #[test]
+    fn via_scale_offers_only_line_a_of_a_two_point_scale() {
+        let mut document = Document::new(100, 100);
+        let (start, end) = (Point::new(0.0, 0.0), Point::new(10.0, 0.0));
+        let points = ScalePoints::new(CalibrationMethod::TwoPoint, vec![start, end]).unwrap();
+        Action::SetScalePoints(points).apply(&mut document).unwrap();
+
+        let lines = GridTool::default().candidate_lines(&document, &Selection::default());
+
+        assert_eq!(lines, [(GridSource::ScaleLine(Line::A), start, end)]);
     }
 
     #[test]

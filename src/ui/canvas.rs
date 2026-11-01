@@ -6,7 +6,7 @@ use eframe::egui::{
     Stroke, TextureHandle, Vec2,
 };
 use gridtool::action::Action;
-use gridtool::calibration::{CalibrationMethod, Line, Scale};
+use gridtool::calibration::{CalibrationMethod, Scale};
 use gridtool::document::Document;
 use gridtool::geometry::{Bounds, BoundsHandle, Point};
 use gridtool::grid::GridSource;
@@ -781,8 +781,10 @@ fn paint_scale_markers(
         .map(|&point| transform.image_to_screen(point))
         .collect();
 
-    for line in Line::ALL {
-        let (start, end) = method.line_endpoints(line);
+    for &line in method.lines() {
+        let Some((start, end)) = method.line_endpoints(line) else {
+            continue;
+        };
         if let (Some(&start), Some(&end)) = (positions.get(start), positions.get(end)) {
             paint_labelled_line(painter, start, end, SCALE_STROKE, line.to_string());
         }
@@ -858,7 +860,7 @@ fn source_segment(
         GridSource::ScaleLine(line) => document
             .calibration()
             .points()
-            .map(|points| points.line(line)),
+            .and_then(|points| points.line(line)),
         GridSource::Measurement(id) => {
             let stored = &document.measurements()[document.measurement_index(id)?];
             let measurement = selection.displayed(id, stored);
@@ -884,8 +886,11 @@ fn paint_active_grid_source(
     let Some(points) = document.calibration().points() else {
         return;
     };
-    let (start_index, end_index) = points.method().line_endpoints(line);
-    let (start, end) = points.line(line);
+    let (Some((start_index, end_index)), Some((start, end))) =
+        (points.method().line_endpoints(line), points.line(line))
+    else {
+        return;
+    };
     let [start, end] = [start, end].map(|point| transform.image_to_screen(point));
     paint_labelled_line(painter, start, end, SCALE_STROKE, line.to_string());
     paint_scale_point(painter, transform, start, start_index + 1);

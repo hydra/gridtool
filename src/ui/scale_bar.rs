@@ -36,7 +36,7 @@ impl ScaleBar {
 
         // Every widget must be drawn each frame, so collect actions eagerly.
         let mut actions = Vec::new();
-        for line in Line::ALL {
+        for &line in tool.method().lines() {
             actions.extend(self.distance_field(ui, line, calibration.distance(line)));
         }
         actions.extend(
@@ -44,7 +44,7 @@ impl ScaleBar {
                 ui,
                 "scale_unit",
                 calibration.unit(),
-                "Units of distances A and B",
+                units_tooltip(tool.method()),
             )
             .map(Action::SetUnit),
         );
@@ -82,6 +82,13 @@ fn method_buttons(ui: &mut egui::Ui, tool: &mut ScaleTool) {
         {
             tool.select_method(method);
         }
+    }
+}
+
+fn units_tooltip(method: CalibrationMethod) -> &'static str {
+    match method.lines() {
+        [_] => "Units of distance A",
+        _ => "Units of distances A and B",
     }
 }
 
@@ -134,6 +141,18 @@ fn format_distance(distance: Option<f64>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_units_tooltip_names_the_distances_of_the_method() {
+        assert_eq!(
+            units_tooltip(CalibrationMethod::TwoPoint),
+            "Units of distance A"
+        );
+        assert_eq!(
+            units_tooltip(CalibrationMethod::FourPoint),
+            "Units of distances A and B"
+        );
+    }
 
     #[test]
     fn empty_text_clears_the_distance() {

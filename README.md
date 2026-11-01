@@ -5,7 +5,7 @@
 ## About
 
 GridTool is a desktop application for measuring real-world objects from an image, such
-as a plan, a drawing or a photo. Calibrate the image's scale from two known distances,
+as a plan, a drawing or a photo. Calibrate the image's scale from one or two known distances,
 then measure distances and overlay real-world grids of any cell size, aligned to a scale
 or measurement line. Every change can be undone, and documents can be saved and loaded.
 
@@ -14,7 +14,7 @@ or measurement line. Every change can be undone, and documents can be saved and 
 ## Features
 
 - **Open images**: PNG, JPEG and BMP plans, drawings and photos.
-- **Scale calibration**: from two lines of known length, using 3 or 4 points, with separate horizontal and vertical scales.
+- **Scale calibration**: from a single line of known length, using 2 points, such as the scale bar on a map, or from two lines of known length, using 3 or 4 points, with separate horizontal and vertical scales.
 - **Point-to-point measurements**: real-world distances, with editable coordinates, per-measurement units (cm or m) and line styles.
 - **Area measurements**: convex or concave outlines with 3 or more points, labelled with their area in cm² or m², with their own line and fill styles.
 - **Grids**: real-world grids with square or rectangular cells of any size, aligned to a scale or measurement line, with adjustable colour and opacity.

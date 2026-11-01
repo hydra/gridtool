@@ -55,7 +55,7 @@ must satisfy them.
 | **Action** | A single change to the document. It can be undone and redone. |
 | **Active document** | The open document that the tool bar, panels and commands are showing and acting on (`WORK-10`). |
 | **Tool mode** | The active tool. It decides what mouse input on the canvas does. |
-| **Calibration points** | Points placed on the image that define two reference lines, A and B. |
+| **Calibration points** | Points placed on the image that define one reference line, A, or two, A and B. |
 | **Scale** | The real-world length of one image pixel along the image's X axis and along its Y axis. |
 | **Measurement** | A line on the document, with a start and an end point, whose real-world length is derived from the scale. Called a **point-to-point** measurement in the UI. |
 | **Area** | An area measurement: a closed outline through 3 or more points on the document, whose real-world area is derived from the scale. |
@@ -115,3 +115,4 @@ must satisfy them.
 | 2026-11-01 | A release build no longer opens a console window on Windows (`SHELL-1b`). |
 | 2026-11-01 | A panic in a release build now saves a crash report and shows a dialog saying where it is (`SHELL-1c`). |
 | 2026-11-01 | Added an About button at the right-hand end of the tool bar, and its dialog (`SHELL-5`, `SHELL-13`). |
+| 2026-11-01 | Added the 2-point calibration method, with one line and the same scale on both axes, and file format version 7 (`SCALE-1`, `SCALE-17`, `FILE-6f`). A loaded document now selects the method of its scale points (`SCALE-10`). |

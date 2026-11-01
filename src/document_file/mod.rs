@@ -43,12 +43,14 @@ pub enum DocumentFile {
     V5(DocumentV5),
     /// The fields of version 5, with fill angles allowed up to a full turn.
     V6(DocumentV5),
+    /// The fields of version 6, with the 2-point calibration method.
+    V7(DocumentV5),
 }
 
 impl DocumentFile {
     /// Describes `document` in the current format version.
     pub fn describe(document: &Document, image: String) -> Self {
-        Self::V6(DocumentV5::describe(document, image))
+        Self::V7(DocumentV5::describe(document, image))
     }
 
     /// The stored image reference.
@@ -58,7 +60,7 @@ impl DocumentFile {
             Self::V2(file) => &file.image,
             Self::V3(file) => &file.image,
             Self::V4(file) => &file.image,
-            Self::V5(file) | Self::V6(file) => &file.image,
+            Self::V5(file) | Self::V6(file) | Self::V7(file) => &file.image,
         }
     }
 
@@ -79,7 +81,8 @@ impl DocumentFile {
             }
             Self::V4(file) => DocumentV5::from(file.clone()).to_document_within_half_turn(),
             Self::V5(file) => file.to_document_within_half_turn(),
-            Self::V6(file) => file.to_document(),
+            Self::V6(file) => file.to_document_without_two_point(),
+            Self::V7(file) => file.to_document(),
         }
     }
 
@@ -195,6 +198,8 @@ pub enum InvalidDocument {
     EmptySize,
     PointOutside(Point),
     WrongScalePointCount,
+    /// A 2-point scale in a file of a version from before there were any.
+    TwoPointNotInVersion,
     TooFewAreaPoints(usize),
     TooFewShapePoints(usize),
     /// The id of an open shape stored with a fill.
@@ -213,6 +218,9 @@ impl fmt::Display for InvalidDocument {
             Self::PointOutside(point) => write!(f, "point {point} is outside the document"),
             Self::WrongScalePointCount => {
                 f.write_str("the number of scale points does not match the method")
+            }
+            Self::TwoPointNotInVersion => {
+                f.write_str("this version of the file cannot have a 2-point scale")
             }
             Self::TooFewAreaPoints(count) => {
                 write!(f, "an area has {count} points, but needs at least 3")

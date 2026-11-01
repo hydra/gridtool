@@ -297,6 +297,8 @@ mod tests {
     const NARROW: f32 = 300.0;
     /// Not the height of the real tool bar: what matters is that the row keeps to it.
     const MIN_HEIGHT: f32 = 30.0;
+    use gridtool::calibration::CalibrationMethod;
+
     /// Inside the single row of controls.
     const ROW_Y: f32 = 20.0;
 
@@ -477,6 +479,32 @@ mod tests {
                 "{mode:?}"
             );
         }
+    }
+
+    #[test]
+    fn the_first_scale_method_is_two_point_with_only_distance_a() {
+        let mut harness = Harness::new(ToolMode::Scale);
+        harness.settled_canvas_top();
+        assert!(harness.shows_text("B"), "3-point by default");
+        let pos = Pos2::new(20.0, ROW_Y);
+        let button = |pressed| Event::PointerButton {
+            pos,
+            button: PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+
+        harness.frame(vec![Event::PointerMoved(pos)]);
+        harness.frame(vec![button(true)]);
+        harness.frame(vec![button(false)]);
+        harness.settled_canvas_top();
+
+        assert_eq!(
+            harness.view.scale_tool.method(),
+            CalibrationMethod::TwoPoint
+        );
+        assert!(harness.shows_text("A"));
+        assert!(!harness.shows_text("B"));
     }
 
     #[test]

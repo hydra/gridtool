@@ -238,7 +238,7 @@ fn files_are_tagged_with_their_format_version() {
         .to_ron()
         .unwrap();
 
-    assert!(text.starts_with("V6("), "{text}");
+    assert!(text.starts_with("V7("), "{text}");
 }
 
 /// A version 1 file exactly as the first release writes it. It must always load.
@@ -942,4 +942,81 @@ fn a_version_6_file_reads_as_version_5_does_apart_from_its_tag() {
         .to_document();
 
     assert_eq!(version_6, version_5);
+}
+
+/// A document with a 2-point scale, described as the current version.
+fn two_point_file() -> DocumentV5 {
+    let mut document = Document::new(200, 100);
+    Action::SetScalePoints(
+        ScalePoints::new(
+            CalibrationMethod::TwoPoint,
+            vec![Point::new(10.0, 10.0), Point::new(110.0, 10.0)],
+        )
+        .unwrap(),
+    )
+    .apply(&mut document)
+    .unwrap();
+    Action::SetDistance {
+        line: Line::A,
+        distance: Some(50.0),
+    }
+    .apply(&mut document)
+    .unwrap();
+    let DocumentFile::V7(file) = DocumentFile::describe(&document, "a.png".to_owned()) else {
+        unreachable!("the current version is 7");
+    };
+    file
+}
+
+#[test]
+fn a_two_point_scale_survives_saving_and_loading() {
+    let text = DocumentFile::V7(two_point_file()).to_ron().unwrap();
+    assert!(text.contains("method: TwoPoint"), "{text}");
+
+    let document = DocumentFile::from_ron(&text)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    let points = document.calibration().points().unwrap();
+    assert_eq!(points.method(), CalibrationMethod::TwoPoint);
+    assert_eq!(points.points().len(), 2);
+    assert_eq!(document.calibration().scale().unwrap().y_per_pixel, 0.5);
+}
+
+#[test]
+fn only_version_7_allows_a_two_point_scale() {
+    let file = two_point_file();
+
+    assert!(DocumentFile::V7(file.clone()).to_document().is_ok());
+    for older in [DocumentFile::V5(file.clone()), DocumentFile::V6(file)] {
+        assert_eq!(
+            older.to_document(),
+            Err(InvalidDocument::TwoPointNotInVersion)
+        );
+    }
+}
+
+#[test]
+fn a_version_7_file_reads_as_version_6_does_apart_from_its_tag() {
+    let version_6 = VERSION_5_SAMPLE.replacen("V5(", "V6(", 1);
+    let version_7 = VERSION_5_SAMPLE.replacen("V5(", "V7(", 1);
+
+    assert_eq!(
+        DocumentFile::from_ron(&version_7).unwrap().to_document(),
+        DocumentFile::from_ron(&version_6).unwrap().to_document()
+    );
+}
+
+#[test]
+fn a_two_point_scale_with_the_wrong_number_of_points_is_rejected() {
+    let mut file = two_point_file();
+    let mut points = file.calibration.points.take().unwrap();
+    points.points.pop();
+    file.calibration.points = Some(points);
+
+    assert_eq!(
+        DocumentFile::V7(file).to_document(),
+        Err(InvalidDocument::WrongScalePointCount)
+    );
 }

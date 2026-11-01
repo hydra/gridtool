@@ -1,13 +1,15 @@
-//! Real-world scale calibration from two measured reference lines.
+//! Real-world scale calibration from one or two measured reference lines.
 
 use std::fmt;
 
 use crate::geometry::Point;
 use crate::units::LengthUnit;
 
-/// How the two reference lines are defined by the calibration points.
+/// How the reference lines are defined by the calibration points.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CalibrationMethod {
+    /// Two points: line A is 1→2, and X and Y have the same scale. There is no line B.
+    TwoPoint,
     /// Three points: line A is 1→2, line B is 2→3 (sharing point 2).
     #[default]
     ThreePoint,
@@ -16,27 +18,41 @@ pub enum CalibrationMethod {
 }
 
 impl CalibrationMethod {
-    pub const ALL: [CalibrationMethod; 2] =
-        [CalibrationMethod::ThreePoint, CalibrationMethod::FourPoint];
+    pub const ALL: [CalibrationMethod; 3] = [
+        CalibrationMethod::TwoPoint,
+        CalibrationMethod::ThreePoint,
+        CalibrationMethod::FourPoint,
+    ];
 
     pub fn point_count(self) -> usize {
         match self {
+            CalibrationMethod::TwoPoint => 2,
             CalibrationMethod::ThreePoint => 3,
             CalibrationMethod::FourPoint => 4,
         }
     }
 
-    /// Indices of the start and end points of `line`.
-    pub fn line_endpoints(self, line: Line) -> (usize, usize) {
+    /// The reference lines this method has.
+    pub fn lines(self) -> &'static [Line] {
+        match self {
+            CalibrationMethod::TwoPoint => &[Line::A],
+            CalibrationMethod::ThreePoint | CalibrationMethod::FourPoint => &Line::ALL,
+        }
+    }
+
+    /// Indices of the start and end points of `line`, if this method has that line.
+    pub fn line_endpoints(self, line: Line) -> Option<(usize, usize)> {
         match (self, line) {
-            (_, Line::A) => (0, 1),
-            (CalibrationMethod::ThreePoint, Line::B) => (1, 2),
-            (CalibrationMethod::FourPoint, Line::B) => (2, 3),
+            (_, Line::A) => Some((0, 1)),
+            (CalibrationMethod::TwoPoint, Line::B) => None,
+            (CalibrationMethod::ThreePoint, Line::B) => Some((1, 2)),
+            (CalibrationMethod::FourPoint, Line::B) => Some((2, 3)),
         }
     }
 
     pub fn name(self) -> &'static str {
         match self {
+            CalibrationMethod::TwoPoint => "2-point",
             CalibrationMethod::ThreePoint => "3-point",
             CalibrationMethod::FourPoint => "4-point",
         }
@@ -131,10 +147,10 @@ impl ScalePoints {
         &self.points
     }
 
-    /// Start and end of `line`.
-    pub fn line(&self, line: Line) -> (Point, Point) {
-        let (start, end) = self.method.line_endpoints(line);
-        (self.points[start], self.points[end])
+    /// Start and end of `line`, if the method has that line.
+    pub fn line(&self, line: Line) -> Option<(Point, Point)> {
+        let (start, end) = self.method.line_endpoints(line)?;
+        Some((self.points[start], self.points[end]))
     }
 
     pub fn set_point(&mut self, index: usize, point: Point) -> Result<(), CalibrationError> {
@@ -233,10 +249,31 @@ impl Calibration {
     /// Calculates the X and Y scale.
     ///
     /// Each line, with pixel extent (dx, dy) and real length L, gives
-    /// `(dx·sx)² + (dy·sy)² = L²`. The two lines form a linear system in `sx²` and `sy²`,
-    /// so the axes can have different scales and the lines need not be axis-aligned.
+    /// `(dx·sx)² + (dy·sy)² = L²`.
     pub fn scale(&self) -> Result<Scale, ScaleError> {
         let points = self.points.as_ref().ok_or(ScaleError::MissingPoints)?;
+        match points.method() {
+            CalibrationMethod::TwoPoint => self.uniform_scale(points),
+            CalibrationMethod::ThreePoint | CalibrationMethod::FourPoint => {
+                self.separate_scale(points)
+            }
+        }
+    }
+
+    /// One line gives one equation, so X and Y are taken to have the same scale.
+    fn uniform_scale(&self, points: &ScalePoints) -> Result<Scale, ScaleError> {
+        let [dx_squared, dy_squared, length_squared] = self.line_equation(points, Line::A)?;
+        let per_pixel = (length_squared / (dx_squared + dy_squared)).sqrt();
+        Ok(Scale {
+            x_per_pixel: per_pixel,
+            y_per_pixel: per_pixel,
+            unit: self.unit,
+        })
+    }
+
+    /// The two lines form a linear system in `sx²` and `sy²`, so the axes can have different
+    /// scales and the lines need not be axis-aligned.
+    fn separate_scale(&self, points: &ScalePoints) -> Result<Scale, ScaleError> {
         let [a, b] = Line::ALL.map(|line| self.line_equation(points, line));
         let ([ax, ay, al], [bx, by, bl]) = (a?, b?);
 
@@ -263,7 +300,7 @@ impl Calibration {
         let length = self
             .distance(line)
             .ok_or(ScaleError::MissingDistance(line))?;
-        let (start, end) = points.line(line);
+        let (start, end) = points.line(line).ok_or(ScaleError::MissingPoints)?;
         let (dx, dy) = (end.x - start.x, end.y - start.y);
         if dx == 0.0 && dy == 0.0 {
             return Err(ScaleError::ZeroLengthLine(line));
@@ -297,18 +334,98 @@ mod tests {
         );
     }
 
+    fn two_point(points: &[(f64, f64)], a: Option<f64>) -> Calibration {
+        let points = points.iter().map(|&(x, y)| Point::new(x, y)).collect();
+        let mut calibration = Calibration::default();
+        calibration.set_points(ScalePoints::new(CalibrationMethod::TwoPoint, points).unwrap());
+        calibration.set_distance(Line::A, a);
+        calibration
+    }
+
+    #[test]
+    fn two_point_has_only_line_a() {
+        let method = CalibrationMethod::TwoPoint;
+        assert_eq!(method.point_count(), 2);
+        assert_eq!(method.lines(), [Line::A]);
+        assert_eq!(method.line_endpoints(Line::A), Some((0, 1)));
+        assert_eq!(method.line_endpoints(Line::B), None);
+
+        let calibration = two_point(&[(1.0, 2.0), (3.0, 4.0)], None);
+        let points = calibration.points().unwrap();
+        assert_eq!(
+            points.line(Line::A),
+            Some((Point::new(1.0, 2.0), Point::new(3.0, 4.0)))
+        );
+        assert_eq!(points.line(Line::B), None);
+    }
+
+    #[test]
+    fn three_and_four_point_have_both_lines() {
+        for method in [CalibrationMethod::ThreePoint, CalibrationMethod::FourPoint] {
+            assert_eq!(method.lines(), Line::ALL);
+        }
+    }
+
+    #[test]
+    fn two_point_gives_the_same_scale_on_both_axes() {
+        // A horizontal scale bar: 100 px = 50 m.
+        let mut calibration = two_point(&[(10.0, 10.0), (110.0, 10.0)], Some(50.0));
+        calibration.set_unit(LengthUnit::Metre);
+
+        let scale = calibration.scale().unwrap();
+
+        assert_near(scale.x_per_pixel, 0.5);
+        assert_near(scale.y_per_pixel, 0.5);
+        assert_eq!(scale.unit, LengthUnit::Metre);
+    }
+
+    #[test]
+    fn two_point_line_may_be_at_any_angle() {
+        // A 3-4-5 triangle: 50 px along the line = 100 units.
+        let calibration = two_point(&[(0.0, 0.0), (30.0, 40.0)], Some(100.0));
+
+        let scale = calibration.scale().unwrap();
+
+        assert_near(scale.x_per_pixel, 2.0);
+        assert_near(scale.y_per_pixel, 2.0);
+        assert_near(
+            scale.length(Point::new(0.0, 0.0), Point::new(30.0, 40.0)),
+            100.0,
+        );
+    }
+
+    #[test]
+    fn two_point_ignores_a_distance_for_line_b() {
+        let mut calibration = two_point(&[(0.0, 0.0), (100.0, 0.0)], Some(10.0));
+        calibration.set_distance(Line::B, Some(999.0));
+
+        assert_near(calibration.scale().unwrap().x_per_pixel, 0.1);
+    }
+
+    #[test]
+    fn two_point_needs_a_distance_and_a_line_with_length() {
+        assert_eq!(
+            two_point(&[(0.0, 0.0), (100.0, 0.0)], None).scale(),
+            Err(ScaleError::MissingDistance(Line::A))
+        );
+        assert_eq!(
+            two_point(&[(5.0, 5.0), (5.0, 5.0)], Some(10.0)).scale(),
+            Err(ScaleError::ZeroLengthLine(Line::A))
+        );
+    }
+
     #[test]
     fn three_point_lines_share_the_middle_point() {
         let method = CalibrationMethod::ThreePoint;
-        assert_eq!(method.line_endpoints(Line::A), (0, 1));
-        assert_eq!(method.line_endpoints(Line::B), (1, 2));
+        assert_eq!(method.line_endpoints(Line::A), Some((0, 1)));
+        assert_eq!(method.line_endpoints(Line::B), Some((1, 2)));
     }
 
     #[test]
     fn four_point_lines_are_independent() {
         let method = CalibrationMethod::FourPoint;
-        assert_eq!(method.line_endpoints(Line::A), (0, 1));
-        assert_eq!(method.line_endpoints(Line::B), (2, 3));
+        assert_eq!(method.line_endpoints(Line::A), Some((0, 1)));
+        assert_eq!(method.line_endpoints(Line::B), Some((2, 3)));
     }
 
     #[test]

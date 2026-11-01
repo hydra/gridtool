@@ -1289,3 +1289,47 @@ fn move_labels_name_the_object() {
         assert_eq!(action.to_string(), label);
     }
 }
+
+fn two_point_document() -> Document {
+    let mut document = Document::new(100, 100);
+    let points = ScalePoints::new(
+        CalibrationMethod::TwoPoint,
+        vec![Point::new(0.0, 0.0), Point::new(10.0, 0.0)],
+    )
+    .unwrap();
+    Action::SetScalePoints(points).apply(&mut document).unwrap();
+    document
+}
+
+#[test]
+fn a_two_point_scale_is_described_by_its_method() {
+    let points = two_point_document().calibration().points().unwrap().clone();
+
+    assert_eq!(
+        Action::SetScalePoints(points).to_string(),
+        "Set 2-point scale points"
+    );
+}
+
+#[test]
+fn a_two_point_scale_has_no_third_point_to_move() {
+    let mut document = two_point_document();
+
+    let result = Action::MoveScalePoint {
+        index: 2,
+        to: Point::new(5.0, 5.0),
+    }
+    .apply(&mut document);
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn a_grid_cannot_be_added_on_line_b_of_a_two_point_scale() {
+    let mut document = two_point_document();
+
+    let result = Action::AddGrid(Grid::new(GridSource::ScaleLine(Line::B), LengthUnit::Metre))
+        .apply(&mut document);
+
+    assert_eq!(result, Err(ActionError::GridSourceMissing));
+}

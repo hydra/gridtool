@@ -65,9 +65,11 @@ impl OpenDocument {
     ) -> Self {
         let name = image_path.display().to_string();
         let saved = file.is_some().then(|| document.clone());
+        let mut view = DocumentView::new(canvas::upload_texture(ctx, &name, image));
+        view.scale_tool.sync_to(document.calibration());
         Self {
             editor: Editor::new(document),
-            view: DocumentView::new(canvas::upload_texture(ctx, &name, image)),
+            view,
             image_path,
             file,
             saved,
@@ -169,6 +171,7 @@ impl OpenDocument {
 mod tests {
     use super::*;
     use gridtool::area::Area;
+    use gridtool::calibration::{CalibrationMethod, ScalePoints};
     use gridtool::geometry::Point;
     use gridtool::measurement::Measurement;
     use gridtool::shape::DrawnShape;
@@ -177,6 +180,33 @@ mod tests {
     use crate::ui::tool_mode::ToolMode;
 
     const UNIT: LengthUnit = LengthUnit::Centimetre;
+
+    #[test]
+    fn a_loaded_document_shows_its_own_scale_method() {
+        let ctx = egui::Context::default();
+        let mut document = Document::new(1, 1);
+        let points = ScalePoints::new(
+            CalibrationMethod::TwoPoint,
+            vec![Point::new(0.0, 0.0), Point::new(1.0, 1.0)],
+        )
+        .unwrap();
+        Action::SetScalePoints(points).apply(&mut document).unwrap();
+        let loaded = LoadedDocument {
+            document,
+            image_path: PathBuf::from("map.png"),
+            image: DecodedImage {
+                width: 1,
+                height: 1,
+                rgba: vec![255; 4],
+            },
+        };
+
+        let open = OpenDocument::from_loaded(&ctx, loaded, PathBuf::from("map.ron"));
+
+        let tool = &open.view.scale_tool;
+        assert_eq!(tool.method(), CalibrationMethod::TwoPoint);
+        assert!(!tool.is_placing(open.editor.document().calibration()));
+    }
 
     fn open_document() -> OpenDocument {
         let image = DecodedImage {

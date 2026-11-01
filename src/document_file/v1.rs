@@ -52,10 +52,14 @@ pub struct ScalePointsV1 {
     pub points: Vec<PointV1>,
 }
 
+// The names are what files contain, so they cannot change.
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MethodV1 {
     ThreePoint,
     FourPoint,
+    /// Version 7 onwards; loading an earlier version rejects it.
+    TwoPoint,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,6 +129,7 @@ impl From<PointV1> for Point {
 impl From<CalibrationMethod> for MethodV1 {
     fn from(method: CalibrationMethod) -> Self {
         match method {
+            CalibrationMethod::TwoPoint => Self::TwoPoint,
             CalibrationMethod::ThreePoint => Self::ThreePoint,
             CalibrationMethod::FourPoint => Self::FourPoint,
         }
@@ -136,6 +141,7 @@ impl From<MethodV1> for CalibrationMethod {
         match method {
             MethodV1::ThreePoint => Self::ThreePoint,
             MethodV1::FourPoint => Self::FourPoint,
+            MethodV1::TwoPoint => Self::TwoPoint,
         }
     }
 }

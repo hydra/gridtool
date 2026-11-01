@@ -206,7 +206,7 @@ impl Grid {
             GridSource::ScaleLine(line) => document
                 .calibration()
                 .points()
-                .map(|points| points.line(line))
+                .and_then(|points| points.line(line))
                 .ok_or(GridError::SourceMissing),
             GridSource::Measurement(id) => document
                 .measurement_index(id)
@@ -766,5 +766,35 @@ mod tests {
             grid.line_spacing(&no_scale),
             Err(GridError::NoScale(_))
         ));
+    }
+
+    #[test]
+    fn a_grid_on_line_b_has_no_source_under_a_two_point_scale_until_line_b_returns() {
+        use crate::calibration::{CalibrationMethod, ScalePoints};
+
+        let set_points = |document: &mut Document, method, coordinates: &[(f64, f64)]| {
+            let points = coordinates.iter().map(|&(x, y)| Point::new(x, y)).collect();
+            crate::action::Action::SetScalePoints(ScalePoints::new(method, points).unwrap())
+                .apply(document)
+                .unwrap();
+        };
+        let three_point = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)];
+        let mut document = Document::new(100, 100);
+        let on_a = Grid::new(GridSource::ScaleLine(Line::A), LengthUnit::Metre);
+        let on_b = Grid::new(GridSource::ScaleLine(Line::B), LengthUnit::Metre);
+
+        set_points(&mut document, CalibrationMethod::ThreePoint, &three_point);
+        assert!(on_b.source_line(&document).is_ok());
+
+        set_points(
+            &mut document,
+            CalibrationMethod::TwoPoint,
+            &[(0.0, 0.0), (10.0, 0.0)],
+        );
+        assert!(on_a.source_line(&document).is_ok());
+        assert_eq!(on_b.source_line(&document), Err(GridError::SourceMissing));
+
+        set_points(&mut document, CalibrationMethod::ThreePoint, &three_point);
+        assert!(on_b.source_line(&document).is_ok());
     }
 }

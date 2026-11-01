@@ -5,6 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use eframe::egui::{Event, Modifiers, PointerButton, Pos2, RawInput, Rect, Vec2};
+use gridtool::calibration::CalibrationMethod;
 use gridtool::geometry::Point;
 
 use super::*;
@@ -807,6 +808,53 @@ fn tabs_and_tab_bars_show_the_normal_cursor_until_they_are_dragged() {
             "from {from:?}"
         );
     }
+}
+
+#[test]
+fn a_two_point_scale_is_placed_with_two_clicks_and_undone_as_one() {
+    let mut fixture = Fixture::new("two_point");
+    fixture.new_document();
+    fixture.open().view.mode = ToolMode::Scale;
+    fixture
+        .open()
+        .view
+        .scale_tool
+        .select_method(CalibrationMethod::TwoPoint);
+    let canvas = fixture.open().view.canvas_rect.unwrap();
+
+    fixture.click(canvas.center());
+    assert!(
+        fixture
+            .open()
+            .editor
+            .document()
+            .calibration()
+            .points()
+            .is_none()
+    );
+    fixture.click(canvas.center() + Vec2::new(100.0, 0.0));
+
+    let points = fixture
+        .open()
+        .editor
+        .document()
+        .calibration()
+        .points()
+        .cloned();
+    let points = points.expect("the second point completes the set");
+    assert_eq!(points.method(), CalibrationMethod::TwoPoint);
+    assert_eq!(points.points().len(), 2);
+
+    fixture.open().editor.undo();
+    assert!(
+        fixture
+            .open()
+            .editor
+            .document()
+            .calibration()
+            .points()
+            .is_none()
+    );
 }
 
 /// In the About button, at the right-hand end of the tool bar.
