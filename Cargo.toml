@@ -30,6 +30,10 @@ icons = ["assets/icons/gridtool.png"]
 before-packaging-command = "cargo build --release --locked"
 out-dir = "target/packages"
 
+[package.metadata.packager.nsis]
+# The Windows installer only takes an ICO file; build.rs makes it from the icon above.
+installer-icon = "target/release/gridtool.ico"
+
 [patch.crates-io]
 # Upstream egui_ltreeview 0.9.0 requires egui 0.36; this copy is patched for egui 0.37.
 egui_ltreeview = { path = "vendor/egui_ltreeview" }

@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::fs::File;
+use std::fs::{self, File};
 use std::path::Path;
 
 use ico::{IconDir, IconDirEntry, IconImage, ResourceType};
@@ -16,13 +16,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Windows shows the icon in an executable's resources, which other platforms don't have.
     if std::env::var("CARGO_CFG_TARGET_OS")? == "windows" {
-        let ico_path = Path::new(&std::env::var("OUT_DIR")?).join("gridtool.ico");
+        let out_dir = std::env::var("OUT_DIR")?;
+        let out_dir = Path::new(&out_dir);
+        let ico_path = out_dir.join("gridtool.ico");
         write_ico(Path::new(ICON_PNG), &ico_path)?;
         WindowsResource::new()
             .set_icon(ico_path.to_str().ok_or("OUT_DIR is not valid UTF-8")?)
             .compile()?;
+        fs::copy(&ico_path, profile_dir(out_dir)?.join("gridtool.ico"))?;
     }
     Ok(())
+}
+
+/// The directory of the build's executable, `target/<profile>`, from the build script's `OUT_DIR`,
+/// `target/<profile>/build/<package>/out`. The ICO file is put there because the installer needs a
+/// path that does not change, which `installer-icon` in `Cargo.toml` names.
+fn profile_dir(out_dir: &Path) -> Result<&Path, Box<dyn Error>> {
+    Ok(out_dir
+        .ancestors()
+        .nth(3)
+        .ok_or("OUT_DIR is not inside a profile directory")?)
 }
 
 /// Writes the PNG as an ICO file holding each of `ICO_SIZES`.

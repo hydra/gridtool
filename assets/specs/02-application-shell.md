@@ -14,7 +14,8 @@ Closing the window may first ask about unsaved changes (`FILE-17`).
 
 **SHELL-1a — Application icon.** The application has one icon, a square image, used
 wherever the platform shows one for it: the window, the task bar or dock, the executable
-file, and the release packages. All of them come from the same image.
+file, the release packages, and the installer program of a package that has one. All of them come
+from the same image.
 - A test MUST check that the bundled icon can be loaded and is square.
 
 ## Layout
