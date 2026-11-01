@@ -9,7 +9,7 @@ as a plan, a drawing or a photo. Calibrate the image's scale from two known dist
 then measure distances and overlay real-world grids of any cell size, aligned to a scale
 or measurement line. Every change can be undone, and documents can be saved and loaded.
 
-<a href="assets/screenshots/Screenshot%202026-10-21%20173320.png"><img src="assets/screenshots/Screenshot%202026-10-21%20173320.png" width="800" alt="GridTool showing a calibrated site plan with measurements and two grids"></a>
+<a href="assets/screenshots/Screenshot%202026-11-01%20213112.png"><img src="assets/screenshots/Screenshot%202026-11-01%20213112.png" width="800" alt="GridTool with two documents side by side, a site plan with a grid and filled areas and a calibrated aerial photo with a measured area, and the Objects, History, Point-to-point and Areas panels docked around them"></a>
 
 ## Features
 
