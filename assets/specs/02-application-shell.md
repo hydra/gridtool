@@ -172,7 +172,14 @@ widget such as a text field has keyboard focus.
 - Each section scrolls independently. With no document open, the two tables show their
   heading and "`No document open`" in weak text.
 
+**SHELL-12 — Scroll bars.** Throughout the application, a scroll bar is drawn whenever there is
+more to scroll to, without the pointer having to be over it or its area, and it takes up space
+beside the content instead of covering it. Where everything fits there is no scroll bar, so its
+presence shows whether something can be scrolled.
+
 ## Acceptance criteria
+
+- Scroll bars (`SHELL-12`): they do not float over the content, in the dark or the light theme.
 
 - The default tool mode is Pan & zoom.
 - Every mode has a distinct icon and a distinct name.

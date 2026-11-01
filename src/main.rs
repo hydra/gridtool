@@ -24,6 +24,7 @@ fn main() -> eframe::Result {
         options,
         Box::new(|cc| {
             egui_material_icons::initialize(&cc.egui_ctx);
+            ui::app_style::apply(&cc.egui_ctx);
             Ok(Box::<GridToolApp>::default())
         }),
     )

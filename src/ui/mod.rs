@@ -2,6 +2,7 @@
 //! modifies the document directly.
 
 mod angle;
+pub mod app_style;
 mod area_tool;
 pub mod areas_panel;
 pub mod canvas;
