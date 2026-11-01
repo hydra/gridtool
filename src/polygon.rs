@@ -101,12 +101,14 @@ pub fn hatch_lines(
         // A line that only touches a corner has nothing to draw.
         segments.extend(
             crossings
-                .chunks_exact(2)
-                .filter(|pair| pair[0] < pair[1])
-                .map(|pair| {
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .filter(|[start, end]| start < end)
+                .map(|[start, end]| {
                     (
-                        direction.point_at(pair[0], position),
-                        direction.point_at(pair[1], position),
+                        direction.point_at(*start, position),
+                        direction.point_at(*end, position),
                     )
                 }),
         );
