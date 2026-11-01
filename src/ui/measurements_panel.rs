@@ -1,5 +1,6 @@
 //! The Point-to-point table: the document's distance measurements, in document order,
-//! with editable coordinates, per-measurement units and colours, and delete buttons.
+//! with editable coordinates, per-measurement units and colours, and delete buttons. The
+//! active measurement's row is selected, and clicking a row makes its measurement active.
 
 use eframe::egui;
 use egui_material_icons::MaterialIcon;
@@ -15,13 +16,14 @@ use super::format::{format_coordinate, format_length, parse_number};
 use super::icon_button::inline_icon_text;
 use super::icons;
 use super::selection::Selection;
+use super::table_rows::{TableOutput, TableRows, row_color};
 use super::unit_picker;
 
 /// The widest coordinate a field must show in full: six digits and a decimal point.
 const WIDEST_COORDINATE: &str = "0000.00";
 const DELETE_ICON: MaterialIcon = icons::DELETE;
 const COLUMN_HEADERS: [&str; 9] = [
-    "#", "x1", "y1", "x2", "y2", "Distance", "Units", "Color", "",
+    "#", "Color", "x1", "y1", "x2", "y2", "Distance", "Units", "",
 ];
 /// One coordinate column per axis of each endpoint.
 const COORDINATE_COLUMNS: usize = 4;
@@ -75,20 +77,24 @@ pub struct MeasurementsPanel {
 }
 
 impl MeasurementsPanel {
-    /// Draws the table into `ui`, returning the action the user completed, if any.
+    /// Draws the table into `ui`, returning what the user did. The row of the active object
+    /// is selected and, if `reveal`, scrolled into view.
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
         document: &Document,
         selection: &Selection,
-    ) -> Option<Action> {
+        reveal: bool,
+    ) -> TableOutput {
         ui.heading(HEADING);
         ui.separator();
         if document.measurements().is_empty() {
             ui.weak("No measurements yet. Use the Measure distance tool to add one.");
-            return None;
+            return TableOutput::default();
         }
 
+        let active = selection.active();
+        let selected_row = active.and_then(|id| document.measurement_index(id));
         egui::ScrollArea::both()
             .id_salt("measurements_scroll")
             .auto_shrink(false)
@@ -96,8 +102,9 @@ impl MeasurementsPanel {
                 let available = ui.available_width();
                 let min_width = min_field_width(ui);
                 let field_width = coordinate_field_width(self.layout, available, min_width);
+                let mut rows = TableRows::default();
                 let table = egui::Grid::new("measurements_table")
-                    .striped(true)
+                    .with_row_color(row_color(selected_row))
                     .num_columns(COLUMN_HEADERS.len())
                     .show(ui, |ui| {
                         for header in COLUMN_HEADERS {
@@ -109,10 +116,10 @@ impl MeasurementsPanel {
                         for (index, stored) in document.measurements().iter().enumerate() {
                             // Show a resize in progress live.
                             let measurement = selection.displayed(stored.id(), stored);
-                            let row_action =
-                                self.row(ui, document, index, &measurement, field_width);
+                            let row_action = rows.row(ui, stored.id(), |ui| {
+                                self.row(ui, document, index, &measurement, field_width)
+                            });
                             action = action.or(row_action);
-                            ui.end_row();
                         }
                         action
                     });
@@ -124,7 +131,8 @@ impl MeasurementsPanel {
                     table_width: table.response.rect.width(),
                     settled,
                 });
-                table.inner
+                let pick = rows.finish(ui, table.response.rect, active.filter(|_| reveal));
+                TableOutput::new(table.inner, pick)
             })
             .inner
     }
@@ -141,6 +149,21 @@ impl MeasurementsPanel {
         let mut actions = Vec::new();
 
         ui.label((index + 1).to_string());
+
+        actions.extend(
+            color_swatch::show(
+                ui,
+                egui::Id::unique(("measurement_color", index)),
+                measurement.line().color,
+                color_swatch::ROW_SWATCH_SIZE,
+                "Choose the line colour of this measurement",
+            )
+            .committed
+            .map(|color| Action::SetStyle {
+                target: StyleTarget::Measurement(index),
+                edit: StyleEdit::LineColor(color),
+            }),
+        );
 
         for endpoint in Endpoint::ALL {
             let displayed = measurement.point(endpoint);
@@ -176,21 +199,6 @@ impl MeasurementsPanel {
                 "Units of this measurement",
             )
             .map(|unit| Action::SetMeasurementUnit { index, unit }),
-        );
-
-        actions.extend(
-            color_swatch::show(
-                ui,
-                egui::Id::unique(("measurement_color", index)),
-                measurement.line().color,
-                color_swatch::ROW_SWATCH_SIZE,
-                "Choose the line colour of this measurement",
-            )
-            .committed
-            .map(|color| Action::SetStyle {
-                target: StyleTarget::Measurement(index),
-                edit: StyleEdit::LineColor(color),
-            }),
         );
 
         if ui
@@ -272,6 +280,11 @@ mod tests {
         .apply(&mut document)
         .unwrap();
         document
+    }
+
+    #[test]
+    fn the_colour_is_in_the_second_column() {
+        assert_eq!(COLUMN_HEADERS[1], "Color");
     }
 
     #[test]
@@ -361,7 +374,7 @@ mod tests {
                 ..Default::default()
             };
             let mut output = ctx.run_ui(input, |ui| {
-                panel.show(ui, &document, &selection);
+                panel.show(ui, &document, &selection, false);
             });
             output.textures_delta.clear();
             layouts.push(panel.layout.unwrap());

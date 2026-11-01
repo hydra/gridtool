@@ -134,13 +134,15 @@ followed by one row per area in list order (`AREA-6`):
 | Column header | Contents |
 |---|---|
 | "`#`" | The 1-based area number |
+| "`Color`" | A colour swatch, 28 × 14 px, filled with the area's line colour, with the tooltip "`Choose the line colour of this area`" (`AREA-13`) |
 | "`Area`" | The calculated area (`AREA-7`), formatted by `FMT-7` and without a unit, or a weak "`—`" if unavailable. Hovering the "`—`" shows "`Scale: <reason>`" (`SCALE-18`) |
 | "`Units`" | A drop-down of area units, "`cm²`" and "`m²`", 50 px wide, with the tooltip "`Units of this area`" (`AREA-13`) |
-| "`Color`" | A colour swatch, 28 × 14 px, filled with the area's line colour, with the tooltip "`Choose the line colour of this area`" (`AREA-13`) |
 | (blank) | A delete button with a trash-can icon (`delete`, `SHELL-6`) at the inline icon size, and the tooltip "`Delete area`" (`AREA-14`) |
 
 While an area's points or resize handles are dragged (`OBJ-9`, `OBJ-15`), its row shows
 the live area.
+
+The row of the active area is selected, and clicking a row makes its area active (`OBJ-6a`).
 
 **AREA-13 — Changing an area's unit or line colour in the table.**
 - Choosing a unit different from the row's current unit commits one **Set area unit**

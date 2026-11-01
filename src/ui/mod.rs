@@ -38,6 +38,7 @@ mod selection;
 mod shape_display;
 pub mod side_panel;
 mod style_controls;
+mod table_rows;
 pub mod tool_controls;
 pub mod tool_keys;
 pub mod tool_mode;

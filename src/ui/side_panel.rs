@@ -2,13 +2,14 @@
 //! stacked top to bottom with draggable dividers between them.
 
 use eframe::egui;
-use gridtool::action::Action;
 use gridtool::editor::Editor;
+use gridtool::object::ObjectId;
 
 use super::areas_panel;
 use super::history_panel;
 use super::measurements_panel::{self, MeasurementsPanel};
 use super::selection::Selection;
+use super::table_rows::TableOutput;
 use super::vertical_split::VerticalSplit;
 
 const DEFAULT_WIDTH: f32 = 460.0;
@@ -22,6 +23,8 @@ const AREAS: usize = 1;
 pub struct SidePanel {
     measurements: MeasurementsPanel,
     sections: VerticalSplit,
+    /// The active object when the tables were last shown.
+    last_active: Option<ObjectId>,
 }
 
 impl Default for SidePanel {
@@ -29,57 +32,64 @@ impl Default for SidePanel {
         Self {
             measurements: MeasurementsPanel::default(),
             sections: VerticalSplit::new(&DEFAULT_SECTION_FRACTIONS),
+            last_active: None,
         }
     }
 }
 
 impl SidePanel {
-    /// Shows the side panel, returning the document action the user completed, if any.
-    /// `open` is the open document's editor and selection, if a document is open.
-    pub fn show(
-        &mut self,
-        ui: &mut egui::Ui,
-        open: Option<(&Editor, &Selection)>,
-    ) -> Option<Action> {
+    /// Shows the side panel, returning what the user did. `open` is the open document's
+    /// editor and selection, if a document is open. A table's row is selected while its object
+    /// is the active object, and is scrolled into view when it becomes so.
+    pub fn show(&mut self, ui: &mut egui::Ui, open: Option<(&Editor, &Selection)>) -> TableOutput {
+        let active = open.and_then(|(_, selection)| selection.active());
+        let reveal = active != self.last_active;
+        self.last_active = active;
         let measurements = &mut self.measurements;
         let sections = &mut self.sections;
         egui::Panel::right("side_panel")
             .resizable(true)
             .default_size(DEFAULT_WIDTH)
             .show(ui, |ui| {
-                let actions = sections.show(ui, "side_panel_sections", |section, ui| {
+                let outputs = sections.show(ui, "side_panel_sections", |section, ui| {
                     match (section, open) {
                         (POINT_TO_POINT, Some((editor, selection))) => {
-                            measurements.show(ui, editor.document(), selection)
+                            measurements.show(ui, editor.document(), selection, reveal)
                         }
                         (AREAS, Some((editor, selection))) => {
-                            areas_panel::show(ui, editor.document(), selection)
+                            areas_panel::show(ui, editor.document(), selection, reveal)
                         }
                         (POINT_TO_POINT, None) => no_document(ui, measurements_panel::HEADING),
                         (AREAS, None) => no_document(ui, areas_panel::HEADING),
                         _ => {
                             history_panel::show(ui, open.map(|(editor, _)| editor));
-                            None
+                            TableOutput::default()
                         }
                     }
                 });
-                actions.into_iter().flatten().next()
+                let (mut action, mut pick) = (None, None);
+                for output in outputs {
+                    action = action.or(output.action);
+                    pick = pick.or(output.pick);
+                }
+                TableOutput { action, pick }
             })
             .inner
     }
 }
 
-fn no_document(ui: &mut egui::Ui, heading: &str) -> Option<Action> {
+fn no_document(ui: &mut egui::Ui, heading: &str) -> TableOutput {
     ui.heading(heading);
     ui.separator();
     ui.weak("No document open");
-    None
+    TableOutput::default()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use eframe::egui::{Pos2, RawInput, Rect};
+    use gridtool::action::Action;
     use gridtool::area::Area;
     use gridtool::document::Document;
     use gridtool::geometry::Point;
@@ -117,7 +127,7 @@ mod tests {
                 ..Default::default()
             };
             let mut output = ctx.run_ui(input, |ui| {
-                assert_eq!(panel.show(ui, open), None);
+                assert_eq!(panel.show(ui, open), TableOutput::default());
             });
             // There is no renderer to upload textures to.
             output.textures_delta.clear();

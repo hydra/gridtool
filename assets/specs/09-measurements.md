@@ -97,14 +97,17 @@ and has one header row followed by one row per measurement in list order (`MEAS-
 | Column header | Contents |
 |---|---|
 | "`#`" | The 1-based measurement number |
+| "`Color`" | A colour swatch, 28 × 14 px, filled with the measurement's line colour, with the tooltip "`Choose the line colour of this measurement`" (`MEAS-15`) |
 | "`x1`" | An editable field for the start's x (`MEAS-12`) |
 | "`y1`" | An editable field for the start's y (`MEAS-12`) |
 | "`x2`" | An editable field for the end's x (`MEAS-12`) |
 | "`y2`" | An editable field for the end's y (`MEAS-12`) |
 | "`Distance`" | The calculated distance (`MEAS-3`), formatted by `FMT-7` and without a unit, or a weak "`—`" if unavailable. Hovering the "`—`" shows "`Scale: <reason>`" (`SCALE-18`) |
 | "`Units`" | A unit drop-down, 50 px wide, with the tooltip "`Units of this measurement`" (`MEAS-13`) |
-| "`Color`" | A colour swatch, 28 × 14 px, filled with the measurement's line colour, with the tooltip "`Choose the line colour of this measurement`" (`MEAS-15`) |
 | (blank) | A delete button with a trash-can icon (`delete`, `SHELL-6`) at the inline icon size, and the tooltip "`Delete measurement`" (`MEAS-14`) |
+
+The row of the active measurement is selected, and clicking a row makes its measurement active
+(`OBJ-6a`).
 
 **MEAS-12 — Editing coordinates.** Each coordinate field is a commit-on-blur field
 (`FMT-9`) in its own column (`MEAS-11`).

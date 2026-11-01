@@ -5,7 +5,7 @@ use crate::file_picker::{RfdDocumentPicker, RfdImagePicker};
 use crate::open_document::OpenDocument;
 use crate::session::{Content, Replacement, Session};
 use crate::ui::canvas;
-use crate::ui::object_tree;
+use crate::ui::object_tree::{self, TreePick};
 use crate::ui::placeholder;
 use crate::ui::side_panel::SidePanel;
 use crate::ui::tool_controls::ToolControls;
@@ -160,7 +160,13 @@ impl eframe::App for GridToolApp {
             .session
             .document()
             .map(|open| (&open.editor, &open.view.selection));
-        actions.extend(self.side_panel.show(ui, open));
+        let tables = self.side_panel.show(ui, open);
+        actions.extend(tables.action);
+        if let Some(id) = tables.pick
+            && let Some(open) = self.session.document_mut()
+        {
+            open.pick(TreePick::Object(id));
+        }
 
         let mode = self.mode;
         egui::CentralPanel::default().show(ui, |ui| match self.session.content_mut() {

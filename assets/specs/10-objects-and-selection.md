@@ -107,6 +107,22 @@ leaf as selected:
   (`OBJ-10`) or undo/redo removing it (`OBJ-7`), the tree selection updates to match.
 - When there is no active object, no object leaf is selected. A selected folder node may
   stay selected.
+- When an object becomes active by any route other than clicking its leaf, every folder
+  containing its leaf opens, and the tree scrolls vertically, only as far as needed, to show the
+  leaf. The tree scrolls vertically and horizontally when it does not fit in its panel.
+
+**OBJ-6a — Table rows reflect the active object.** A row of the Point-to-point (`MEAS-11`) or Areas
+(`AREA-12`) table is **selected** exactly while its object is the active object, so at most one
+row is selected in the whole side panel, and none while the active object has no row or there is
+no active object. A selected row has the selection colour as its background. The current position
+in the History section (`HIST`) is not a selection and is not affected.
+- **Clicking a row**, anywhere between the left and right of the table, including on a field, drop-down or
+  colour swatch in it, makes its object the active object and brings it into view, as clicking its
+  leaf does (`OBJ-5`), and its tool becomes active (`OBJ-7a`). The header row, and anything drawn
+  over the table such as an open drop-down, are not part of a row.
+- **Delete.** A click on a row's delete button only deletes its object, without making it active.
+- **Scrolling.** When an object becomes active by any route, its row scrolls into view vertically, only as
+  far as needed. The table does not scroll horizontally.
 
 ## Active object
 
@@ -282,6 +298,15 @@ or drawn shape.
   grabbed.
 
 ## Acceptance criteria
+
+- Table rows (`OBJ-6a`):
+  - Clicking down a table's first column picks each row's object in turn, and picks nothing on
+    the header row or beyond the right of the table.
+  - Only the active object's row has the selection colour; other rows stay striped.
+  - A row out of view is scrolled to when its object becomes active; one in view does not move.
+  - A click on a row's delete button does not also pick the row.
+- Tree (`OBJ-6`): with its folders closed, an object made active elsewhere has them opened, and a
+  leaf out of view is scrolled to.
 
 - The active object and the tool (`OBJ-7a`):
   - A new measurement, area or drawn shape becomes the active object, and its tool stays the
