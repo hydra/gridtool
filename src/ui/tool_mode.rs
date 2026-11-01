@@ -20,11 +20,13 @@ pub enum ToolMode {
     Grid,
     /// Click on the image to move the document origin (the rotation centre).
     Origin,
+    /// Draw lines by clicking their points, optionally joining them to enclose an area.
+    DrawLine,
 }
 
 impl ToolMode {
     /// Every mode, in tool bar order.
-    pub const ALL: [ToolMode; 7] = [
+    pub const ALL: [ToolMode; 8] = [
         ToolMode::Pan,
         ToolMode::Rotate,
         ToolMode::Scale,
@@ -32,7 +34,13 @@ impl ToolMode {
         ToolMode::Area,
         ToolMode::Grid,
         ToolMode::Origin,
+        ToolMode::DrawLine,
     ];
+
+    /// Whether the mode starts a new group of tool bar buttons: the drawing tools.
+    pub fn starts_group(self) -> bool {
+        self == ToolMode::DrawLine
+    }
 
     pub fn icon(self) -> MaterialIcon {
         match self {
@@ -43,6 +51,7 @@ impl ToolMode {
             ToolMode::Area => icons::AREA,
             ToolMode::Grid => icons::GRID,
             ToolMode::Origin => icons::ORIGIN,
+            ToolMode::DrawLine => icons::DRAW_LINE,
         }
     }
 
@@ -55,6 +64,7 @@ impl ToolMode {
             ToolMode::Area => "Measure area",
             ToolMode::Grid => "Grid",
             ToolMode::Origin => "Origin",
+            ToolMode::DrawLine => "Draw line",
         }
     }
 }
@@ -83,6 +93,18 @@ mod tests {
 
         assert_eq!(position(ToolMode::Area), position(ToolMode::Measure) + 1);
         assert_eq!(position(ToolMode::Grid), position(ToolMode::Area) + 1);
+    }
+
+    #[test]
+    fn draw_line_starts_the_drawing_group_after_origin() {
+        let position = |mode| ToolMode::ALL.iter().position(|&m| m == mode).unwrap();
+
+        assert_eq!(position(ToolMode::DrawLine), position(ToolMode::Origin) + 1);
+        let group_starts: Vec<_> = ToolMode::ALL
+            .into_iter()
+            .filter(|mode| mode.starts_group())
+            .collect();
+        assert_eq!(group_starts, [ToolMode::DrawLine]);
     }
 
     #[test]

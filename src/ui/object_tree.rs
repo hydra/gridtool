@@ -1,6 +1,6 @@
 //! Left-hand panel: a tree of the document's objects (Document > Measurements >
-//! Point-to-point / Area, and Document > Grids, then each object in document order).
-//! Clicking an object makes it the active object.
+//! Point-to-point / Area, Document > Grids and Document > Shapes, then each object in
+//! document order). Clicking an object makes it the active object.
 
 use eframe::egui;
 use egui_ltreeview::{Action as TreeAction, TreeView};
@@ -14,6 +14,7 @@ use super::format::format_length;
 use super::icon_button::icon_button;
 use super::icons::{DELETE as DELETE_ICON, DUPLICATE as DUPLICATE_ICON};
 use super::selection::Selection;
+use super::shape_bar;
 
 const DEFAULT_WIDTH: f32 = 220.0;
 
@@ -25,6 +26,7 @@ pub enum TreeNode {
     PointToPoint,
     Areas,
     Grids,
+    Shapes,
     Object(ObjectId),
 }
 
@@ -159,6 +161,11 @@ fn show_tree(
             for (index, grid) in document.grids().iter().enumerate() {
                 let label = format!("Grid {} ({})", index + 1, source_label(document, grid));
                 builder.leaf(TreeNode::Object(grid.id()), label);
+            }
+            builder.close_dir();
+            builder.dir(TreeNode::Shapes, "Shapes");
+            for (index, shape) in document.shapes().iter().enumerate() {
+                builder.leaf(TreeNode::Object(shape.id()), shape_bar::label(index, shape));
             }
             builder.close_dir();
             builder.close_dir();
@@ -311,12 +318,32 @@ mod tests {
     }
 
     #[test]
+    fn commands_target_the_active_shape() {
+        let mut document = Document::new(100, 100);
+        Action::AddShape(
+            gridtool::shape::DrawnShape::open(vec![Point::new(1.0, 1.0), Point::new(2.0, 2.0)])
+                .unwrap(),
+        )
+        .apply(&mut document)
+        .unwrap();
+
+        assert_eq!(
+            ObjectCommands::for_active(&document, Some(document.shapes()[0].id())),
+            ObjectCommands {
+                duplicate: Some(Action::DuplicateShape { index: 0 }),
+                delete: Some(Action::DeleteShape { index: 0 }),
+            }
+        );
+    }
+
+    #[test]
     fn only_a_single_object_node_picks_an_object() {
         let (a, _) = two_ids();
 
         assert_eq!(pick_from(&[TreeNode::Object(a)]), TreePick::Object(a));
         assert_eq!(pick_from(&[TreeNode::Measurements]), TreePick::NoObject);
         assert_eq!(pick_from(&[TreeNode::Grids]), TreePick::NoObject);
+        assert_eq!(pick_from(&[TreeNode::Shapes]), TreePick::NoObject);
         assert_eq!(pick_from(&[TreeNode::PointToPoint]), TreePick::NoObject);
         assert_eq!(pick_from(&[TreeNode::Areas]), TreePick::NoObject);
         assert_eq!(pick_from(&[TreeNode::Document]), TreePick::NoObject);

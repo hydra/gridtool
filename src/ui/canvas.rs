@@ -13,8 +13,9 @@ use gridtool::grid::GridSource;
 use gridtool::imaging::DecodedImage;
 use gridtool::measurement::{self, Endpoint};
 use gridtool::polygon;
+use gridtool::shape;
 
-use super::area_tool::{AreaTool, PointHit};
+use super::area_tool::AreaTool;
 use super::color::{to_color32, with_opacity};
 use super::document_view::DocumentView;
 use super::format::format_length;
@@ -22,11 +23,14 @@ use super::grid_display::paint_grids;
 use super::grid_tool::add_grid;
 use super::hit_test::nearest_within;
 use super::line_hit::segment_at;
+use super::line_tool::LineTool;
 use super::measure_tool::MeasureTool;
 use super::object_drag::Grip;
+use super::pending_outline::{PendingOutline, PointHit};
 use super::rotate_handle;
 use super::scale_tool::ScaleTool;
 use super::selection::Selection;
+use super::shape_display::paint_shapes;
 use super::tool_mode::ToolMode;
 use super::viewport::{DocumentTransform, Viewport};
 
@@ -84,8 +88,8 @@ const ORIGIN_CROSS_LENGTH: f32 = 25.0;
 const POINT_GRAB_RADIUS: f32 = 10.0;
 const LABEL_OFFSET: f32 = 12.0;
 const LABEL_FONT_SIZE: f32 = 14.0;
-const DASH_LENGTH: f32 = 6.0;
-const DASH_GAP: f32 = 4.0;
+pub const DASH_LENGTH: f32 = 6.0;
+pub const DASH_GAP: f32 = 4.0;
 /// How strongly one point of mouse-wheel scrolling changes the zoom.
 const SCROLL_ZOOM_SPEED: f32 = 0.002;
 
@@ -131,6 +135,9 @@ pub fn show(
             ToolMode::Area => handle_area(ui, &response, transform, document, &mut view.area_tool),
             ToolMode::Grid => handle_grid(ui, &response, transform, document, view),
             ToolMode::Origin => handle_origin(ui, &response, transform, document),
+            ToolMode::DrawLine => {
+                handle_draw_line(ui, &response, transform, document, &mut view.line_tool)
+            }
         },
     };
     if mode != ToolMode::Grid {
@@ -147,11 +154,12 @@ pub fn show(
     // In every mode the secondary button pans. Done after the tool so its cursor wins.
     drag_pan(ui, &response, &mut view.viewport, PointerButton::Secondary);
 
-    // Drawing order: image, grids, areas, then the lines grids align to, then tool
-    // overlays.
+    // Drawing order: image, grids, drawn shapes, areas, then the lines grids align to, then
+    // tool overlays.
     let transform = view.viewport.transform(view_center, document_size);
     paint_document(&painter, transform, &view.texture);
     paint_grids(&painter, transform, document, &view.selection);
+    paint_shapes(&painter, transform, document, &view.selection);
     paint_areas(&painter, transform, document, &view.selection);
     paint_measurements(&painter, transform, document, &view.selection);
     match mode {
@@ -168,7 +176,8 @@ pub fn show(
         | ToolMode::Rotate
         | ToolMode::Measure
         | ToolMode::Area
-        | ToolMode::Origin => {}
+        | ToolMode::Origin
+        | ToolMode::DrawLine => {}
     }
     paint_active_grid_source(&painter, transform, document, &view.selection);
     match mode {
@@ -186,7 +195,22 @@ pub fn show(
             }
         }
         ToolMode::Area => {
-            paint_pending_area(&painter, transform, &view.area_tool, response.hover_pos());
+            paint_pending_outline(
+                &painter,
+                transform,
+                &view.area_tool.outline,
+                gridtool::area::DEFAULT_COLOR,
+                response.hover_pos(),
+            );
+        }
+        ToolMode::DrawLine => {
+            paint_pending_outline(
+                &painter,
+                transform,
+                &view.line_tool.outline,
+                shape::COLOR,
+                response.hover_pos(),
+            );
         }
         ToolMode::Grid => {
             if let Some(source) = view.grid_tool.hovered() {
@@ -572,11 +596,41 @@ fn handle_area(
     document: &Document,
     tool: &mut AreaTool,
 ) -> Option<Action> {
-    let on_screen = to_screen(transform, tool.points());
-    let hit_at = |position| AreaTool::hit_at(&on_screen, position, POINT_GRAB_RADIUS);
+    let (point, hit) = outline_click(ui, response, transform, document, &tool.outline)?;
+    tool.click(point, hit, document.calibration().unit())
+}
+
+/// Each click places the next point of a line. Clicking the first point joins it up into a
+/// closed shape (once it has three points); double-clicking the last point finishes it
+/// open; clicking the last point removes it.
+fn handle_draw_line(
+    ui: &egui::Ui,
+    response: &Response,
+    transform: DocumentTransform,
+    document: &Document,
+    tool: &mut LineTool,
+) -> Option<Action> {
+    let (point, hit) = outline_click(ui, response, transform, document, &tool.outline)?;
+    tool.click(point, hit, response.double_clicked())
+}
+
+/// Updates the cursor for a tool placing the points of `outline`, and returns the image
+/// point of a click this frame that the tool should act on, with the placed point it landed
+/// on, if any. Clicks outside the document count only if they land on a placed point.
+fn outline_click(
+    ui: &egui::Ui,
+    response: &Response,
+    transform: DocumentTransform,
+    document: &Document,
+    outline: &PendingOutline,
+) -> Option<(Point, Option<PointHit>)> {
+    let on_screen = to_screen(transform, outline.points());
+    let hit_at = |position| PendingOutline::hit_at(&on_screen, position, POINT_GRAB_RADIUS);
     match response.hover_pos().and_then(hit_at) {
         Some(PointHit::Last) => ui.set_cursor_icon(CursorIcon::PointingHand),
-        Some(PointHit::First) if tool.can_close() => ui.set_cursor_icon(CursorIcon::PointingHand),
+        Some(PointHit::First) if outline.can_close() => {
+            ui.set_cursor_icon(CursorIcon::PointingHand)
+        }
         _ if response.hovered() => ui.set_cursor_icon(CursorIcon::Crosshair),
         _ => {}
     }
@@ -587,10 +641,7 @@ fn handle_area(
         .flatten()?;
     let hit = hit_at(clicked);
     let point = transform.screen_to_image(clicked);
-    if hit.is_none() && !document.contains(point) {
-        return None;
-    }
-    tool.click(point, hit, document.calibration().unit())
+    (hit.is_some() || document.contains(point)).then_some((point, hit))
 }
 
 /// A click anywhere on the image moves the document origin there.
@@ -856,24 +907,25 @@ fn paint_areas(
     }
 }
 
-/// Draws the outline being placed: the points so far joined by solid lines, and a dashed
-/// line on to the pointer. Over the first point, once the outline can be closed, the
+/// Draws an outline being placed, in `rgb`: the points so far joined by solid lines, and a
+/// dashed line on to the pointer. Over the first point, once the outline can be closed, the
 /// dashed line closes the outline and the area is shown filled.
-fn paint_pending_area(
+fn paint_pending_outline(
     painter: &egui::Painter,
     transform: DocumentTransform,
-    tool: &AreaTool,
+    outline: &PendingOutline,
+    rgb: gridtool::color::Rgb,
     pointer: Option<Pos2>,
 ) {
-    let points = tool.points();
+    let points = outline.points();
     let on_screen = to_screen(transform, points);
     let (Some(&first), Some(&last)) = (on_screen.first(), on_screen.last()) else {
         return;
     };
-    let rgb = gridtool::area::DEFAULT_COLOR;
     let stroke = Stroke::new(OBJECT_LINE_WIDTH, to_color32(rgb));
-    let closing = tool.can_close()
-        && pointer.and_then(|pointer| AreaTool::hit_at(&on_screen, pointer, POINT_GRAB_RADIUS))
+    let closing = outline.can_close()
+        && pointer
+            .and_then(|pointer| PendingOutline::hit_at(&on_screen, pointer, POINT_GRAB_RADIUS))
             == Some(PointHit::First);
 
     if closing {
@@ -892,44 +944,54 @@ fn paint_pending_area(
     for &position in &on_screen {
         paint_point_handle(painter, position, stroke.color);
     }
-    if tool.can_close() {
+    if outline.can_close() {
         painter.circle_stroke(first, CLOSE_TARGET_RADIUS, stroke);
     }
 }
 
 /// Fills the outline through `points` (image coordinates, drawn at `on_screen`) with a
-/// translucent `color`, then strokes its edges. Concave outlines are triangulated.
+/// translucent `color`, then strokes its edges.
 fn paint_filled_outline(
     painter: &egui::Painter,
     points: &[Point],
     on_screen: &[Pos2],
     color: gridtool::color::Rgb,
 ) {
-    let fill = with_opacity(color, AREA_FILL_OPACITY);
-    let mut mesh = egui::Mesh::default();
-    for &position in on_screen {
-        mesh.colored_vertex(position, fill);
-    }
-    for triangle in polygon::triangulate(points) {
-        let [a, b, c] = triangle.map(|index| index as u32);
-        mesh.add_triangle(a, b, c);
-    }
-    painter.add(mesh);
+    fill_outline(
+        painter,
+        points,
+        on_screen,
+        with_opacity(color, AREA_FILL_OPACITY),
+    );
     painter.add(Shape::closed_line(
         on_screen.to_vec(),
         Stroke::new(OBJECT_LINE_WIDTH, to_color32(color)),
     ));
 }
 
-fn to_screen(transform: DocumentTransform, points: &[Point]) -> Vec<Pos2> {
+/// Fills the outline through `points` (image coordinates, drawn at `on_screen`) with
+/// `color`. Concave outlines are triangulated.
+pub fn fill_outline(painter: &egui::Painter, points: &[Point], on_screen: &[Pos2], color: Color32) {
+    let mut mesh = egui::Mesh::default();
+    for &position in on_screen {
+        mesh.colored_vertex(position, color);
+    }
+    for triangle in polygon::triangulate(points) {
+        let [a, b, c] = triangle.map(|index| index as u32);
+        mesh.add_triangle(a, b, c);
+    }
+    painter.add(mesh);
+}
+
+pub fn to_screen(transform: DocumentTransform, points: &[Point]) -> Vec<Pos2> {
     points
         .iter()
         .map(|&point| transform.image_to_screen(point))
         .collect()
 }
 
-/// A measurement end or area corner.
-fn paint_point_handle(painter: &egui::Painter, position: Pos2, color: Color32) {
+/// A measurement end, area corner or point of the active drawn shape.
+pub fn paint_point_handle(painter: &egui::Painter, position: Pos2, color: Color32) {
     painter.circle_filled(position, POINT_HANDLE_RADIUS, color);
 }
 
@@ -991,6 +1053,7 @@ mod tests {
     use super::*;
     use eframe::egui::{Event, Modifiers, RawInput};
     use gridtool::measurement::Measurement;
+    use gridtool::shape::DrawnShape;
     use gridtool::units::LengthUnit;
 
     const SCREEN: Rect = Rect::from_min_max(Pos2::ZERO, Pos2::new(800.0, 600.0));
@@ -1110,6 +1173,23 @@ mod tests {
             .unwrap();
             let id = self.document.areas()[0].id();
             self.view.selection.select(Some(id));
+        }
+
+        /// Adds the closed shape through the points of [`TRIANGLE`] and makes it the active
+        /// object. On screen its points are at [`TRIANGLE_ON_SCREEN`].
+        fn select_new_shape(&mut self) {
+            Action::AddShape(DrawnShape::closed(triangle_points()).unwrap())
+                .apply(&mut self.document)
+                .unwrap();
+            let id = self.document.shapes()[0].id();
+            self.view.selection.select(Some(id));
+        }
+
+        /// Lets enough time pass that the next click is not part of a double-click.
+        fn settle(&mut self) {
+            for _ in 0..30 {
+                self.frame(Vec::new());
+            }
         }
 
         /// How far the view has been panned from its default.
@@ -1428,6 +1508,139 @@ mod tests {
         }
     }
 
+    fn triangle_points() -> Vec<Point> {
+        TRIANGLE.iter().map(|&(x, y)| Point::new(x, y)).collect()
+    }
+
+    #[test]
+    fn clicking_points_then_the_first_point_adds_a_closed_shape() {
+        let mut harness = Harness::new(ToolMode::DrawLine);
+        for corner in TRIANGLE_ON_SCREEN {
+            harness.click(corner);
+        }
+        assert!(harness.actions.is_empty());
+
+        harness.click(TRIANGLE_ON_SCREEN[0] + Vec2::new(4.0, -3.0));
+
+        let expected = DrawnShape::closed(triangle_points()).unwrap();
+        assert_eq!(harness.actions, [Action::AddShape(expected)]);
+        assert!(harness.view.line_tool.outline.points().is_empty());
+    }
+
+    #[test]
+    fn double_clicking_finishes_an_open_line_ending_at_the_double_clicked_point() {
+        let mut harness = Harness::new(ToolMode::DrawLine);
+        harness.click(TRIANGLE_ON_SCREEN[0]);
+        harness.settle();
+        harness.click(TRIANGLE_ON_SCREEN[1]);
+        assert!(harness.actions.is_empty());
+
+        harness.click(TRIANGLE_ON_SCREEN[1]);
+
+        let expected = DrawnShape::open(triangle_points()[..2].to_vec()).unwrap();
+        assert_eq!(harness.actions, [Action::AddShape(expected)]);
+    }
+
+    #[test]
+    fn a_slow_click_on_the_last_point_of_a_line_removes_it() {
+        let mut harness = Harness::new(ToolMode::DrawLine);
+        harness.click(TRIANGLE_ON_SCREEN[0]);
+        harness.settle();
+        harness.click(TRIANGLE_ON_SCREEN[1]);
+        harness.settle();
+
+        harness.click(TRIANGLE_ON_SCREEN[1]);
+
+        assert!(harness.actions.is_empty());
+        assert_eq!(harness.view.line_tool.outline.points().len(), 1);
+    }
+
+    #[test]
+    fn the_active_shapes_points_and_handles_can_be_dragged_in_every_mode() {
+        for mode in ToolMode::ALL {
+            let mut harness = Harness::new(mode);
+            harness.select_new_shape();
+
+            harness.drag(PointerButton::Primary, TRIANGLE_ON_SCREEN[2], DRAG_BY);
+
+            assert_eq!(
+                harness.actions,
+                [Action::MoveShapePoint {
+                    index: 0,
+                    point: 2,
+                    to: Point::new(80.0, 85.0),
+                }],
+                "{mode:?}"
+            );
+            assert_eq!(harness.pan(), Vec2::ZERO, "{mode:?} should not pan");
+        }
+    }
+
+    #[test]
+    fn the_active_shapes_box_handles_stretch_it() {
+        let mut harness = Harness::new(ToolMode::Pan);
+        harness.select_new_shape();
+        // The right edge handle, as for the area with these points.
+        let right_handle = Pos2::new(360.0 + SELECTION_PADDING, 290.0);
+
+        harness.drag(PointerButton::Primary, right_handle, Vec2::new(40.0, 0.0));
+
+        assert_eq!(
+            harness.actions,
+            [Action::ResizeShape {
+                index: 0,
+                points: vec![
+                    Point::new(20.0, 20.0),
+                    Point::new(100.0, 20.0),
+                    Point::new(60.0, 60.0),
+                ],
+            }]
+        );
+    }
+
+    #[test]
+    fn clicking_outside_an_active_shapes_box_clears_it() {
+        let mut harness = Harness::new(ToolMode::Pan);
+        harness.select_new_shape();
+
+        harness.click(TRIANGLE_ON_SCREEN[0] + Vec2::new(20.0, 10.0));
+        assert!(harness.view.selection.active().is_some());
+
+        harness.click(EMPTY_SPOT);
+        assert_eq!(harness.view.selection.active(), None);
+    }
+
+    #[test]
+    fn every_fill_and_line_style_can_be_painted_at_any_zoom() {
+        use gridtool::shape::{FillStyle, LineStyle};
+
+        let mut harness = Harness::new(ToolMode::Pan);
+        harness.select_new_shape();
+        for fill in FillStyle::ALL {
+            for line in LineStyle::ALL {
+                for action in [
+                    Action::SetShapeFillStyle {
+                        index: 0,
+                        style: fill,
+                    },
+                    Action::SetShapeLineStyle {
+                        index: 0,
+                        style: line,
+                    },
+                ] {
+                    action.apply(&mut harness.document).unwrap();
+                }
+                for factor in [1024.0, 1.0 / 1024.0, 1.0] {
+                    harness
+                        .view
+                        .viewport
+                        .zoom_about(SCREEN.center(), SCREEN.center(), factor);
+                    harness.frame(Vec::new());
+                }
+            }
+        }
+    }
+
     #[test]
     fn clicking_corners_then_the_first_point_adds_an_area() {
         let mut harness = Harness::new(ToolMode::Area);
@@ -1435,7 +1648,7 @@ mod tests {
             harness.click(corner);
         }
         assert!(harness.actions.is_empty());
-        assert_eq!(harness.view.area_tool.points().len(), 3);
+        assert_eq!(harness.view.area_tool.outline.points().len(), 3);
 
         // Within reach of the first point, not exactly on it.
         harness.click(TRIANGLE_ON_SCREEN[0] + Vec2::new(4.0, -3.0));
@@ -1446,7 +1659,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(harness.actions, [Action::AddArea(expected)]);
-        assert!(harness.view.area_tool.points().is_empty());
+        assert!(harness.view.area_tool.outline.points().is_empty());
     }
 
     #[test]
@@ -1456,10 +1669,13 @@ mod tests {
         harness.click(TRIANGLE_ON_SCREEN[1]);
 
         harness.click(TRIANGLE_ON_SCREEN[1] + Vec2::new(2.0, 2.0));
-        assert_eq!(harness.view.area_tool.points(), [Point::new(20.0, 20.0)]);
+        assert_eq!(
+            harness.view.area_tool.outline.points(),
+            [Point::new(20.0, 20.0)]
+        );
 
         harness.click(EMPTY_SPOT);
-        assert_eq!(harness.view.area_tool.points().len(), 1);
+        assert_eq!(harness.view.area_tool.outline.points().len(), 1);
         assert!(harness.actions.is_empty());
     }
 
@@ -1471,7 +1687,7 @@ mod tests {
 
         harness.click(TRIANGLE_ON_SCREEN[0]);
 
-        assert_eq!(harness.view.area_tool.points().len(), 2);
+        assert_eq!(harness.view.area_tool.outline.points().len(), 2);
         assert!(harness.actions.is_empty());
     }
 

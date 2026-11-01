@@ -20,9 +20,11 @@ Closing the window may first ask about unsaved changes (`FILE-17`).
 2. **Tool options row.** A second horizontal row directly below the tool bar. It is shown
    only when the active tool mode has options *and* a document is open. Its contents
    depend on the mode: see `VIEW-12` (Rotate), `SCALE-3` (Scale) and `GRID-8` (Grid).
-   The Pan & zoom, Measure distance, Measure area and Origin modes have no options row.
+   The Pan & zoom, Measure distance, Measure area, Origin and Draw line modes have no
+   options row.
 3. **Object properties row.** Shown below the tool options row while the active object
-   has editable properties. Currently this means grids (`GRID-14`).
+   has editable properties. Currently this means grids (`GRID-14`) and drawn shapes
+   (`DRAW-13`).
 4. Below the rows, side by side, from left to right:
    - **Object panel.** Docked on the left-hand side (see `OBJ-3`).
    - **Canvas.** Fills the remaining space and shows the document (see `VIEW`, `SCALE`,
@@ -56,8 +58,13 @@ error message centred, in the toolkit's error colour (see `IMG-6`).
 | 13 | Grid mode button | grid (`grid_on`) | "`Grid`" |
 | 14 | Origin mode button | crosshair (`my_location`) | "`Origin`" (`ORIGIN-2`) |
 | 15 | Horizontal spacer, 16 px | — | — |
-| 16 | Undo button | undo arrow (`undo`) | "`Undo`" |
-| 17 | Redo button | redo arrow (`redo`) | "`Redo`" |
+| 16 | Draw line mode button (`DRAW-1`) | line segments joined at points (`polyline`) | "`Draw line`" |
+| 17 | Horizontal spacer, 16 px | — | — |
+| 18 | Undo button | undo arrow (`undo`) | "`Undo`" |
+| 19 | Redo button | redo arrow (`redo`) | "`Redo`" |
+
+Items 16 onward up to the next spacer are the **drawing tools** group; future drawing tools
+are added to it.
 
 **SHELL-6 — Icon font.** Every icon in the UI is a **Google Material Symbols** icon
 (<https://fonts.google.com/icons>), style **Rounded**, **filled**.
@@ -81,23 +88,23 @@ one place.
 ## Tool modes
 
 **SHELL-8.** There is exactly one active tool mode at a time. The modes are **Pan &
-zoom**, **Rotate view**, **Scale**, **Measure distance**, **Measure area**, **Grid** and
-**Origin**. **Pan & zoom is
-the default** when the application starts.
+zoom**, **Rotate view**, **Scale**, **Measure distance**, **Measure area**, **Grid**,
+**Origin** and **Draw line**. **Pan & zoom is the default** when the application starts.
 
 **SHELL-9.** The mode buttons work like a radio group. The active mode's button is shown
 as selected, and clicking a mode button makes that mode active. The active mode is
 application state and stays the same when a different image is opened.
 
-**SHELL-10.** New modes will be added later. The list of modes MUST be defined in one
-place, so that adding a mode needs no duplicated tool bar code.
+**SHELL-10.** New modes will be added later. The list of modes, and which of them start a
+new group of buttons (`SHELL-5`), MUST be defined in one place, so that adding a mode needs
+no duplicated tool bar code.
 
 **SHELL-10a — Cancelling a tool operation.** Pressing **Escape**, or switching to another
 tool mode, abandons whatever the tool is part-way through, without committing an action
 or changing the document:
 - the pending scale points while placing (`SCALE-4`), and any scale point drag
 - the pending start point of a measurement (`MEAS-5`)
-- the points placed so far for a new area (`AREA-2`)
+- the points placed so far for a new area (`AREA-2`) or drawn shape (`DRAW-2`)
 - a drag of the active object's points or resize handles in progress (`OBJ-9`,
   `OBJ-15`); the object keeps its shape and stays active
 - a rotate-handle drag in progress (`VIEW-13`); the view keeps the rotation it reached
@@ -110,8 +117,13 @@ for something else:
   away from it; a further Escape then cancels the tool
 
 **SHELL-10b — Removing the last point.** Pressing **Backspace** removes the last point
-placed for a new area (`AREA-3`). Like Escape, it does nothing while a dialog is open or
-while a widget such as a text field has keyboard focus (where it edits the text).
+placed for a new area (`AREA-3`) or drawn shape (`DRAW-3`). Like Escape, it does nothing
+while a dialog is open or while a widget such as a text field has keyboard focus (where it
+edits the text).
+
+**SHELL-10c — Finishing a line.** Pressing **Enter** finishes the drawn line being placed,
+leaving it open (`DRAW-5`). Like Escape, it does nothing while a dialog is open or while a
+widget such as a text field has keyboard focus.
 
 ## Side panel
 
@@ -141,16 +153,19 @@ while a widget such as a text field has keyboard focus (where it edits the text)
 - The default tool mode is Pan & zoom.
 - Every mode has a distinct icon and a distinct name.
 - In the tool bar, Measure distance comes directly after Scale, Measure area directly
-  after Measure distance, and Grid directly after Measure area.
+  after Measure distance, and Grid directly after Measure area. Draw line comes directly
+  after Origin and starts a new group.
 - Cancelling (`SHELL-10a`):
   - Escape with nothing focused cancels; Escape in a focused text field does not, and
     the next Escape does.
   - Cancelling drops pending scale points and a scale point drag, committing nothing,
     and the document's points are unchanged.
-  - Cancelling drops a pending measurement start and the points placed for a new area.
+  - Cancelling drops a pending measurement start and the points placed for a new area or
+    drawn shape.
   - Cancelling a drag of the active object commits nothing, shows the object unchanged
     and keeps it active.
   - Backspace with nothing focused is read as "remove the last point"; Backspace in a
+    focused text field is not. Enter with nothing focused is read as "finish"; Enter in a
     focused text field is not.
   - Cancelling stops a rotate-handle drag.
 - Side panel (`SHELL-11`):

@@ -25,6 +25,7 @@ must satisfy them.
 | [12-origin.md](12-origin.md) | Document origin (rotation centre), Origin mode and marker | `ORIGIN` |
 | [13-files.md](13-files.md) | New, Load, Save, Save as; unsaved changes; closing the window; closing the window; the `.ron` file format | `FILE` |
 | [14-areas.md](14-areas.md) | Measure area tool, area measurements, Areas table | `AREA` |
+| [15-shapes.md](15-shapes.md) | Draw line tool, drawn shapes and their styles, shape properties row | `DRAW` |
 
 ## Conventions
 
@@ -44,7 +45,7 @@ must satisfy them.
 
 | Term | Meaning |
 |---|---|
-| **Document** | The thing being edited: an image-sized rectangle plus its calibration data, measurements, areas, grids and origin. |
+| **Document** | The thing being edited: an image-sized rectangle plus its calibration data, measurements, areas, grids, drawn shapes and origin. |
 | **Document file** | A `.ron` file describing a document in a versioned format, referring to its image by path (`FILE`). |
 | **Unsaved changes** | The open document differs from the document as last loaded or saved, or it has never been saved. |
 | **Image coordinates** | Pixel coordinates on the un-rotated image. The origin is at the top-left corner, x increases to the right and y increases downwards. Values may be fractional. |
@@ -56,8 +57,9 @@ must satisfy them.
 | **Scale** | The real-world length of one image pixel along the image's X axis and along its Y axis. |
 | **Measurement** | A line on the document, with a start and an end point, whose real-world length is derived from the scale. Called a **point-to-point** measurement in the UI. |
 | **Area** | An area measurement: a closed outline through 3 or more points on the document, whose real-world area is derived from the scale. |
-| **Object** | Something the user places on the document and can select: measurements, areas and grids. Each has a stable object id. |
-| **Active object** | The single selected object. Measurements and areas show a purple selection box with resize handles, and their points can be dragged; grids show their properties row. It is presentation state, not part of the document. |
+| **Drawn shape** | A line through 2 or more points on the document, or a closed outline through 3 or more, with a line and fill style. Nothing is measured from it. |
+| **Object** | Something the user places on the document and can select: measurements, areas, grids and drawn shapes. Each has a stable object id. |
+| **Active object** | The single selected object. Measurements, areas and drawn shapes show a purple selection box with resize handles, and their points can be dragged; grids and drawn shapes show their properties row. It is presentation state, not part of the document. |
 | **Grid** | Regularly spaced lines over the whole document, aligned to a scale line or measurement line, with cells sized in real-world units. |
 | **Origin** | A point on the image, stored in the document, that the view rotates about. It defaults to the image centre. |
 | **Alignment source** | The scale line or measurement line a grid is aligned to. |
@@ -86,3 +88,4 @@ must satisfy them.
 | 2026-10-22 | Added area measurements (`14`): the Measure area tool and button (`SHELL-5`), placing, removing (Backspace, `SHELL-10b`) and finishing outlines, filled convex and concave areas, the Area tree folder, the Areas table, and seven area actions (`HIST-2`). Measurements gained a colour, with a colour column in their table (`MEAS-1`, `MEAS-15`) and a Set measurement colour action. The measurements table is now headed "`Point-to-point`", and the tree has "`Point-to-point`" and "`Area`" folders inside "`Measurements`" (`OBJ-4`). The active measurement's or area's points can be dragged (`OBJ-15`), replacing `OBJ-11`, and an area's handles stretch it (`OBJ-9b`). The side panel now has three sections sharing the height 33 / 34 / 33 %, with dividers that move height between neighbours (`SHELL-11`). Files are now saved as version 2, and version 1 files are migrated (`FILE-6a`). |
 | 2026-10-22 | Picking an object in the tree no longer always centres it (`OBJ-5`, `OBJ-5a`): the view stays put while any part of the object is on screen; otherwise it pans to the object's focus point, then zooms out if needed so the whole object fits with a 16 px margin. |
 | 2026-10-22 | The Point-to-point table has separate "`x1`", "`y1`", "`x2`" and "`y2`" columns (`MEAS-11`). Coordinate fields are at least wide enough for "`9999.99`" and share any spare width in the section equally (`MEAS-12`). |
+| 2026-11-01 | Added drawn shapes (`15`): the Draw line tool in a new drawing tools group after a spacer (`SHELL-5`), lines left open with a double-click or Enter (`SHELL-10c`) or joined up into closed shapes, three line styles, five fill styles with a fill line distance and separate line and fill opacity in a properties row (`SHELL-2`), a "`Shapes`" tree folder (`OBJ-4`), and ten shape actions (`HIST-2`). Files are now saved as version 3, and earlier versions are migrated (`FILE-6b`). The drawing order now lists areas and shapes (`GRID-6`). |

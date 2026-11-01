@@ -5,6 +5,7 @@ use crate::grid::Grid;
 use crate::imaging::DecodedImage;
 use crate::measurement::Measurement;
 use crate::object::{Identified, ObjectId};
+use crate::shape::DrawnShape;
 
 /// The image-space shape an object is drawn as, e.g. to tell whether it is in view.
 #[derive(Debug, Clone, PartialEq)]
@@ -20,6 +21,7 @@ pub(crate) struct Objects {
     pub measurements: Vec<Identified<Measurement>>,
     pub areas: Vec<Identified<Area>>,
     pub grids: Vec<Identified<Grid>>,
+    pub shapes: Vec<Identified<DrawnShape>>,
 }
 
 /// The thing being edited. Modified only through [`crate::action::Action`]s.
@@ -31,6 +33,7 @@ pub struct Document {
     measurements: Vec<Identified<Measurement>>,
     areas: Vec<Identified<Area>>,
     grids: Vec<Identified<Grid>>,
+    shapes: Vec<Identified<DrawnShape>>,
     /// The image's origin: the point the view rotates about. Always inside the document.
     origin: Point,
     /// The id the next added object will get. Ids are never reused within a history.
@@ -47,6 +50,7 @@ impl Document {
             measurements: Vec::new(),
             areas: Vec::new(),
             grids: Vec::new(),
+            shapes: Vec::new(),
             origin: Point::new(f64::from(width) / 2.0, f64::from(height) / 2.0),
             next_object_id: 1,
         }
@@ -134,16 +138,28 @@ impl Document {
         self.grids.iter().position(|grid| grid.id() == id)
     }
 
+    /// Drawn shapes, in the order they were added.
+    pub fn shapes(&self) -> &[Identified<DrawnShape>] {
+        &self.shapes
+    }
+
+    /// List position of the drawn shape with `id`, if it exists.
+    pub fn shape_index(&self, id: ObjectId) -> Option<usize> {
+        self.shapes.iter().position(|shape| shape.id() == id)
+    }
+
     /// Whether any object with `id` exists.
     pub fn contains_object(&self, id: ObjectId) -> bool {
         self.measurement_index(id).is_some()
             || self.area_index(id).is_some()
             || self.grid_index(id).is_some()
+            || self.shape_index(id).is_some()
     }
 
     /// The image point to bring into view for an object: the centre of a measurement's
-    /// bounding box, the centre of an area ([`Area::center`]), or the midpoint of a grid's
-    /// alignment line. `None` if the object (or a grid's alignment line) does not exist.
+    /// bounding box, the centre of an area ([`Area::center`]) or drawn shape
+    /// ([`DrawnShape::center`]), or the midpoint of a grid's alignment line. `None` if the
+    /// object (or a grid's alignment line) does not exist.
     pub fn object_focus_point(&self, id: ObjectId) -> Option<Point> {
         if let Some(index) = self.measurement_index(id) {
             return Some(self.measurements[index].bounds().center());
@@ -151,15 +167,25 @@ impl Document {
         if let Some(index) = self.area_index(id) {
             return Some(self.areas[index].center());
         }
+        if let Some(index) = self.shape_index(id) {
+            return Some(self.shapes[index].center());
+        }
         let grid = &self.grids[self.grid_index(id)?];
         let (start, end) = grid.source_line(self).ok()?;
         Some(Bounds::around(start, end).center())
     }
 
-    /// The shape of an object: a measurement's line, an area's closed outline, or a
-    /// grid's alignment line. `None` if the object (or a grid's alignment line) does not
-    /// exist.
+    /// The shape of an object: a measurement's line, an area's closed outline, a drawn
+    /// shape's points, or a grid's alignment line. `None` if the object (or a grid's
+    /// alignment line) does not exist.
     pub fn object_outline(&self, id: ObjectId) -> Option<Outline> {
+        if let Some(index) = self.shape_index(id) {
+            let shape = &self.shapes[index];
+            return Some(Outline {
+                points: shape.points().to_vec(),
+                closed: shape.is_closed(),
+            });
+        }
         if let Some(index) = self.measurement_index(id) {
             let measurement = &self.measurements[index];
             return Some(Outline {
@@ -199,6 +225,10 @@ impl Document {
         &mut self.grids
     }
 
+    pub(crate) fn shapes_mut(&mut self) -> &mut Vec<Identified<DrawnShape>> {
+        &mut self.shapes
+    }
+
     /// The id the next added object will get.
     pub(crate) fn next_object_id(&self) -> u64 {
         self.next_object_id
@@ -221,6 +251,7 @@ impl Document {
             measurements: objects.measurements,
             areas: objects.areas,
             grids: objects.grids,
+            shapes: objects.shapes,
             origin,
             next_object_id,
         }

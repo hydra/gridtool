@@ -17,4 +17,5 @@ pub mod imaging;
 pub mod measurement;
 pub mod object;
 pub mod polygon;
+pub mod shape;
 pub mod units;

@@ -5,8 +5,8 @@
 //! written by older versions of the application can always be read. A new format gets
 //! a new module and a new [`super::DocumentFile`] variant.
 //!
-//! Version 1 files are loaded by migrating them to version 2 ([`super::v2`]), which also
-//! reuses the version 1 types that did not change.
+//! Version 1 files are loaded by migrating them to the later versions ([`super::v2`],
+//! [`super::v3`]), which also reuse the version 1 types that did not change.
 
 use serde::{Deserialize, Serialize};
 

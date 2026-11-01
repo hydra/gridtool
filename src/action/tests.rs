@@ -1,6 +1,9 @@
 use super::*;
 use crate::calibration::CalibrationMethod;
 use crate::document::Outline;
+use crate::editor::Editor;
+
+mod shapes;
 
 fn three_points() -> ScalePoints {
     ScalePoints::new(

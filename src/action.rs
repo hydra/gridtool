@@ -12,6 +12,7 @@ use crate::geometry::Point;
 use crate::grid::{CellDimension, CellShape, Grid, GridSource};
 use crate::measurement::{Endpoint, Measurement};
 use crate::object::{Identified, ObjectId};
+use crate::shape::{DrawnShape, FillStyle, LineStyle};
 use crate::units::LengthUnit;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -87,6 +88,31 @@ pub enum Action {
     SetGridColor { index: usize, color: Rgb },
     /// Changes a grid's opacity (0 to 1).
     SetGridOpacity { index: usize, opacity: f32 },
+    /// Appends a drawn shape to the end of the list.
+    AddShape(DrawnShape),
+    /// Moves one point of an existing shape.
+    MoveShapePoint {
+        index: usize,
+        point: usize,
+        to: Point,
+    },
+    /// Replaces every point of a shape at once (e.g. after resizing its bounding box). The
+    /// number of points must stay the same.
+    ResizeShape { index: usize, points: Vec<Point> },
+    /// Changes how a shape's line is drawn.
+    SetShapeLineStyle { index: usize, style: LineStyle },
+    /// Changes the opacity of a shape's line (0 to 1).
+    SetShapeLineOpacity { index: usize, opacity: f32 },
+    /// Changes how a closed shape is filled.
+    SetShapeFillStyle { index: usize, style: FillStyle },
+    /// Changes the distance between a closed shape's fill lines, in image pixels.
+    SetShapeFillSpacing { index: usize, spacing: f64 },
+    /// Changes the opacity of a closed shape's fill (0 to 1).
+    SetShapeFillOpacity { index: usize, opacity: f32 },
+    /// Removes a shape; later shapes move up one place.
+    DeleteShape { index: usize },
+    /// Appends an exact copy of a shape, with a new object id, to the end of the list.
+    DuplicateShape { index: usize },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -94,14 +120,46 @@ pub enum ActionError {
     PointOutsideDocument(Point),
     NoScalePoints,
     InvalidDistance(f64),
-    MeasurementIndexOutOfRange { index: usize, count: usize },
-    AreaIndexOutOfRange { index: usize, count: usize },
-    AreaPointIndexOutOfRange { point: usize, count: usize },
-    AreaPointCountChanged { expected: usize, actual: usize },
-    GridIndexOutOfRange { index: usize, count: usize },
+    MeasurementIndexOutOfRange {
+        index: usize,
+        count: usize,
+    },
+    AreaIndexOutOfRange {
+        index: usize,
+        count: usize,
+    },
+    AreaPointIndexOutOfRange {
+        point: usize,
+        count: usize,
+    },
+    AreaPointCountChanged {
+        expected: usize,
+        actual: usize,
+    },
+    GridIndexOutOfRange {
+        index: usize,
+        count: usize,
+    },
     GridSourceMissing,
     InvalidCellSize(f64),
     InvalidOpacity(f32),
+    ShapeIndexOutOfRange {
+        index: usize,
+        count: usize,
+    },
+    ShapePointIndexOutOfRange {
+        point: usize,
+        count: usize,
+    },
+    ShapePointCountChanged {
+        expected: usize,
+        actual: usize,
+    },
+    /// Only a closed shape encloses an area to fill.
+    ShapeNotClosed {
+        index: usize,
+    },
+    InvalidFillSpacing(f64),
     Calibration(CalibrationError),
 }
 
@@ -139,6 +197,24 @@ impl fmt::Display for ActionError {
             }
             Self::InvalidOpacity(opacity) => {
                 write!(f, "opacity must be between 0 and 1, got {opacity}")
+            }
+            Self::ShapeIndexOutOfRange { index, count } => {
+                write!(f, "shape {} does not exist (there are {count})", index + 1)
+            }
+            Self::ShapePointIndexOutOfRange { point, count } => write!(
+                f,
+                "shape point {} does not exist (there are {count})",
+                point + 1
+            ),
+            Self::ShapePointCountChanged { expected, actual } => write!(
+                f,
+                "a shape with {expected} points cannot be given {actual} points"
+            ),
+            Self::ShapeNotClosed { index } => {
+                write!(f, "shape {} is not closed, so has no fill", index + 1)
+            }
+            Self::InvalidFillSpacing(spacing) => {
+                write!(f, "fill spacing must be a positive number, got {spacing}")
             }
             Self::Calibration(error) => error.fmt(f),
         }
@@ -300,6 +376,70 @@ impl Action {
                 ensure_valid_opacity(*opacity)?;
                 grid_mut(document, *index)?.set_opacity(*opacity);
             }
+            Action::AddShape(shape) => {
+                for &point in shape.points() {
+                    ensure_inside(document, point)?;
+                }
+                let id = document.allocate_object_id();
+                document
+                    .shapes_mut()
+                    .push(Identified::new(id, shape.clone()));
+            }
+            Action::MoveShapePoint { index, point, to } => {
+                ensure_inside(document, *to)?;
+                let shape = shape_mut(document, *index)?;
+                let count = shape.points().len();
+                if *point >= count {
+                    return Err(ActionError::ShapePointIndexOutOfRange {
+                        point: *point,
+                        count,
+                    });
+                }
+                *shape = shape.with_point(*point, *to);
+            }
+            Action::ResizeShape { index, points } => {
+                for &point in points {
+                    ensure_inside(document, point)?;
+                }
+                let shape = shape_mut(document, *index)?;
+                let expected = shape.points().len();
+                if points.len() != expected {
+                    return Err(ActionError::ShapePointCountChanged {
+                        expected,
+                        actual: points.len(),
+                    });
+                }
+                shape.set_points(points.clone());
+            }
+            Action::SetShapeLineStyle { index, style } => {
+                shape_mut(document, *index)?.set_line_style(*style);
+            }
+            Action::SetShapeLineOpacity { index, opacity } => {
+                ensure_valid_opacity(*opacity)?;
+                shape_mut(document, *index)?.set_line_opacity(*opacity);
+            }
+            Action::SetShapeFillStyle { index, style } => {
+                closed_shape_mut(document, *index)?.set_fill_style(*style);
+            }
+            Action::SetShapeFillSpacing { index, spacing } => {
+                if !(spacing.is_finite() && *spacing > 0.0) {
+                    return Err(ActionError::InvalidFillSpacing(*spacing));
+                }
+                closed_shape_mut(document, *index)?.set_fill_spacing(*spacing);
+            }
+            Action::SetShapeFillOpacity { index, opacity } => {
+                ensure_valid_opacity(*opacity)?;
+                closed_shape_mut(document, *index)?.set_fill_opacity(*opacity);
+            }
+            Action::DeleteShape { index } => {
+                shape_mut(document, *index)?;
+                document.shapes_mut().remove(*index);
+            }
+            Action::DuplicateShape { index } => {
+                let copy = shape_mut(document, *index)?.clone();
+                let id = document.allocate_object_id();
+                document.shapes_mut().push(Identified::new(id, copy));
+            }
         }
         Ok(())
     }
@@ -312,6 +452,9 @@ impl Action {
         }
         if let Some(index) = document.area_index(id) {
             return Some(Action::DuplicateArea { index });
+        }
+        if let Some(index) = document.shape_index(id) {
+            return Some(Action::DuplicateShape { index });
         }
         document
             .grid_index(id)
@@ -327,6 +470,9 @@ impl Action {
         if let Some(index) = document.area_index(id) {
             return Some(Action::DeleteArea { index });
         }
+        if let Some(index) = document.shape_index(id) {
+            return Some(Action::DeleteShape { index });
+        }
         document
             .grid_index(id)
             .map(|index| Action::DeleteGrid { index })
@@ -337,9 +483,11 @@ impl Action {
         matches!(
             self,
             Action::AddGrid(_)
+                | Action::AddShape(_)
                 | Action::DuplicateMeasurement { .. }
                 | Action::DuplicateArea { .. }
                 | Action::DuplicateGrid { .. }
+                | Action::DuplicateShape { .. }
         )
     }
 }
@@ -376,6 +524,24 @@ fn area_mut(document: &mut Document, index: usize) -> Result<&mut Area, ActionEr
         .get_mut(index)
         .map(|area| &mut **area)
         .ok_or(ActionError::AreaIndexOutOfRange { index, count })
+}
+
+fn shape_mut(document: &mut Document, index: usize) -> Result<&mut DrawnShape, ActionError> {
+    let shapes = document.shapes_mut();
+    let count = shapes.len();
+    shapes
+        .get_mut(index)
+        .map(|shape| &mut **shape)
+        .ok_or(ActionError::ShapeIndexOutOfRange { index, count })
+}
+
+fn closed_shape_mut(document: &mut Document, index: usize) -> Result<&mut DrawnShape, ActionError> {
+    let shape = shape_mut(document, index)?;
+    if shape.is_closed() {
+        Ok(shape)
+    } else {
+        Err(ActionError::ShapeNotClosed { index })
+    }
 }
 
 fn ensure_inside(document: &Document, point: Point) -> Result<(), ActionError> {
@@ -477,6 +643,39 @@ impl fmt::Display for Action {
                 index + 1,
                 (opacity * 100.0).round()
             ),
+            Action::AddShape(shape) if shape.is_closed() => {
+                write!(f, "Add closed shape with {} points", shape.points().len())
+            }
+            Action::AddShape(shape) => {
+                write!(f, "Add line with {} points", shape.points().len())
+            }
+            Action::MoveShapePoint { index, point, to } => {
+                write!(f, "Move shape {} point {} to {to}", index + 1, point + 1)
+            }
+            Action::ResizeShape { index, .. } => write!(f, "Resize shape {}", index + 1),
+            Action::SetShapeLineStyle { index, style } => {
+                write!(f, "Set shape {} line style to {}", index + 1, style.name())
+            }
+            Action::SetShapeLineOpacity { index, opacity } => write!(
+                f,
+                "Set shape {} line opacity to {}%",
+                index + 1,
+                (opacity * 100.0).round()
+            ),
+            Action::SetShapeFillStyle { index, style } => {
+                write!(f, "Set shape {} fill style to {}", index + 1, style.name())
+            }
+            Action::SetShapeFillSpacing { index, spacing } => {
+                write!(f, "Set shape {} fill spacing to {spacing} px", index + 1)
+            }
+            Action::SetShapeFillOpacity { index, opacity } => write!(
+                f,
+                "Set shape {} fill opacity to {}%",
+                index + 1,
+                (opacity * 100.0).round()
+            ),
+            Action::DeleteShape { index } => write!(f, "Delete shape {}", index + 1),
+            Action::DuplicateShape { index } => write!(f, "Duplicate shape {}", index + 1),
         }
     }
 }

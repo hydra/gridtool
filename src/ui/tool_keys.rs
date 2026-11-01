@@ -1,6 +1,7 @@
-//! Keys that act on the active tool: Escape cancels what it is part-way through, and
-//! Backspace removes the last point placed. Neither applies while a widget such as a
-//! text field has keyboard focus, since the key is meant for that widget.
+//! Keys that act on the active tool: Escape cancels what it is part-way through,
+//! Backspace removes the last point placed, and Enter finishes a line being drawn. None
+//! applies while a widget such as a text field has keyboard focus, since the key is meant
+//! for that widget.
 
 use eframe::egui::{self, Key};
 
@@ -11,6 +12,8 @@ pub struct ToolKeyPresses {
     pub cancel: bool,
     /// Backspace: remove the last point placed.
     pub remove_last_point: bool,
+    /// Enter: finish a line being drawn, leaving it open.
+    pub finish: bool,
 }
 
 /// Reads the tool keys, ignoring them while a widget has keyboard focus.
@@ -32,6 +35,7 @@ impl ToolKeys {
         ctx.input(|input| ToolKeyPresses {
             cancel: input.key_pressed(Key::Escape),
             remove_last_point: input.key_pressed(Key::Backspace),
+            finish: input.key_pressed(Key::Enter),
         })
     }
 
@@ -94,6 +98,17 @@ mod tests {
         );
         assert!(frame(&ctx, &mut keys, vec![press(Key::Escape)], false).cancel);
         assert!(frame(&ctx, &mut keys, vec![press(Key::Backspace)], false).remove_last_point);
+        assert!(frame(&ctx, &mut keys, vec![press(Key::Enter)], false).finish);
+    }
+
+    #[test]
+    fn enter_in_a_focused_text_field_does_not_finish_a_line() {
+        let ctx = egui::Context::default();
+        let mut keys = ToolKeys::default();
+        frame(&ctx, &mut keys, Vec::new(), true);
+        frame(&ctx, &mut keys, Vec::new(), true);
+
+        assert!(!frame(&ctx, &mut keys, vec![press(Key::Enter)], true).finish);
     }
 
     #[test]

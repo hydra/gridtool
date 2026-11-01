@@ -10,6 +10,7 @@ use crate::ui::object_tree;
 use crate::ui::placeholder;
 use crate::ui::rotation_bar::RotationBar;
 use crate::ui::scale_bar::ScaleBar;
+use crate::ui::shape_bar;
 use crate::ui::side_panel::SidePanel;
 use crate::ui::tool_keys::{ToolKeyPresses, ToolKeys};
 use crate::ui::tool_mode::ToolMode;
@@ -70,7 +71,11 @@ impl GridToolApp {
     fn show_tool_options(&mut self, ui: &mut egui::Ui) -> Option<Action> {
         let open = self.session.document_mut()?;
         match self.mode {
-            ToolMode::Pan | ToolMode::Measure | ToolMode::Area | ToolMode::Origin => None,
+            ToolMode::Pan
+            | ToolMode::Measure
+            | ToolMode::Area
+            | ToolMode::Origin
+            | ToolMode::DrawLine => None,
             ToolMode::Rotate => {
                 self.rotation_bar
                     .show(ui, &mut open.view.viewport, open.editor.document());
@@ -87,29 +92,35 @@ impl GridToolApp {
         }
     }
 
-    /// Shows the properties row of the active object, if it has one (grids do).
+    /// Shows the properties row of the active object, if it has one (grids and drawn shapes
+    /// do).
     fn show_object_properties(&mut self, ui: &mut egui::Ui) -> Option<Action> {
         let open = self.session.document_mut()?;
-        self.grid_bar.show(
+        let grid = self.grid_bar.show(
             ui,
             open.editor.document(),
             &mut open.view.selection,
             open.view.viewport.zoom(),
-        )
+        );
+        grid.or(shape_bar::show(
+            ui,
+            open.editor.document(),
+            &mut open.view.selection,
+        ))
     }
 
     /// Escape and switching tool mode both abandon what the tool was part-way through;
-    /// Backspace removes the last point placed.
-    fn apply_tool_keys(&mut self, keys: ToolKeyPresses, mode_changed: bool) {
-        let Some(open) = self.session.document_mut() else {
-            return;
-        };
+    /// Backspace removes the last point placed; Enter finishes a line being drawn, returning
+    /// the action that adds it.
+    fn apply_tool_keys(&mut self, keys: ToolKeyPresses, mode_changed: bool) -> Option<Action> {
+        let open = self.session.document_mut()?;
         if keys.cancel || mode_changed {
             open.view.cancel_tool();
         }
         if keys.remove_last_point {
             open.view.remove_last_point();
         }
+        keys.finish.then(|| open.view.finish_line()).flatten()
     }
 
     /// Keeps the window open while the session asks about unsaved changes.
@@ -159,9 +170,11 @@ impl eframe::App for GridToolApp {
         if let Some(action) = top_panel::show(ui, &mut self.mode, state) {
             self.handle(&ctx, action);
         }
-        self.apply_tool_keys(keys, self.mode != previous_mode);
-
-        let mut actions: Vec<Action> = self.show_tool_options(ui).into_iter().collect();
+        let mut actions: Vec<Action> = self
+            .apply_tool_keys(keys, self.mode != previous_mode)
+            .into_iter()
+            .collect();
+        actions.extend(self.show_tool_options(ui));
         actions.extend(self.show_object_properties(ui));
 
         let tree = self.session.document_mut().map(|open| {

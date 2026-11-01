@@ -39,6 +39,16 @@ view change (pan, zoom, rotation).
 | **Duplicate measurement** | index | Appends an exact copy (both endpoints, the unit and the colour) to the end of the list, with the next object id (`OBJ-12`) | The index exists | "`Duplicate measurement <index+1>`" |
 | **Duplicate grid** | index | Appends an exact copy (alignment source, shape, both cell sizes, unit, colour and opacity) to the end of the list, with the next object id (`OBJ-12`). A grid whose alignment line is missing can still be duplicated | The index exists | "`Duplicate grid <index+1>`" |
 | **Delete grid** | index | Removes one grid; later ones move up | The index exists | "`Delete grid <index+1>`" |
+| **Add shape** | the shape (`DRAW-8`) | Appends a drawn shape to the end of the shape list and gives it the next object id (`OBJ-1`) | Every point is inside the document | "`Add line with <count> points`" for an open shape, or "`Add closed shape with <count> points`" |
+| **Move shape point** | index, point number (0-based), new position | Moves one point of one shape (`OBJ-15`) | The index and the point exist, and the position is inside the document | "`Move shape <index+1> point <point+1> to (<x>, <y>)`", with coordinates to 1 decimal place |
+| **Resize shape** | index, the new points | Replaces every point of one shape at once; its id, closed state and style are kept (`OBJ-9`) | The index exists, the number of points is unchanged, and every point is inside the document | "`Resize shape <index+1>`" |
+| **Set shape line style** | index, line style | Changes how one shape's line is drawn (`DRAW-14`) | The index exists | "`Set shape <index+1> line style to <Thin\|Thick\|Dashed>`" |
+| **Set shape line opacity** | index, opacity | Changes the opacity of one shape's line | The index exists and the opacity is in [0, 1] | "`Set shape <index+1> line opacity to <percent>%`", rounded to a whole percent |
+| **Set shape fill style** | index, fill style | Changes how one closed shape is filled | The index exists and the shape is closed | "`Set shape <index+1> fill style to <None\|Solid\|Vertical lines\|Horizontal lines\|Crosshatch>`" |
+| **Set shape fill spacing** | index, spacing in image pixels | Changes the distance between one closed shape's fill lines | The index exists, the shape is closed, and the spacing is finite and > 0 | "`Set shape <index+1> fill spacing to <value> px`", with the value written as for **Set distance** |
+| **Set shape fill opacity** | index, opacity | Changes the opacity of one closed shape's fill | The index exists, the shape is closed, and the opacity is in [0, 1] | "`Set shape <index+1> fill opacity to <percent>%`", rounded to a whole percent |
+| **Delete shape** | index | Removes one shape; later ones move up | The index exists | "`Delete shape <index+1>`" |
+| **Duplicate shape** | index | Appends an exact copy (every point, the closed state and the style) to the end of the shape list, with the next object id (`OBJ-12`) | The index exists | "`Duplicate shape <index+1>`" |
 
 **HIST-3 — Errors.** A rejected action returns an error describing why, and changes
 nothing. The UI should never produce an invalid action. If one is rejected anyway, it is

@@ -1,7 +1,83 @@
-//! Polygon maths for area measurements: area, centroid and triangulation of a closed
-//! outline given by its corner points in order.
+//! Polygon maths for closed outlines given by their corner points in order: area,
+//! centroid, triangulation and hatching.
 
-use crate::geometry::Point;
+use crate::geometry::{Bounds, Point};
+
+/// The direction of a set of parallel fill lines, along the image's axes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HatchDirection {
+    Vertical,
+    Horizontal,
+}
+
+impl HatchDirection {
+    /// `point` as (position along the lines, position across them).
+    fn along_across(self, point: Point) -> (f64, f64) {
+        match self {
+            HatchDirection::Vertical => (point.y, point.x),
+            HatchDirection::Horizontal => (point.x, point.y),
+        }
+    }
+
+    /// The inverse of [`Self::along_across`].
+    fn point_at(self, along: f64, across: f64) -> Point {
+        match self {
+            HatchDirection::Vertical => Point::new(across, along),
+            HatchDirection::Horizontal => Point::new(along, across),
+        }
+    }
+}
+
+/// The parts inside the outline of parallel lines at every whole multiple of `spacing`,
+/// for the lines that pass through `region`. A line crossing the outline more than once
+/// gives several segments (inside is decided by the even-odd rule). Because the lines sit
+/// at multiples of `spacing`, they stay put when the outline changes.
+pub fn hatch_lines(
+    points: &[Point],
+    direction: HatchDirection,
+    spacing: f64,
+    region: Bounds,
+) -> Vec<(Point, Point)> {
+    let Some(bounds) = Bounds::enclosing(points.iter().copied()) else {
+        return Vec::new();
+    };
+    let across = |point| direction.along_across(point).1;
+    let low = across(bounds.min).max(across(region.min));
+    let high = across(bounds.max).min(across(region.max));
+    let (first, last) = (
+        (low / spacing).ceil() as i64,
+        (high / spacing).floor() as i64,
+    );
+
+    let mut segments = Vec::new();
+    for line in first..=last {
+        let position = line as f64 * spacing;
+        let mut crossings: Vec<f64> = edges(points)
+            .filter_map(|(a, b)| {
+                let (a_along, a_across) = direction.along_across(a);
+                let (b_along, b_across) = direction.along_across(b);
+                // Half-open, so that a line through a corner counts it once.
+                ((a_across > position) != (b_across > position)).then(|| {
+                    a_along + (position - a_across) / (b_across - a_across) * (b_along - a_along)
+                })
+            })
+            .collect();
+        crossings.sort_by(f64::total_cmp);
+        // A line that only touches a corner has nothing to draw.
+        segments.extend(
+            crossings
+                .chunks_exact(2)
+                .filter(|pair| pair[0] < pair[1])
+                .map(|pair| {
+                    (
+                        direction.point_at(pair[0], position),
+                        direction.point_at(pair[1], position),
+                    )
+                }),
+        );
+    }
+    segments
+}
 
 /// The shoelace sum: twice the polygon's area, positive for one winding direction and
 /// negative for the other. For a self-intersecting outline, oppositely wound parts
@@ -163,6 +239,77 @@ mod tests {
         assert_eq!(triangulated_area(&l_shape), 300.0);
         l_shape.reverse();
         assert_eq!(triangulated_area(&l_shape), 300.0);
+    }
+
+    const EVERYWHERE: Bounds = Bounds {
+        min: Point::new(-1000.0, -1000.0),
+        max: Point::new(1000.0, 1000.0),
+    };
+
+    #[test]
+    fn hatch_lines_sit_at_multiples_of_the_spacing_inside_the_outline() {
+        let square = points(&[(5.0, 5.0), (25.0, 5.0), (25.0, 25.0), (5.0, 25.0)]);
+
+        assert_eq!(
+            hatch_lines(&square, HatchDirection::Vertical, 10.0, EVERYWHERE),
+            [
+                (Point::new(10.0, 5.0), Point::new(10.0, 25.0)),
+                (Point::new(20.0, 5.0), Point::new(20.0, 25.0)),
+            ]
+        );
+        assert_eq!(
+            hatch_lines(&square, HatchDirection::Horizontal, 20.0, EVERYWHERE),
+            [(Point::new(5.0, 20.0), Point::new(25.0, 20.0))]
+        );
+    }
+
+    #[test]
+    fn hatch_lines_split_where_a_concave_outline_is_crossed_more_than_once() {
+        // A U shape: 30 wide and 20 tall, with a notch from x = 10 to 20 down to y = 10.
+        let u_shape = points(&[
+            (0.0, 0.0),
+            (10.0, 0.0),
+            (10.0, 10.0),
+            (20.0, 10.0),
+            (20.0, 0.0),
+            (30.0, 0.0),
+            (30.0, 20.0),
+            (0.0, 20.0),
+        ]);
+
+        let lines = hatch_lines(&u_shape, HatchDirection::Horizontal, 5.0, EVERYWHERE);
+
+        let at_5: Vec<_> = lines.iter().filter(|(a, _)| a.y == 5.0).collect();
+        assert_eq!(
+            at_5,
+            [
+                &(Point::new(0.0, 5.0), Point::new(10.0, 5.0)),
+                &(Point::new(20.0, 5.0), Point::new(30.0, 5.0)),
+            ]
+        );
+        let at_15: Vec<_> = lines.iter().filter(|(a, _)| a.y == 15.0).collect();
+        assert_eq!(at_15, [&(Point::new(0.0, 15.0), Point::new(30.0, 15.0))]);
+    }
+
+    #[test]
+    fn hatch_lines_are_only_generated_for_the_region() {
+        let square = points(&[(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)]);
+        let region = Bounds::around(Point::new(25.0, -500.0), Point::new(45.0, 500.0));
+
+        let lines = hatch_lines(&square, HatchDirection::Vertical, 10.0, region);
+
+        let positions: Vec<f64> = lines.iter().map(|(a, _)| a.x).collect();
+        assert_eq!(positions, [30.0, 40.0]);
+    }
+
+    #[test]
+    fn a_hatch_line_through_a_corner_stays_paired() {
+        let diamond = points(&[(10.0, 0.0), (20.0, 10.0), (10.0, 20.0), (0.0, 10.0)]);
+
+        let lines = hatch_lines(&diamond, HatchDirection::Horizontal, 10.0, EVERYWHERE);
+
+        // y = 0 touches only the top corner and y = 20 only the bottom one.
+        assert_eq!(lines, [(Point::new(0.0, 10.0), Point::new(20.0, 10.0))]);
     }
 
     #[test]

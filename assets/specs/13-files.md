@@ -15,6 +15,8 @@ completely, so loading it re-creates the exact document state (`DOC-1`).
 - every grid (`GRID-1`), in list order, with its object id, alignment source (a scale
   line, or a measurement by object id, which may refer to a deleted measurement), shape,
   sizes A and B (both, even for square cells), unit, colour and opacity
+- every drawn shape (`DRAW-8`), in list order, with its object id, points, closed state,
+  line style and opacity, and fill style, spacing and opacity
 - the object id counter (`OBJ-1`), so ids are never reused after loading
 
 **FILE-2 — Not saved.** These are **not** saved:
@@ -39,7 +41,7 @@ failed save never leaves a half-written document.
 **FILE-5 — Versioned description, separate from runtime state.** The file holds a
 *description* of the document in a versioned format. It is not a dump of the runtime
 data structures:
-- **Tagged.** The top level names its version, for example `V2(( … ))`.
+- **Tagged.** The top level names its version, for example `V3(( … ))`.
 - **Converted on save.** Saving converts the runtime document to the current version's
   description.
 - **Converted on load.** Loading converts a description of **any** supported version back
@@ -63,22 +65,34 @@ data structures:
   - `shape` is `Square|Rectangle`
 - `next_object_id`: a whole number
 
-**FILE-6a — Version 2 (current).** Version 2 is version 1 with these changes:
+**FILE-6a — Version 2.** (no longer written; still loaded) Version 2 is version 1 with these changes:
 - `measurements`: a list of `(id, start, end, unit, color: (r, g, b))`
 - `areas`, after `measurements`: a list of `(id, points: [(x, y), …], unit, color: (r, g, b))`
 
 Every other field is exactly as in version 1. A version 1 file is migrated to version 2
 by giving every measurement the default colour, blue (`MEAS-1`), and adding no areas.
 
+**FILE-6b — Version 3 (current).** Version 3 is version 2 with this change:
+- `shapes`, after `grids`: a list of `(id, points: [(x, y), …], closed, line_style,
+  line_opacity, fill_style, fill_spacing, fill_opacity)`
+  - `closed` is `true` or `false`
+  - `line_style` is `Thin|Thick|Dashed`
+  - `fill_style` is `None|Solid|VerticalLines|HorizontalLines|Crosshatch`
+
+Every other field is exactly as in version 2. A version 2 file is migrated to version 3 by
+adding no shapes.
+
 **FILE-7 — Validation on load.** A loaded description is checked as strictly as actions
 check their inputs (`HIST-2`), so a hand-edited or damaged file cannot produce an invalid
 document. Loading fails when:
 - the size is zero
-- a point (scale point, measurement endpoint, area point or origin) is outside the
-  document
-- an area has fewer than 3 points
+- a point (scale point, measurement endpoint, area point, shape point or origin) is
+  outside the document
+- an area has fewer than 3 points, a closed shape fewer than 3, or an open shape fewer
+  than 2
+- an open shape has a fill style other than `None`
 - the number of scale points does not match the method
-- a distance or cell size is not finite and > 0
+- a distance, cell size or fill spacing is not finite and > 0
 - an opacity is outside [0, 1]
 - an object id is 0, used twice, or not below `next_object_id`
 
@@ -193,15 +207,20 @@ and shows the dialogs.
   - a moved origin
   - a measurement with a changed colour, and areas with a changed unit and colour and a
     gap in their ids
+  - a styled open line, and a closed shape with every style changed
 
   Duplicating a grid then gives the same next id in both.
-- The written text starts with `V2(`.
+- The written text starts with `V3(`.
 - A literal version 1 sample loads with the expected values; its measurements are blue and
-  it has no areas.
+  it has no areas or shapes.
 - A literal version 2 sample loads with the expected values, including a measurement's
-  colour and an area's points, unit and colour.
+  colour and an area's points, unit and colour. It has no shapes.
+- A literal version 3 sample loads with the expected values, including an open and a closed
+  shape's points and styles.
 - Each `FILE-7` failure is rejected with its reason. This includes an area with 2 points, an area point outside
-  the document, and an area reusing a measurement's id.
+  the document, an area reusing a measurement's id, an open shape with 1 point, a closed
+  shape with 2 points, a shape point outside the document, an open shape with a fill, a
+  shape opacity of 1.5, a fill spacing of 0, and a shape reusing another shape's id.
 - Image references:
   - `a.png` beside the document is stored as `a.png`
   - an image in `images/` below it is stored as `images/b.png`

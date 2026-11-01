@@ -5,11 +5,13 @@ use crate::calibration::{CalibrationMethod, Line, ScalePoints};
 use crate::color::Rgb;
 use crate::grid::{CellDimension, CellShape, Grid, GridSource};
 use crate::measurement::Measurement;
+use crate::shape::{DrawnShape, FillStyle, LineStyle};
 use crate::units::LengthUnit;
 
 /// A document using every feature: calibration, measurements with a gap in their ids and
 /// a changed colour, areas with every property changed, grids with every property
-/// changed (one aligned to a deleted measurement), a moved origin.
+/// changed (one aligned to a deleted measurement), drawn shapes (a styled line and a
+/// closed shape with every property changed), a moved origin.
 fn rich_document() -> Document {
     let mut document = Document::new(200, 100);
     let measurement = |x: f64| {
@@ -93,6 +95,41 @@ fn rich_document() -> Document {
             opacity: 0.25,
         },
         Action::SetOrigin(Point::new(33.5, 66.25)),
+        Action::AddShape(
+            DrawnShape::open(vec![Point::new(1.0, 1.0), Point::new(30.5, 40.0)]).unwrap(),
+        ),
+        Action::SetShapeLineStyle {
+            index: 0,
+            style: LineStyle::Dashed,
+        },
+        Action::SetShapeLineOpacity {
+            index: 0,
+            opacity: 0.75,
+        },
+        Action::AddShape(
+            DrawnShape::closed(vec![
+                Point::new(5.0, 5.0),
+                Point::new(50.0, 5.0),
+                Point::new(50.0, 45.0),
+            ])
+            .unwrap(),
+        ),
+        Action::SetShapeLineStyle {
+            index: 1,
+            style: LineStyle::Thick,
+        },
+        Action::SetShapeFillStyle {
+            index: 1,
+            style: FillStyle::Crosshatch,
+        },
+        Action::SetShapeFillSpacing {
+            index: 1,
+            spacing: 100.0,
+        },
+        Action::SetShapeFillOpacity {
+            index: 1,
+            opacity: 0.125,
+        },
     ];
     for action in actions {
         action.apply(&mut document).unwrap();
@@ -145,7 +182,7 @@ fn files_are_tagged_with_their_format_version() {
         .to_ron()
         .unwrap();
 
-    assert!(text.starts_with("V2("), "{text}");
+    assert!(text.starts_with("V3("), "{text}");
 }
 
 /// A version 1 file exactly as the first release writes it. It must always load.
@@ -226,6 +263,119 @@ fn version_1_files_get_default_colours_and_no_areas() {
 
     assert_eq!(document.measurements()[0].color(), Rgb::BLUE);
     assert!(document.areas().is_empty());
+    assert!(document.shapes().is_empty());
+}
+
+/// A version 3 file exactly as the release that added drawn shapes writes it. It must
+/// always load.
+const VERSION_3_SAMPLE: &str = r#"V3((
+    image: "photo.png",
+    width: 200,
+    height: 100,
+    origin: (x: 100.0, y: 50.0),
+    calibration: (
+        points: None,
+        distance_a: None,
+        distance_b: None,
+        unit: Centimetre,
+    ),
+    measurements: [],
+    areas: [],
+    grids: [],
+    shapes: [(
+        id: 1,
+        points: [(x: 1.0, y: 2.0), (x: 30.0, y: 2.0)],
+        closed: false,
+        line_style: Dashed,
+        line_opacity: 0.75,
+        fill_style: None,
+        fill_spacing: 20.0,
+        fill_opacity: 0.5,
+    ), (
+        id: 2,
+        points: [(x: 10.0, y: 10.0), (x: 50.0, y: 10.0), (x: 50.0, y: 40.0)],
+        closed: true,
+        line_style: Thick,
+        line_opacity: 1.0,
+        fill_style: Crosshatch,
+        fill_spacing: 50.0,
+        fill_opacity: 0.25,
+    )],
+    next_object_id: 3,
+))"#;
+
+#[test]
+fn version_3_files_load() {
+    let document = DocumentFile::from_ron(VERSION_3_SAMPLE)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    let [line, closed] = document.shapes() else {
+        panic!("expected two shapes");
+    };
+    assert!(!line.is_closed());
+    assert_eq!(line.points()[1], Point::new(30.0, 2.0));
+    assert_eq!(line.line_style(), LineStyle::Dashed);
+    assert_eq!(line.line_opacity(), 0.75);
+    assert!(closed.is_closed());
+    assert_eq!(closed.line_style(), LineStyle::Thick);
+    assert_eq!(closed.fill_style(), FillStyle::Crosshatch);
+    assert_eq!(closed.fill_spacing(), 50.0);
+    assert_eq!(closed.fill_opacity(), 0.25);
+    assert_eq!(document.next_object_id(), 3);
+}
+
+#[test]
+fn version_2_files_load_without_shapes() {
+    let document = DocumentFile::from_ron(VERSION_2_SAMPLE)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    assert!(document.shapes().is_empty());
+}
+
+#[test]
+fn invalid_shapes_are_rejected() {
+    let valid = || match DocumentFile::from_ron(VERSION_3_SAMPLE).unwrap() {
+        DocumentFile::V3(file) => file,
+        _ => unreachable!("the sample is version 3"),
+    };
+    type Corruption = fn(&mut DocumentV3);
+    let cases: [(Corruption, InvalidDocument); 7] = [
+        (
+            |f| f.shapes[0].points.truncate(1),
+            InvalidDocument::TooFewShapePoints(1),
+        ),
+        (
+            |f| f.shapes[1].points.truncate(2),
+            InvalidDocument::TooFewShapePoints(2),
+        ),
+        (
+            |f| f.shapes[0].points[0].x = 201.0,
+            InvalidDocument::PointOutside(Point::new(201.0, 2.0)),
+        ),
+        (
+            |f| f.shapes[0].fill_style = f.shapes[1].fill_style,
+            InvalidDocument::FilledOpenShape(1),
+        ),
+        (
+            |f| f.shapes[1].line_opacity = 1.5,
+            InvalidDocument::BadOpacity(1.5),
+        ),
+        (
+            |f| f.shapes[1].fill_spacing = 0.0,
+            InvalidDocument::NotPositive(0.0),
+        ),
+        (|f| f.shapes[1].id = 1, InvalidDocument::BadObjectId(1)),
+    ];
+
+    for (corrupt, expected) in cases {
+        let mut file = valid();
+        corrupt(&mut file);
+        assert_eq!(file.to_document(), Err(expected));
+    }
 }
 
 #[test]
@@ -249,10 +399,10 @@ fn version_2_files_load() {
 #[test]
 fn invalid_contents_are_rejected() {
     let valid = || match DocumentFile::from_ron(VERSION_1_SAMPLE).unwrap() {
-        DocumentFile::V1(file) => DocumentV2::from(file),
-        DocumentFile::V2(_) => unreachable!("the sample is version 1"),
+        DocumentFile::V1(file) => DocumentV3::from(DocumentV2::from(file)),
+        _ => unreachable!("the sample is version 1"),
     };
-    type Corruption = fn(&mut DocumentV2);
+    type Corruption = fn(&mut DocumentV3);
     let cases: [(Corruption, InvalidDocument); 7] = [
         (|f| f.width = 0, InvalidDocument::EmptySize),
         (
@@ -419,8 +569,8 @@ fn loading_reports_what_went_wrong() {
 #[test]
 fn invalid_areas_are_rejected() {
     let valid = || match DocumentFile::from_ron(VERSION_2_SAMPLE).unwrap() {
-        DocumentFile::V2(file) => file,
-        DocumentFile::V1(_) => unreachable!("the sample is version 2"),
+        DocumentFile::V2(file) => DocumentV3::from(file),
+        _ => unreachable!("the sample is version 2"),
     };
 
     let mut two_points = valid();

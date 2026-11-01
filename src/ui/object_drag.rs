@@ -7,6 +7,7 @@ use gridtool::document::Document;
 use gridtool::geometry::{Bounds, BoundsHandle, Point};
 use gridtool::measurement::{Endpoint, Measurement};
 use gridtool::object::ObjectId;
+use gridtool::shape::DrawnShape;
 
 /// The part of the active object a drag holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,15 +23,19 @@ pub enum Grip {
 pub enum Shape {
     Measurement(Measurement),
     Area(Area),
+    Drawn(DrawnShape),
 }
 
 impl Shape {
-    /// The shape of the object with `id`, if it is a measurement or an area.
+    /// The shape of the object with `id`, if it is a measurement, an area or a drawn shape.
     pub fn of(document: &Document, id: ObjectId) -> Option<Shape> {
         if let Some(index) = document.measurement_index(id) {
             return Some(Shape::Measurement(
                 (*document.measurements()[index]).clone(),
             ));
+        }
+        if let Some(index) = document.shape_index(id) {
+            return Some(Shape::Drawn((*document.shapes()[index]).clone()));
         }
         let index = document.area_index(id)?;
         Some(Shape::Area((*document.areas()[index]).clone()))
@@ -43,6 +48,7 @@ impl Shape {
                 .map(|endpoint| measurement.point(endpoint))
                 .to_vec(),
             Shape::Area(area) => area.points().to_vec(),
+            Shape::Drawn(drawn) => drawn.points().to_vec(),
         }
     }
 
@@ -50,6 +56,7 @@ impl Shape {
         match self {
             Shape::Measurement(measurement) => measurement.bounds(),
             Shape::Area(area) => area.bounds(),
+            Shape::Drawn(drawn) => drawn.bounds(),
         }
     }
 
@@ -72,6 +79,13 @@ impl Shape {
             }
             (Shape::Area(area), Grip::Point(index)) => match area.points().get(index) {
                 Some(&point) => Shape::Area(area.with_point(index, clamp(moved(point)))),
+                None => self.clone(),
+            },
+            (Shape::Drawn(drawn), Grip::Bounds(handle)) => {
+                Shape::Drawn(drawn.resized(handle, dx, dy).map_points(clamp))
+            }
+            (Shape::Drawn(drawn), Grip::Point(index)) => match drawn.points().get(index) {
+                Some(&point) => Shape::Drawn(drawn.with_point(index, clamp(moved(point)))),
                 None => self.clone(),
             },
         }
@@ -106,6 +120,15 @@ impl Shape {
                 point,
                 to: *area.points().get(point)?,
             },
+            (Shape::Drawn(drawn), Grip::Bounds(_)) => Action::ResizeShape {
+                index,
+                points: drawn.points().to_vec(),
+            },
+            (Shape::Drawn(drawn), Grip::Point(point)) => Action::MoveShapePoint {
+                index,
+                point,
+                to: *drawn.points().get(point)?,
+            },
         })
     }
 
@@ -114,6 +137,7 @@ impl Shape {
         match self {
             Shape::Measurement(_) => document.measurement_index(id),
             Shape::Area(_) => document.area_index(id),
+            Shape::Drawn(_) => document.shape_index(id),
         }
     }
 }
@@ -308,6 +332,71 @@ mod tests {
                 index: 0,
                 start: Point::new(10.0, 10.0),
                 end: Point::new(60.0, 30.0),
+            })
+        );
+    }
+
+    /// The document's drawn line (10, 10), (40, 10), (40, 30).
+    fn document_with_drawn_line() -> (Document, ObjectId) {
+        let mut document = document();
+        Action::AddShape(
+            DrawnShape::open(vec![
+                Point::new(10.0, 10.0),
+                Point::new(40.0, 10.0),
+                Point::new(40.0, 30.0),
+            ])
+            .unwrap(),
+        )
+        .apply(&mut document)
+        .unwrap();
+        let id = document.shapes()[0].id();
+        (document, id)
+    }
+
+    #[test]
+    fn dragging_a_drawn_shapes_point_moves_only_that_point_and_stays_inside() {
+        let (document, id) = document_with_drawn_line();
+
+        let action = drag(
+            &document,
+            id,
+            Grip::Point(1),
+            Point::new(40.0, 10.0),
+            Point::new(50.0, -20.0),
+        );
+
+        assert_eq!(
+            action,
+            Some(Action::MoveShapePoint {
+                index: 0,
+                point: 1,
+                to: Point::new(50.0, 0.0),
+            })
+        );
+    }
+
+    #[test]
+    fn dragging_a_drawn_shapes_handle_stretches_every_point() {
+        let (document, id) = document_with_drawn_line();
+
+        // The right edge from x = 40 to x = 70 doubles the width.
+        let action = drag(
+            &document,
+            id,
+            Grip::Bounds(BoundsHandle::Right),
+            Point::new(40.0, 20.0),
+            Point::new(70.0, 20.0),
+        );
+
+        assert_eq!(
+            action,
+            Some(Action::ResizeShape {
+                index: 0,
+                points: vec![
+                    Point::new(10.0, 10.0),
+                    Point::new(70.0, 10.0),
+                    Point::new(70.0, 30.0),
+                ],
             })
         );
     }

@@ -11,6 +11,7 @@ use super::color_swatch;
 use super::commit_field::CommitField;
 use super::format::{format_length, parse_number};
 use super::grid_display;
+use super::opacity_slider;
 use super::selection::Selection;
 use super::unit_picker;
 
@@ -49,7 +50,7 @@ impl GridBar {
                     ui.separator();
                     actions.extend(color_picker(ui, id, index, stored, selection));
                     ui.separator();
-                    actions.extend(opacity_slider(ui, id, index, stored, selection));
+                    actions.extend(grid_opacity(ui, id, index, stored, selection));
                     let displayed = selection.displayed_grid(id, stored);
                     if let Err(reason) = grid_display::visibility(&displayed, document, zoom) {
                         ui.separator();
@@ -150,9 +151,7 @@ fn color_picker(
         .map(|color| Action::SetGridColor { index, color })
 }
 
-/// A 0–100 % slider. Dragging previews live and commits one action on release; clicks
-/// and keyboard changes commit immediately.
-fn opacity_slider(
+fn grid_opacity(
     ui: &mut egui::Ui,
     id: ObjectId,
     index: usize,
@@ -161,18 +160,11 @@ fn opacity_slider(
 ) -> Option<Action> {
     ui.label("Opacity:");
     let displayed = selection.displayed_grid(id, stored);
-    let mut percent = displayed.opacity() * 100.0;
-    let response = ui.add(
-        egui::Slider::new(&mut percent, 0.0..=100.0)
-            .suffix("%")
-            .fixed_decimals(0),
-    );
-    if response.changed() {
-        selection.preview_grid(displayed.with_opacity(percent.round() / 100.0));
+    let edit = opacity_slider::show(ui, displayed.opacity());
+    if let Some(opacity) = edit.preview {
+        selection.preview_grid(displayed.with_opacity(opacity));
     }
-
-    let finished = response.drag_stopped() || (response.changed() && !response.dragged());
-    if !finished {
+    if !edit.finished {
         return None;
     }
     let chosen = selection.displayed_grid(id, stored).opacity();

@@ -21,15 +21,17 @@ pub const AREA: MaterialIcon = material::ICON_PENTAGON;
 pub const GRID: MaterialIcon = material::ICON_GRID_ON;
 /// A crosshair.
 pub const ORIGIN: MaterialIcon = material::ICON_MY_LOCATION;
+/// Line segments joined at points.
+pub const DRAW_LINE: MaterialIcon = material::ICON_POLYLINE;
 pub const UNDO: MaterialIcon = material::ICON_UNDO;
 pub const REDO: MaterialIcon = material::ICON_REDO;
 pub const DELETE: MaterialIcon = material::ICON_DELETE;
 pub const DUPLICATE: MaterialIcon = material::ICON_CONTENT_COPY;
 
 #[cfg(test)]
-pub const ALL: [MaterialIcon; 16] = [
-    NEW, LOAD, SAVE, SAVE_AS, OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, AREA, GRID, ORIGIN, UNDO,
-    REDO, DELETE, DUPLICATE,
+pub const ALL: [MaterialIcon; 17] = [
+    NEW, LOAD, SAVE, SAVE_AS, OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, AREA, GRID, ORIGIN,
+    DRAW_LINE, UNDO, REDO, DELETE, DUPLICATE,
 ];
 
 #[cfg(test)]

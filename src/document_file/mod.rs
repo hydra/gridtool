@@ -7,6 +7,7 @@
 
 mod v1;
 mod v2;
+mod v3;
 
 use std::fmt;
 use std::fs;
@@ -22,6 +23,7 @@ use crate::imaging::{DecodedImage, ImageLoadError, decode_file};
 
 pub use v1::DocumentV1;
 pub use v2::DocumentV2;
+pub use v3::DocumentV3;
 
 /// The extension of document files, without the dot.
 pub const EXTENSION: &str = "ron";
@@ -32,12 +34,13 @@ pub const EXTENSION: &str = "ron";
 pub enum DocumentFile {
     V1(DocumentV1),
     V2(DocumentV2),
+    V3(DocumentV3),
 }
 
 impl DocumentFile {
     /// Describes `document` in the current format version.
     pub fn describe(document: &Document, image: String) -> Self {
-        Self::V2(DocumentV2::describe(document, image))
+        Self::V3(DocumentV3::describe(document, image))
     }
 
     /// The stored image reference.
@@ -45,14 +48,16 @@ impl DocumentFile {
         match self {
             Self::V1(file) => &file.image,
             Self::V2(file) => &file.image,
+            Self::V3(file) => &file.image,
         }
     }
 
     /// Re-creates the runtime document, migrating older versions first.
     pub fn to_document(&self) -> Result<Document, InvalidDocument> {
         match self {
-            Self::V1(file) => DocumentV2::from(file.clone()).to_document(),
-            Self::V2(file) => file.to_document(),
+            Self::V1(file) => DocumentV3::from(DocumentV2::from(file.clone())).to_document(),
+            Self::V2(file) => DocumentV3::from(file.clone()).to_document(),
+            Self::V3(file) => file.to_document(),
         }
     }
 
@@ -169,6 +174,9 @@ pub enum InvalidDocument {
     PointOutside(Point),
     WrongScalePointCount,
     TooFewAreaPoints(usize),
+    TooFewShapePoints(usize),
+    /// The id of an open shape stored with a fill.
+    FilledOpenShape(u64),
     NotPositive(f64),
     BadOpacity(f32),
     /// Zero, duplicated, or not below the stored next object id.
@@ -185,6 +193,12 @@ impl fmt::Display for InvalidDocument {
             }
             Self::TooFewAreaPoints(count) => {
                 write!(f, "an area has {count} points, but needs at least 3")
+            }
+            Self::TooFewShapePoints(count) => {
+                write!(f, "a shape has too few points ({count})")
+            }
+            Self::FilledOpenShape(id) => {
+                write!(f, "shape {id} has a fill but is not closed")
             }
             Self::NotPositive(value) => write!(f, "{value} should be a positive number"),
             Self::BadOpacity(value) => write!(f, "opacity {value} is not between 0 and 1"),

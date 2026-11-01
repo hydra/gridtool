@@ -93,11 +93,14 @@ opacity applied as alpha (`round(opacity × 255)`). They are drawn in **every** 
 **GRID-6 — Drawing order.** The canvas draws, from bottom to top:
 1. the image and its outline (`VIEW-6`, `VIEW-7`)
 2. **grids**
-3. measurement lines (`MEAS-9`)
-4. scale lines and markers, when shown (`SCALE-11`, `GRID-8`, `GRID-13`)
-5. the grid tool's hover highlight (`GRID-9`)
-6. other tool overlays: the rotate arrow and the pending measurement
-7. the selection box (`OBJ-8`)
+3. drawn shapes (`DRAW-11`)
+4. areas (`AREA-9`)
+5. measurement lines (`MEAS-9`)
+6. scale lines and markers, when shown (`SCALE-11`, `GRID-8`, `GRID-13`)
+7. the grid tool's hover highlight (`GRID-9`)
+8. other tool overlays: the rotate arrow, the pending measurement, and the area or drawn
+   shape being placed
+9. the selection box (`OBJ-8`)
 
 ## Grid tool
 

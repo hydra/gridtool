@@ -10,6 +10,7 @@ use gridtool::geometry::{Bounds, Point};
 use gridtool::grid::Grid;
 use gridtool::measurement::Measurement;
 use gridtool::object::ObjectId;
+use gridtool::shape::DrawnShape;
 
 use super::object_drag::{Grip, ObjectDrag, Shape};
 
@@ -20,6 +21,9 @@ pub struct Selection {
     /// Uncommitted style edits (colour, opacity) of the active grid, shown live while
     /// the user is still choosing.
     grid_preview: Option<Grid>,
+    /// Uncommitted style edits (opacities) of the active drawn shape, shown live while the
+    /// user is still choosing.
+    drawn_preview: Option<DrawnShape>,
 }
 
 impl Selection {
@@ -33,6 +37,7 @@ impl Selection {
         if self.active != id {
             self.drag = None;
             self.grid_preview = None;
+            self.drawn_preview = None;
         }
         self.active = id;
     }
@@ -45,6 +50,7 @@ impl Selection {
         }
         self.drag = None;
         self.grid_preview = None;
+        self.drawn_preview = None;
     }
 
     /// Abandons a drag in progress, without committing anything.
@@ -98,8 +104,32 @@ impl Selection {
         }
     }
 
-    /// The active object's shape as currently displayed, if it has one (measurements and
-    /// areas do; grids do not).
+    /// How to display the drawn shape with `id`: the drag preview if it is being dragged,
+    /// otherwise the style preview if it is active and has uncommitted edits, otherwise the
+    /// shape itself.
+    pub fn displayed_drawn(&self, id: ObjectId, drawn: &DrawnShape) -> DrawnShape {
+        if let Some(Shape::Drawn(preview)) = self.previewed(id) {
+            return preview.clone();
+        }
+        match &self.drawn_preview {
+            Some(preview) if self.active == Some(id) => preview.clone(),
+            _ => drawn.clone(),
+        }
+    }
+
+    /// Shows `drawn` in place of the active shape until the preview is cleared.
+    pub fn preview_drawn(&mut self, drawn: DrawnShape) {
+        if self.active.is_some() {
+            self.drawn_preview = Some(drawn);
+        }
+    }
+
+    pub fn clear_drawn_preview(&mut self) {
+        self.drawn_preview = None;
+    }
+
+    /// The active object's shape as currently displayed, if it has one (measurements, areas
+    /// and drawn shapes do; grids do not).
     fn active_shape(&self, document: &Document) -> Option<Shape> {
         let id = self.active?;
         match self.previewed(id) {
@@ -394,6 +424,75 @@ mod tests {
             selection.active_bounds(&document).map(|b| b.min),
             Some(Point::new(50.0, 50.0))
         );
+    }
+
+    fn document_with_drawn_line() -> (Document, ObjectId) {
+        let mut document = document_with_two_measurements();
+        Action::AddShape(
+            DrawnShape::open(vec![Point::new(10.0, 50.0), Point::new(30.0, 70.0)]).unwrap(),
+        )
+        .apply(&mut document)
+        .unwrap();
+        let id = document.shapes()[0].id();
+        (document, id)
+    }
+
+    #[test]
+    fn an_active_drawn_shape_has_bounds_and_points_that_follow_a_drag() {
+        let (document, id) = document_with_drawn_line();
+        let stored = &document.shapes()[0];
+        let mut selection = Selection::default();
+        selection.select(Some(id));
+        assert_eq!(selection.active_points(&document), stored.points());
+
+        assert!(selection.begin_drag(&document, Grip::Point(1), Point::new(30.0, 70.0)));
+        selection.drag_to(&document, Point::new(40.0, 80.0));
+
+        assert_eq!(
+            selection.displayed_drawn(id, stored).points()[1],
+            Point::new(40.0, 80.0)
+        );
+        assert_eq!(
+            selection.active_bounds(&document),
+            Some(Bounds::around(
+                Point::new(10.0, 50.0),
+                Point::new(40.0, 80.0)
+            ))
+        );
+        assert_eq!(
+            selection.end_drag(&document),
+            Some(Action::MoveShapePoint {
+                index: 0,
+                point: 1,
+                to: Point::new(40.0, 80.0),
+            })
+        );
+    }
+
+    #[test]
+    fn a_drawn_shape_preview_shows_only_for_the_active_shape_until_dropped() {
+        let (document, id) = document_with_drawn_line();
+        let stored = &document.shapes()[0];
+        let mut selection = Selection::default();
+
+        selection.preview_drawn(stored.with_line_opacity(0.1));
+        assert_eq!(selection.displayed_drawn(id, stored), **stored);
+
+        selection.select(Some(id));
+        selection.preview_drawn(stored.with_line_opacity(0.1));
+        assert_eq!(selection.displayed_drawn(id, stored).line_opacity(), 0.1);
+
+        selection.clear_drawn_preview();
+        assert_eq!(selection.displayed_drawn(id, stored), **stored);
+
+        selection.preview_drawn(stored.with_line_opacity(0.1));
+        selection.sync_to(&document);
+        assert_eq!(selection.displayed_drawn(id, stored), **stored);
+
+        selection.preview_drawn(stored.with_line_opacity(0.1));
+        selection.select(None);
+        selection.select(Some(id));
+        assert_eq!(selection.displayed_drawn(id, stored), **stored);
     }
 
     fn document_with_grid() -> (Document, ObjectId) {

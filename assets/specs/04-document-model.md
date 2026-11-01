@@ -11,6 +11,7 @@
   from the calibration, not stored (`AREA-7`).
 - **grids**: an ordered list of grids, with all their display properties (see `GRID-1`,
   `GRID-2`).
+- **shapes**: an ordered list of drawn shapes, with their styles (see `DRAW-8`).
 - **origin**: a point inside the document that the view rotates about. It defaults to the
   image centre (`ORIGIN-1`).
 - **object id counter**: the next object id to allocate. Every object carries a stable

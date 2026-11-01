@@ -70,6 +70,9 @@ pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> Opti
 
                 ui.add_space(SECTION_SPACING);
                 for tool in ToolMode::ALL {
+                    if tool.starts_group() {
+                        ui.add_space(SECTION_SPACING);
+                    }
                     ui.selectable_value(mode, tool, icon_text(tool.icon()))
                         .on_hover_text(tool.name());
                 }
