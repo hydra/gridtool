@@ -21,7 +21,7 @@ of the document (`DOC-1`), so moving it is an action and can be undone and redon
 (`SHELL-5`):
 - **Icon:** a crosshair (`my_location`, `SHELL-6`).
 - **Tooltip:** "`Origin`".
-- **Options row:** none (`SHELL-2`).
+- **Tool controls:** none (`SHELL-2a`).
 
 **ORIGIN-3 — Setting the origin.** In Origin mode, a primary click (press and release
 without dragging) on the canvas:

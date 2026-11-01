@@ -3,10 +3,11 @@
 
 use eframe::egui;
 use egui_material_icons::MaterialIcon;
-use gridtool::action::Action;
+use gridtool::action::{Action, StyleTarget};
 use gridtool::document::Document;
 use gridtool::geometry::Point;
 use gridtool::measurement::{Endpoint, Measurement};
+use gridtool::style::{StyleEdit, Styled};
 
 use super::color_swatch;
 use super::commit_field::CommitField;
@@ -181,12 +182,15 @@ impl MeasurementsPanel {
             color_swatch::show(
                 ui,
                 egui::Id::unique(("measurement_color", index)),
-                measurement.color(),
+                measurement.line().color,
                 color_swatch::ROW_SWATCH_SIZE,
-                "Choose the colour of this measurement",
+                "Choose the line colour of this measurement",
             )
             .committed
-            .map(|color| Action::SetMeasurementColor { index, color }),
+            .map(|color| Action::SetStyle {
+                target: StyleTarget::Measurement(index),
+                edit: StyleEdit::LineColor(color),
+            }),
         );
 
         if ui

@@ -10,7 +10,7 @@ outline may be convex or concave.
 - its button comes directly after the Measure distance button (`SHELL-5`)
 - its icon is a polygon (`pentagon`, `SHELL-6`)
 - its tooltip is "`Measure area`"
-- it has no tool options row
+- its controls are in the tool controls row (`AREA-17`)
 
 Clicking its button cancels whatever the previous tool was part-way through, as any
 switch of tool mode does (`SHELL-10a`).
@@ -31,8 +31,8 @@ places the next point of a new outline:
 
 **AREA-4 — Finishing.** A primary click within 10 px of the **first** point finishes the
 outline, once at least **3** points are placed:
-1. One **Add area** action (`HIST-2`) is committed, with the placed points in order and,
-   as its unit, the calibration unit at that moment. The new area is cyan (`AREA-6`).
+1. One **Add area** action (`HIST-2`) is committed, with the placed points in order and the
+   unit, line and fill the tool's controls show (`AREA-17`).
 2. The placed points are cleared, ready for the next outline.
 
 Further rules:
@@ -55,7 +55,13 @@ Further rules:
   from each point to the next and from the last back to the first.
 - **unit**: the length unit whose square the area is reported in (`SCALE-2`), for example
   centimetres for cm². It is independent of the calibration unit and of other objects.
-- **colour**: an RGB colour; **cyan** (`#00FFFF`) for a new area.
+- **line style**, **line colour** and **line opacity**, as for a drawn shape (`DRAW-8`):
+  Thick, **cyan** (`#00FFFF`) and 100 % for a new area.
+- **fill style**, **fill colour**, **fill spacing**, **fill unit**, **fill angle** and
+  **fill opacity**, as for a drawn shape: Solid, cyan, 10 in the calibration's unit, 0 and
+  25 % for a new area.
+
+The tool's controls can give a new area other values (`AREA-17`).
 
 The document holds an ordered list of areas, separate from the list of point-to-point
 measurements (`MEAS-2`). New areas are added at the end, and the list is never sorted.
@@ -81,27 +87,30 @@ picked in the object tree while it is off screen (`OBJ-5`, `OBJ-5a`).
 ## Drawing
 
 **AREA-9 — Areas on the canvas.** Areas are drawn in **every** tool mode, above the grids
-and below the point-to-point measurements (`MEAS-8`), each in its colour:
-- **Fill.** The enclosed area, filled with the colour at 25 % opacity. Concave outlines
-  are split into triangles (ear clipping), so only the inside is filled. An outline that
-  crosses itself may be only partly filled.
-- **Outline.** A 2 px closed line through the points.
-- **Point markers.** A filled circle with a 5 px radius at each point.
-- **Label.** Drawn in a 14 px proportional font, centred at the area's centre
+and below the point-to-point measurements (`MEAS-8`):
+- **Fill.** In its fill style, colour and opacity, drawn as a closed shape's fill is
+  (`DRAW-11`). Concave outlines are split into triangles (ear clipping), so only the inside
+  is filled. An outline that crosses itself may be only partly filled. Fill lines are laid
+  out as in `DRAW-10`, so they need a calibrated scale.
+- **Outline.** A closed line through the points, in its line style, colour and opacity
+  (`DRAW-11`).
+- **Point markers.** A filled circle with a 5 px radius at each point, in its line colour.
+- **Label.** In its line colour, drawn in a 14 px proportional font, centred at the area's centre
   (`AREA-8`). The text is "`<n>: <area> <unit²>`", with the area formatted by `FMT-7` and
   the unit's area symbol (`cm²` or `m²`), or just "`<n>`" when the area is unavailable.
 
 The active area also shows its selection box (`OBJ-8`).
 
-**AREA-10 — The outline being placed.** In Measure area mode, in cyan:
-- each placed point as a point marker
-- a 2 px solid line through the placed points, in order
-- while the pointer is over the canvas, a 2 px dashed line (6 px dashes, 4 px gaps) from
+**AREA-10 — The outline being placed.** In Measure area mode, with the line and fill the
+tool's controls show (`AREA-17`):
+- each placed point as a point marker, in the line colour
+- a line through the placed points, in order, in the line style, colour and opacity
+- while the pointer is over the canvas, a 2 px dashed line in the line colour (6 px dashes, 4 px gaps) from
   the last point to the pointer
 - once the outline can be finished (`AREA-4`), a 9 px radius ring around the first point
 
 While the pointer is over the first point and the outline can be finished, the dashed
-line is replaced by a preview of the finished area: the closed outline, filled as in
+line is replaced by a preview of the finished area: the closed outline and its fill, as in
 `AREA-9`.
 
 ## Object tree
@@ -126,17 +135,17 @@ followed by one row per area in list order (`AREA-6`):
 | "`#`" | The 1-based area number |
 | "`Area`" | The calculated area (`AREA-7`), formatted by `FMT-7` and without a unit, or a weak "`—`" if unavailable. Hovering the "`—`" shows "`Scale: <reason>`" (`SCALE-18`) |
 | "`Units`" | A drop-down of area units, "`cm²`" and "`m²`", 50 px wide, with the tooltip "`Units of this area`" (`AREA-13`) |
-| "`Color`" | A colour swatch, 28 × 14 px, filled with the area's colour, with the tooltip "`Choose the colour of this area`" (`AREA-13`) |
+| "`Color`" | A colour swatch, 28 × 14 px, filled with the area's line colour, with the tooltip "`Choose the line colour of this area`" (`AREA-13`) |
 | (blank) | A delete button with a trash-can icon (`delete`, `SHELL-6`) at the inline icon size, and the tooltip "`Delete area`" (`AREA-14`) |
 
 While an area's points or resize handles are dragged (`OBJ-9`, `OBJ-15`), its row shows
 the live area.
 
-**AREA-13 — Changing an area's unit or colour.**
+**AREA-13 — Changing an area's unit or line colour in the table.**
 - Choosing a unit different from the row's current unit commits one **Set area unit**
   action for that row. The calibration unit and other objects are not affected.
 - The colour swatch works as for measurements (`MEAS-15`). When the picker closes on a
-  different colour, one **Set area colour** action is committed for that row.
+  different colour, one **Set style** action is committed for that row.
 
 **AREA-14 — Deleting.** Clicking the delete button commits one **Delete area** action for
 that row.
@@ -152,7 +161,28 @@ that row.
 - it can be duplicated and deleted with the object tool bar (`OBJ-12`, `OBJ-13`)
 - it is saved and loaded with the document (`FILE-1`, `FILE-6a`)
 
+## Tool controls
+
+**AREA-16 — Controls of the active area.** While the active object is an area, the tool
+controls row (`SHELL-2a`) shows, left to right, wrapping if the window is too narrow:
+1. "`Area <n>`" in strong text, then a separator.
+2. A drop-down of area units, with the tooltip "`Units of this area`". Picking a different one
+   commits one **Set area unit** action.
+3. A separator, then the line and fill controls of `DRAW-13`, which commit as `DRAW-14` says.
+
+**AREA-17 — Controls of the Measure area tool.** With no active object, in Measure area mode,
+the row shows:
+1. "`New area`" in strong text, then a separator.
+2. A drop-down of area units, with the tooltip "`Units of new areas`".
+3. A separator, then the same line and fill controls as `AREA-16`.
+
+They work as the Measure distance tool's do (`MEAS-17`). The area unit and the fill unit each
+follow the calibration unit until the user picks one here.
+
 ## Acceptance criteria
+
+- The next area gets the unit, line and fill chosen in the tool's controls.
+- A new area has a Thick cyan line and a Solid cyan fill at 25 %.
 
 - Calculation (`AREA-7`):
   - With sx = 0.5 and sy = 0.25 cm/px, the 40 × 80 px rectangle from (10, 20) is 400 cm²,
@@ -181,7 +211,7 @@ that row.
   - Duplicate and delete are found for an area by its id. Duplicating an area activates
     the copy; adding one does not activate it.
   - Labels: "`Add area with 3 points`", "`Move area 1 point 3 to (1.0, 2.0)`",
-    "`Resize area 2`", "`Set area 1 units to m`", "`Set area 1 color to #00FFFF`",
+    "`Resize area 2`", "`Set area 1 units to m`", "`Set area 1 line color to #00FFFF`",
     "`Delete area 3`", "`Duplicate area 1`".
 - Tool (`AREA-2` – `AREA-4`):
   - Three clicks, then a click 5 px from the first point, commit exactly one Add area

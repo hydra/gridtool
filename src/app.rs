@@ -5,13 +5,10 @@ use crate::file_picker::{RfdDocumentPicker, RfdImagePicker};
 use crate::open_document::OpenDocument;
 use crate::session::{Content, Replacement, Session};
 use crate::ui::canvas;
-use crate::ui::grid_bar::GridBar;
 use crate::ui::object_tree;
 use crate::ui::placeholder;
-use crate::ui::rotation_bar::RotationBar;
-use crate::ui::scale_bar::ScaleBar;
-use crate::ui::shape_bar::ShapeBar;
 use crate::ui::side_panel::SidePanel;
+use crate::ui::tool_controls::ToolControls;
 use crate::ui::tool_keys::{ToolKeyPresses, ToolKeys};
 use crate::ui::tool_mode::ToolMode;
 use crate::ui::top_panel::{self, ToolBarState, TopPanelAction};
@@ -19,10 +16,7 @@ use crate::ui::top_panel::{self, ToolBarState, TopPanelAction};
 pub struct GridToolApp {
     session: Session,
     mode: ToolMode,
-    rotation_bar: RotationBar,
-    scale_bar: ScaleBar,
-    grid_bar: GridBar,
-    shape_bar: ShapeBar,
+    tool_controls: ToolControls,
     side_panel: SidePanel,
     tool_keys: ToolKeys,
     /// The window title last sent to the window.
@@ -34,10 +28,7 @@ impl GridToolApp {
         Self {
             session,
             mode: ToolMode::default(),
-            rotation_bar: RotationBar::default(),
-            scale_bar: ScaleBar::default(),
-            grid_bar: GridBar::default(),
-            shape_bar: ShapeBar::default(),
+            tool_controls: ToolControls::default(),
             side_panel: SidePanel::default(),
             tool_keys: ToolKeys::default(),
             title: crate::APP_NAME.to_owned(),
@@ -69,53 +60,23 @@ impl GridToolApp {
         }
     }
 
-    /// Shows the options row for the active tool, returning any document action from it.
-    fn show_tool_options(&mut self, ui: &mut egui::Ui) -> Option<Action> {
-        let open = self.session.document_mut()?;
-        match self.mode {
-            ToolMode::Pan
-            | ToolMode::Measure
-            | ToolMode::Area
-            | ToolMode::Origin
-            | ToolMode::DrawLine => None,
-            ToolMode::Rotate => {
-                self.rotation_bar
-                    .show(ui, &mut open.view.viewport, open.editor.document());
-                None
-            }
-            ToolMode::Scale => {
-                self.scale_bar
-                    .show(ui, open.editor.document(), &mut open.view.scale_tool)
-            }
-            ToolMode::Grid => {
-                open.view.grid_tool.show_options(ui, open.editor.document());
-                None
-            }
-        }
+    /// Shows the row under the tool bar, returning any document action from it.
+    fn show_tool_controls(&mut self, ui: &mut egui::Ui, min_height: f32) -> Option<Action> {
+        let open = self
+            .session
+            .document_mut()
+            .map(|open| (&mut open.view, open.editor.document()));
+        self.tool_controls.show(ui, self.mode, min_height, open)
     }
 
-    /// Shows the properties row of the active object, if it has one (grids and drawn shapes
-    /// do).
-    fn show_object_properties(&mut self, ui: &mut egui::Ui) -> Option<Action> {
-        let open = self.session.document_mut()?;
-        let grid = self.grid_bar.show(
-            ui,
-            open.editor.document(),
-            &mut open.view.selection,
-            open.view.viewport.zoom(),
-        );
-        let shape = self
-            .shape_bar
-            .show(ui, open.editor.document(), &mut open.view.selection);
-        grid.or(shape)
-    }
-
-    /// Escape and switching tool mode both abandon what the tool was part-way through;
-    /// Backspace removes the last point placed; Enter finishes a line being drawn, returning
+    /// Escape abandons what the tool was part-way through, and switching tool mode leaves it
+    /// altogether. Backspace removes the last point placed; Enter finishes a line being drawn, returning
     /// the action that adds it.
     fn apply_tool_keys(&mut self, keys: ToolKeyPresses, mode_changed: bool) -> Option<Action> {
         let open = self.session.document_mut()?;
-        if keys.cancel || mode_changed {
+        if mode_changed {
+            open.view.leave_tool();
+        } else if keys.cancel {
             open.view.cancel_tool();
         }
         if keys.remove_last_point {
@@ -169,15 +130,15 @@ impl eframe::App for GridToolApp {
             None => self.tool_keys.read(&ctx),
         };
         let previous_mode = self.mode;
-        if let Some(action) = top_panel::show(ui, &mut self.mode, state) {
+        let tool_bar = top_panel::show(ui, &mut self.mode, state);
+        if let Some(action) = tool_bar.action {
             self.handle(&ctx, action);
         }
         let mut actions: Vec<Action> = self
             .apply_tool_keys(keys, self.mode != previous_mode)
             .into_iter()
             .collect();
-        actions.extend(self.show_tool_options(ui));
-        actions.extend(self.show_object_properties(ui));
+        actions.extend(self.show_tool_controls(ui, tool_bar.content_height));
 
         let tree = self.session.document_mut().map(|open| {
             let view = &mut open.view;
@@ -222,6 +183,13 @@ impl eframe::App for GridToolApp {
             for action in actions {
                 open.perform(action);
             }
+        }
+        // A different active object brings its tool, whose controls show from the next frame.
+        if let Some(open) = self.session.document_mut()
+            && let Some(mode) = open.view.tool_of_new_active_object(open.editor.document())
+        {
+            self.mode = mode;
+            ctx.request_repaint();
         }
 
         self.show_dialog(&ctx);

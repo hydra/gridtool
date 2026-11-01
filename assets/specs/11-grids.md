@@ -109,7 +109,8 @@ opacity applied as alpha (`round(opacity × 255)`). They are drawn in **every** 
 - its icon is a grid (`grid_on`, `SHELL-6`)
 - its tooltip is "`Grid`"
 
-**GRID-8 — Options row.** In Grid mode, with a document open, the tool options row shows:
+**GRID-8 — Tool controls.** In Grid mode, with a document open and no active grid, the tool
+controls row (`SHELL-2a`) shows:
 - **Mode buttons.** Two toggle buttons, "`Via scale`" (**default**) and
   "`Via measurement`", which select the *alignment mode*. Selecting a mode is not an
   action.
@@ -171,9 +172,9 @@ source is always drawn, in every tool mode:
 
 ## Grid properties row
 
-**GRID-14 — Placement.** While the active object is a grid and a document is open, a
-*grid properties row* is shown below the tool options row (if any), directly under the
-main tool bar area (`SHELL-2`). It wraps onto more lines if there is not enough width.
+**GRID-14 — Placement.** While the active object is a grid, the tool controls row
+(`SHELL-2a`) shows the *grid properties row*, instead of the Grid tool's own controls
+(`GRID-8`). It wraps onto more lines if there is not enough width.
 Groups are separated by vertical separators:
 
 1. "`Grid <n>`", in strong text.

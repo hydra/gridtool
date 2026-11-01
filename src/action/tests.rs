@@ -822,7 +822,7 @@ fn resizes_an_area_keeping_its_id_unit_and_colour() {
     assert_eq!(area.id(), id);
     assert_eq!(area.points(), points);
     assert_eq!(area.unit(), LengthUnit::Centimetre);
-    assert_eq!(area.color(), Rgb::CYAN);
+    assert_eq!(area.line().color, Rgb::CYAN);
 }
 
 #[test]
@@ -893,13 +893,13 @@ fn sets_area_and_measurement_units_and_colours() {
             index: 0,
             unit: LengthUnit::Metre,
         },
-        Action::SetAreaColor {
-            index: 0,
-            color: Rgb::new(9, 8, 7),
+        Action::SetStyle {
+            target: StyleTarget::Area(0),
+            edit: StyleEdit::LineColor(Rgb::new(9, 8, 7)),
         },
-        Action::SetMeasurementColor {
-            index: 0,
-            color: Rgb::new(1, 2, 3),
+        Action::SetStyle {
+            target: StyleTarget::Measurement(0),
+            edit: StyleEdit::LineColor(Rgb::new(1, 2, 3)),
         },
     ] {
         action.apply(&mut document).unwrap();
@@ -907,17 +907,17 @@ fn sets_area_and_measurement_units_and_colours() {
 
     let area = &document.areas()[0];
     assert_eq!(area.unit(), LengthUnit::Metre);
-    assert_eq!(area.color(), Rgb::new(9, 8, 7));
-    assert_eq!(document.measurements()[0].color(), Rgb::new(1, 2, 3));
+    assert_eq!(area.line().color, Rgb::new(9, 8, 7));
+    assert_eq!(document.measurements()[0].line().color, Rgb::new(1, 2, 3));
     assert_eq!(document.calibration().unit(), LengthUnit::Centimetre);
 }
 
 #[test]
 fn duplicates_and_deletes_areas() {
     let mut document = document_with_areas(2);
-    Action::SetAreaColor {
-        index: 0,
-        color: Rgb::new(1, 2, 3),
+    Action::SetStyle {
+        target: StyleTarget::Area(0),
+        edit: StyleEdit::LineColor(Rgb::new(1, 2, 3)),
     }
     .apply(&mut document)
     .unwrap();
@@ -1042,23 +1042,123 @@ fn describes_area_and_colour_actions() {
             "Set area 1 units to m",
         ),
         (
-            Action::SetAreaColor {
-                index: 0,
-                color: Rgb::CYAN,
+            Action::SetStyle {
+                target: StyleTarget::Area(0),
+                edit: StyleEdit::LineColor(Rgb::CYAN),
             },
-            "Set area 1 color to #00FFFF",
+            "Set area 1 line color to #00FFFF",
         ),
         (Action::DeleteArea { index: 2 }, "Delete area 3"),
         (Action::DuplicateArea { index: 0 }, "Duplicate area 1"),
         (
-            Action::SetMeasurementColor {
-                index: 1,
-                color: Rgb::new(255, 0, 0),
+            Action::SetStyle {
+                target: StyleTarget::Measurement(1),
+                edit: StyleEdit::LineColor(Rgb::new(255, 0, 0)),
             },
-            "Set measurement 2 color to #FF0000",
+            "Set measurement 2 line color to #FF0000",
         ),
     ];
     for (action, label) in labels {
         assert_eq!(action.to_string(), label);
     }
+}
+
+fn document_with_area_and_measurement() -> Document {
+    let mut document = document_with_areas(1);
+    Action::AddMeasurement(measurement(1.0, 2.0))
+        .apply(&mut document)
+        .unwrap();
+    document
+}
+
+#[test]
+fn styles_a_measurement_and_an_area() {
+    use crate::style::{FillStyle, LineStyle};
+
+    let mut document = document_with_area_and_measurement();
+    let line_edit = StyleEdit::LineStyle(LineStyle::Dashed);
+    for action in [
+        Action::SetStyle {
+            target: StyleTarget::Measurement(0),
+            edit: line_edit,
+        },
+        Action::SetStyle {
+            target: StyleTarget::Area(0),
+            edit: line_edit,
+        },
+        Action::SetStyle {
+            target: StyleTarget::Area(0),
+            edit: StyleEdit::FillStyle(FillStyle::Crosshatch),
+        },
+    ] {
+        action.apply(&mut document).unwrap();
+    }
+
+    assert_eq!(document.measurements()[0].line().style, LineStyle::Dashed);
+    assert_eq!(document.areas()[0].line().style, LineStyle::Dashed);
+    assert_eq!(
+        document.areas()[0].stored_fill().style,
+        FillStyle::Crosshatch
+    );
+}
+
+#[test]
+fn rejects_invalid_style_edits_of_measurements_and_areas() {
+    let mut document = document_with_area_and_measurement();
+    let before = document.clone();
+    let cases = [
+        (
+            StyleTarget::Measurement(0),
+            StyleEdit::FillOpacity(0.5),
+            ActionError::HasNoFill(StyleTarget::Measurement(0)),
+        ),
+        (
+            StyleTarget::Measurement(0),
+            StyleEdit::LineOpacity(1.5),
+            ActionError::InvalidOpacity(1.5),
+        ),
+        (
+            StyleTarget::Area(0),
+            StyleEdit::FillSpacing(0.0),
+            ActionError::InvalidFillSpacing(0.0),
+        ),
+        (
+            StyleTarget::Area(0),
+            StyleEdit::FillAngle(180.0),
+            ActionError::InvalidFillAngle(180.0),
+        ),
+        (
+            StyleTarget::Area(9),
+            StyleEdit::LineOpacity(0.5),
+            ActionError::AreaIndexOutOfRange { index: 9, count: 1 },
+        ),
+        (
+            StyleTarget::Measurement(9),
+            StyleEdit::LineOpacity(0.5),
+            ActionError::MeasurementIndexOutOfRange { index: 9, count: 1 },
+        ),
+    ];
+    for (target, edit, error) in cases {
+        let action = Action::SetStyle { target, edit };
+        assert_eq!(action.apply(&mut document), Err(error), "{action:?}");
+    }
+    assert_eq!(document, before);
+}
+
+#[test]
+fn rejects_new_objects_with_invalid_styles() {
+    let mut document = document_with_areas(1);
+    let mut measurement = measurement(1.0, 2.0);
+    measurement.line_mut().opacity = 1.5;
+    assert_eq!(
+        Action::AddMeasurement(measurement).apply(&mut document),
+        Err(ActionError::InvalidOpacity(1.5))
+    );
+
+    let mut area = (*document.areas()[0]).clone();
+    area.fill_mut().unwrap().spacing = -1.0;
+    assert_eq!(
+        Action::AddArea(area).apply(&mut document),
+        Err(ActionError::InvalidFillSpacing(-1.0))
+    );
 }

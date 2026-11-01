@@ -1,4 +1,5 @@
 use egui_material_icons::MaterialIcon;
+use gridtool::object::ObjectKind;
 
 use super::icons;
 
@@ -36,6 +37,17 @@ impl ToolMode {
         ToolMode::Origin,
         ToolMode::DrawLine,
     ];
+
+    /// The tool that adds objects of `kind`, which becomes the active tool along with one
+    /// of them.
+    pub fn for_object(kind: ObjectKind) -> ToolMode {
+        match kind {
+            ObjectKind::Measurement => ToolMode::Measure,
+            ObjectKind::Area => ToolMode::Area,
+            ObjectKind::Grid => ToolMode::Grid,
+            ObjectKind::Shape => ToolMode::DrawLine,
+        }
+    }
 
     /// Whether the mode starts a new group of tool bar buttons: the drawing tools.
     pub fn starts_group(self) -> bool {
@@ -105,6 +117,17 @@ mod tests {
             .filter(|mode| mode.starts_group())
             .collect();
         assert_eq!(group_starts, [ToolMode::DrawLine]);
+    }
+
+    #[test]
+    fn each_kind_of_object_belongs_to_the_tool_that_adds_it() {
+        assert_eq!(
+            ToolMode::for_object(ObjectKind::Measurement),
+            ToolMode::Measure
+        );
+        assert_eq!(ToolMode::for_object(ObjectKind::Area), ToolMode::Area);
+        assert_eq!(ToolMode::for_object(ObjectKind::Grid), ToolMode::Grid);
+        assert_eq!(ToolMode::for_object(ObjectKind::Shape), ToolMode::DrawLine);
     }
 
     #[test]

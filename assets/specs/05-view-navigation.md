@@ -122,7 +122,7 @@ is off screen (`OBJ-5a`).
 
 ## Rotate view mode
 
-**VIEW-12 — Options row.** The tool options row contains:
+**VIEW-12 — Tool controls.** In Rotate mode, the tool controls row (`SHELL-2a`) contains:
 - the label "`View rotation (°):`"
 - a single-line text field 80 px wide, which shows and edits the view rotation
 

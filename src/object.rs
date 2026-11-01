@@ -25,6 +25,15 @@ impl fmt::Display for ObjectId {
     }
 }
 
+/// What sort of thing an object is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ObjectKind {
+    Measurement,
+    Area,
+    Grid,
+    Shape,
+}
+
 /// An object stored in a document, paired with its [`ObjectId`]. Dereferences to the
 /// object itself.
 #[derive(Debug, Clone, PartialEq)]

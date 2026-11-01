@@ -83,19 +83,15 @@ impl GridTool {
         }
     }
 
-    /// Shows the tool options row: the alignment mode buttons and a hint.
+    /// Shows the tool's controls: the alignment mode buttons and a hint.
     pub fn show_options(&mut self, ui: &mut egui::Ui, document: &Document) {
-        egui::Panel::top("grid_tool_bar").show(ui, |ui| {
-            ui.horizontal(|ui| {
-                for via in GridVia::ALL {
-                    if ui.selectable_label(self.via == via, via.name()).clicked() {
-                        self.set_via(via);
-                    }
-                }
-                ui.separator();
-                ui.weak(hint(self.via, document));
-            });
-        });
+        for via in GridVia::ALL {
+            if ui.selectable_label(self.via == via, via.name()).clicked() {
+                self.set_via(via);
+            }
+        }
+        ui.separator();
+        ui.weak(hint(self.via, document));
     }
 }
 

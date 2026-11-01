@@ -1,9 +1,11 @@
-//! Drawing the document's drawn shapes: their fill, then their line in its style.
+//! Drawing lines and fills in their styles, for every kind of object that has them, and
+//! the document's drawn shapes: their fill, then their line.
 
 use eframe::egui::{self, Pos2, Rect, Shape, Stroke, Vec2};
 use gridtool::calibration::Scale;
 use gridtool::document::Document;
-use gridtool::shape::{DrawnShape, FillStyle, LineStyle};
+use gridtool::geometry::Point;
+use gridtool::style::{FillAppearance, FillStyle, LineAppearance, LineStyle, Styled};
 
 use super::canvas::{DASH_GAP, DASH_LENGTH, fill_outline, paint_point_handle, to_screen};
 use super::color::{to_color32, with_opacity};
@@ -29,32 +31,34 @@ pub fn paint_shapes(
     for stored in document.shapes() {
         let drawn = selection.displayed_drawn(stored.id(), stored);
         let on_screen = to_screen(transform, drawn.points());
-        paint_fill(painter, transform, scale, &drawn, &on_screen);
-        paint_line(painter, &drawn, &on_screen);
+        if let Some(fill) = drawn.fill() {
+            paint_fill(painter, transform, scale, fill, drawn.points(), &on_screen);
+        }
+        paint_line(painter, drawn.line(), &on_screen, drawn.is_closed());
         if selection.active() == Some(stored.id()) {
             for &position in &on_screen {
-                paint_point_handle(painter, position, to_color32(drawn.line_color()));
+                paint_point_handle(painter, position, to_color32(drawn.line().color));
             }
         }
     }
 }
 
-fn paint_fill(
+/// Fills the closed outline through `points` (image coordinates, drawn at `on_screen`).
+/// Fill lines are a real-world distance apart, so they are drawn only if there is a `scale`.
+pub fn paint_fill(
     painter: &egui::Painter,
     transform: DocumentTransform,
     scale: Option<Scale>,
-    drawn: &DrawnShape,
+    fill: FillAppearance,
+    points: &[Point],
     on_screen: &[Pos2],
 ) {
-    if !drawn.is_closed() {
+    let color = with_opacity(fill.color, fill.opacity);
+    if fill.style == FillStyle::Solid {
+        fill_outline(painter, points, on_screen, color);
         return;
     }
-    let color = with_opacity(drawn.fill_color(), drawn.fill_opacity());
-    if drawn.fill_style() == FillStyle::Solid {
-        fill_outline(painter, drawn.points(), on_screen, color);
-        return;
-    }
-    let Some(scale) = scale else {
+    let Some(scale) = scale.filter(|_| fill.style.has_lines()) else {
         return;
     };
     // When zoomed out, enough lines are skipped to keep them apart on screen, rather than
@@ -62,7 +66,7 @@ fn paint_fill(
     let min_gap = f64::from(MIN_SCREEN_SPACING) / f64::from(transform.zoom());
     let region = transform.image_bounds_of(painter.clip_rect());
     let stroke = Stroke::new(FILL_LINE_WIDTH, color);
-    for (start, end) in drawn.fill_lines(scale, min_gap, region) {
+    for (start, end) in fill.lines(points, scale, min_gap, region) {
         painter.line_segment(
             [
                 transform.image_to_screen(start),
@@ -73,10 +77,10 @@ fn paint_fill(
     }
 }
 
-fn paint_line(painter: &egui::Painter, drawn: &DrawnShape, on_screen: &[Pos2]) {
-    let color = with_opacity(drawn.line_color(), drawn.line_opacity());
-    let closed = drawn.is_closed();
-    match drawn.line_style() {
+/// Draws the line through `on_screen`, back to its start if `closed`.
+pub fn paint_line(painter: &egui::Painter, line: LineAppearance, on_screen: &[Pos2], closed: bool) {
+    let color = with_opacity(line.color, line.opacity);
+    match line.style {
         LineStyle::Thin => paint_solid(painter, on_screen, closed, THIN_LINE_WIDTH, color),
         LineStyle::Thick => paint_solid(painter, on_screen, closed, THICK_LINE_WIDTH, color),
         LineStyle::Dashed => {

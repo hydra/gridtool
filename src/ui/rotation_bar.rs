@@ -14,20 +14,13 @@ pub struct RotationBar {
 }
 
 impl RotationBar {
-    /// Shows the row. Typed rotations pivot about the document origin.
+    /// Shows the controls. Typed rotations pivot about the document origin.
     pub fn show(&mut self, ui: &mut egui::Ui, viewport: &mut Viewport, document: &Document) {
-        egui::Panel::top("rotation_bar").show(ui, |ui| {
-            ui.horizontal(|ui| {
-                let label = ui.label("View rotation (°):");
-                let field = ui
-                    .add(
-                        egui::TextEdit::singleline(&mut self.angle_text)
-                            .desired_width(ANGLE_FIELD_WIDTH),
-                    )
-                    .labelled_by(label.id);
-                self.sync(&field, viewport, document);
-            });
-        });
+        let label = ui.label("View rotation (°):");
+        let field = ui
+            .add(egui::TextEdit::singleline(&mut self.angle_text).desired_width(ANGLE_FIELD_WIDTH))
+            .labelled_by(label.id);
+        self.sync(&field, viewport, document);
     }
 
     /// While the user is typing, applies every valid angle they enter; otherwise keeps

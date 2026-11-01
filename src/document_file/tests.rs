@@ -1,11 +1,12 @@
 use super::*;
-use crate::action::Action;
+use crate::action::{Action, StyleTarget};
 use crate::area::Area;
 use crate::calibration::{CalibrationMethod, Line, ScalePoints};
 use crate::color::Rgb;
 use crate::grid::{CellDimension, CellShape, Grid, GridSource};
 use crate::measurement::Measurement;
-use crate::shape::{DrawnShape, FillStyle, LineStyle};
+use crate::shape::DrawnShape;
+use crate::style::{FillStyle, LineStyle, StyleEdit, Styled};
 use crate::units::LengthUnit;
 
 /// A document using every feature: calibration, measurements with a gap in their ids and
@@ -50,9 +51,9 @@ fn rich_document() -> Document {
             index: 2,
             unit: LengthUnit::Metre,
         },
-        Action::SetMeasurementColor {
-            index: 0,
-            color: Rgb::new(200, 100, 0),
+        Action::SetStyle {
+            target: StyleTarget::Measurement(0),
+            edit: StyleEdit::LineColor(Rgb::new(200, 100, 0)),
         },
         Action::AddArea(
             Area::new(
@@ -71,9 +72,41 @@ fn rich_document() -> Document {
             index: 1,
             unit: LengthUnit::Metre,
         },
-        Action::SetAreaColor {
-            index: 1,
-            color: Rgb::new(1, 2, 3),
+        Action::SetStyle {
+            target: StyleTarget::Area(1),
+            edit: StyleEdit::LineColor(Rgb::new(1, 2, 3)),
+        },
+        Action::SetStyle {
+            target: StyleTarget::Area(1),
+            edit: StyleEdit::LineStyle(LineStyle::Thin),
+        },
+        Action::SetStyle {
+            target: StyleTarget::Area(1),
+            edit: StyleEdit::FillStyle(FillStyle::Lines),
+        },
+        Action::SetStyle {
+            target: StyleTarget::Area(1),
+            edit: StyleEdit::FillColor(Rgb::new(7, 8, 9)),
+        },
+        Action::SetStyle {
+            target: StyleTarget::Area(1),
+            edit: StyleEdit::FillSpacing(2.5),
+        },
+        Action::SetStyle {
+            target: StyleTarget::Area(1),
+            edit: StyleEdit::FillAngle(45.0),
+        },
+        Action::SetStyle {
+            target: StyleTarget::Area(1),
+            edit: StyleEdit::FillOpacity(0.75),
+        },
+        Action::SetStyle {
+            target: StyleTarget::Measurement(0),
+            edit: StyleEdit::LineStyle(LineStyle::Dashed),
+        },
+        Action::SetStyle {
+            target: StyleTarget::Measurement(0),
+            edit: StyleEdit::LineOpacity(0.5),
         },
         Action::DeleteArea { index: 0 },
         Action::AddGrid(Grid::new(GridSource::ScaleLine(Line::B), LengthUnit::Metre)),
@@ -102,17 +135,17 @@ fn rich_document() -> Document {
             )
             .unwrap(),
         ),
-        Action::SetShapeLineStyle {
-            index: 0,
-            style: LineStyle::Dashed,
+        Action::SetStyle {
+            target: StyleTarget::Shape(0),
+            edit: StyleEdit::LineStyle(LineStyle::Dashed),
         },
-        Action::SetShapeLineColor {
-            index: 0,
-            color: Rgb::new(10, 20, 30),
+        Action::SetStyle {
+            target: StyleTarget::Shape(0),
+            edit: StyleEdit::LineColor(Rgb::new(10, 20, 30)),
         },
-        Action::SetShapeLineOpacity {
-            index: 0,
-            opacity: 0.75,
+        Action::SetStyle {
+            target: StyleTarget::Shape(0),
+            edit: StyleEdit::LineOpacity(0.75),
         },
         Action::AddShape(
             DrawnShape::closed(
@@ -125,33 +158,33 @@ fn rich_document() -> Document {
             )
             .unwrap(),
         ),
-        Action::SetShapeLineStyle {
-            index: 1,
-            style: LineStyle::Thick,
+        Action::SetStyle {
+            target: StyleTarget::Shape(1),
+            edit: StyleEdit::LineStyle(LineStyle::Thick),
         },
-        Action::SetShapeFillStyle {
-            index: 1,
-            style: FillStyle::Crosshatch,
+        Action::SetStyle {
+            target: StyleTarget::Shape(1),
+            edit: StyleEdit::FillStyle(FillStyle::Crosshatch),
         },
-        Action::SetShapeFillColor {
-            index: 1,
-            color: Rgb::new(40, 50, 60),
+        Action::SetStyle {
+            target: StyleTarget::Shape(1),
+            edit: StyleEdit::FillColor(Rgb::new(40, 50, 60)),
         },
-        Action::SetShapeFillSpacing {
-            index: 1,
-            spacing: 100.0,
+        Action::SetStyle {
+            target: StyleTarget::Shape(1),
+            edit: StyleEdit::FillSpacing(100.0),
         },
-        Action::SetShapeFillUnit {
-            index: 1,
-            unit: LengthUnit::Centimetre,
+        Action::SetStyle {
+            target: StyleTarget::Shape(1),
+            edit: StyleEdit::FillUnit(LengthUnit::Centimetre),
         },
-        Action::SetShapeFillAngle {
-            index: 1,
-            degrees: 22.5,
+        Action::SetStyle {
+            target: StyleTarget::Shape(1),
+            edit: StyleEdit::FillAngle(22.5),
         },
-        Action::SetShapeFillOpacity {
-            index: 1,
-            opacity: 0.125,
+        Action::SetStyle {
+            target: StyleTarget::Shape(1),
+            edit: StyleEdit::FillOpacity(0.125),
         },
     ];
     for action in actions {
@@ -205,7 +238,7 @@ fn files_are_tagged_with_their_format_version() {
         .to_ron()
         .unwrap();
 
-    assert!(text.starts_with("V3("), "{text}");
+    assert!(text.starts_with("V4("), "{text}");
 }
 
 /// A version 1 file exactly as the first release writes it. It must always load.
@@ -284,7 +317,7 @@ fn version_1_files_get_default_colours_and_no_areas() {
         .to_document()
         .unwrap();
 
-    assert_eq!(document.measurements()[0].color(), Rgb::BLUE);
+    assert_eq!(document.measurements()[0].line().color, Rgb::BLUE);
     assert!(document.areas().is_empty());
     assert!(document.shapes().is_empty());
 }
@@ -347,17 +380,17 @@ fn version_3_files_load() {
     };
     assert!(!line.is_closed());
     assert_eq!(line.points()[1], Point::new(30.0, 2.0));
-    assert_eq!(line.line_style(), LineStyle::Dashed);
-    assert_eq!(line.line_color(), Rgb::new(1, 2, 3));
-    assert_eq!(line.line_opacity(), 0.75);
+    assert_eq!(line.line().style, LineStyle::Dashed);
+    assert_eq!(line.line().color, Rgb::new(1, 2, 3));
+    assert_eq!(line.line().opacity, 0.75);
     assert!(closed.is_closed());
-    assert_eq!(closed.line_style(), LineStyle::Thick);
-    assert_eq!(closed.fill_style(), FillStyle::Crosshatch);
-    assert_eq!(closed.fill_color(), Rgb::new(4, 5, 6));
-    assert_eq!(closed.fill_spacing(), 2.5);
-    assert_eq!(closed.fill_unit(), LengthUnit::Metre);
-    assert_eq!(closed.fill_angle(), 45.0);
-    assert_eq!(closed.fill_opacity(), 0.25);
+    assert_eq!(closed.line().style, LineStyle::Thick);
+    assert_eq!(closed.stored_fill().style, FillStyle::Crosshatch);
+    assert_eq!(closed.stored_fill().color, Rgb::new(4, 5, 6));
+    assert_eq!(closed.stored_fill().spacing, 2.5);
+    assert_eq!(closed.stored_fill().unit, LengthUnit::Metre);
+    assert_eq!(closed.stored_fill().angle, 45.0);
+    assert_eq!(closed.stored_fill().opacity, 0.25);
     assert_eq!(document.next_object_id(), 3);
 }
 
@@ -374,10 +407,10 @@ fn version_2_files_load_without_shapes() {
 #[test]
 fn invalid_shapes_are_rejected() {
     let valid = || match DocumentFile::from_ron(VERSION_3_SAMPLE).unwrap() {
-        DocumentFile::V3(file) => file,
+        DocumentFile::V3(file) => DocumentV4::from(file),
         _ => unreachable!("the sample is version 3"),
     };
-    type Corruption = fn(&mut DocumentV3);
+    type Corruption = fn(&mut DocumentV4);
     let cases: [(Corruption, InvalidDocument); 9] = [
         (
             |f| f.shapes[0].points.truncate(1),
@@ -429,23 +462,151 @@ fn version_2_files_load() {
         .unwrap();
 
     let measurement = &document.measurements()[0];
-    assert_eq!(measurement.color(), Rgb::new(255, 0, 0));
+    assert_eq!(measurement.line().color, Rgb::new(255, 0, 0));
     assert_eq!(measurement.unit(), LengthUnit::Metre);
     let area = &document.areas()[0];
     assert_eq!(area.points().len(), 3);
     assert_eq!(area.points()[1], Point::new(50.0, 10.0));
     assert_eq!(area.unit(), LengthUnit::Metre);
-    assert_eq!(area.color(), Rgb::CYAN);
+    assert_eq!(area.line().color, Rgb::CYAN);
     assert_eq!(document.next_object_id(), 3);
+}
+
+#[test]
+fn earlier_files_keep_how_their_measurements_and_areas_looked() {
+    let document = DocumentFile::from_ron(VERSION_2_SAMPLE)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    let line = document.measurements()[0].line();
+    assert_eq!(line.style, LineStyle::Thick);
+    assert_eq!(line.color, Rgb::new(255, 0, 0));
+    assert_eq!(line.opacity, 1.0);
+
+    let area = &document.areas()[0];
+    assert_eq!(area.line().style, LineStyle::Thick);
+    assert_eq!(area.line().color, Rgb::CYAN);
+    assert_eq!(area.line().opacity, 1.0);
+    let fill = area.stored_fill();
+    assert_eq!(fill.style, FillStyle::Solid);
+    assert_eq!(fill.color, Rgb::CYAN);
+    assert_eq!(fill.opacity, 0.25);
+    assert_eq!(fill.spacing, 10.0);
+    assert_eq!(fill.unit, area.unit());
+    assert_eq!(fill.angle, 0.0);
+}
+
+/// A version 4 file exactly as the release that added measurement and area styles writes it.
+/// It must always load.
+const VERSION_4_SAMPLE: &str = r#"V4((
+    image: "photo.png",
+    width: 200,
+    height: 100,
+    origin: (x: 100.0, y: 50.0),
+    calibration: (
+        points: None,
+        distance_a: None,
+        distance_b: None,
+        unit: Centimetre,
+    ),
+    measurements: [(
+        id: 1,
+        start: (x: 10.0, y: 10.0),
+        end: (x: 50.0, y: 10.0),
+        unit: Metre,
+        line_style: Dashed,
+        line_color: (r: 1, g: 2, b: 3),
+        line_opacity: 0.75,
+    )],
+    areas: [(
+        id: 2,
+        points: [(x: 10.0, y: 10.0), (x: 50.0, y: 10.0), (x: 30.0, y: 40.0)],
+        unit: Metre,
+        line_style: Thin,
+        line_color: (r: 4, g: 5, b: 6),
+        line_opacity: 0.5,
+        fill_style: Crosshatch,
+        fill_color: (r: 7, g: 8, b: 9),
+        fill_spacing: 2.5,
+        fill_unit: Centimetre,
+        fill_angle: 45.0,
+        fill_opacity: 0.25,
+    )],
+    grids: [],
+    shapes: [],
+    next_object_id: 3,
+))"#;
+
+#[test]
+fn version_4_files_load() {
+    let document = DocumentFile::from_ron(VERSION_4_SAMPLE)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    let line = document.measurements()[0].line();
+    assert_eq!(line.style, LineStyle::Dashed);
+    assert_eq!(line.color, Rgb::new(1, 2, 3));
+    assert_eq!(line.opacity, 0.75);
+
+    let area = &document.areas()[0];
+    assert_eq!(area.line().style, LineStyle::Thin);
+    assert_eq!(area.line().color, Rgb::new(4, 5, 6));
+    assert_eq!(area.line().opacity, 0.5);
+    let fill = area.stored_fill();
+    assert_eq!(fill.style, FillStyle::Crosshatch);
+    assert_eq!(fill.color, Rgb::new(7, 8, 9));
+    assert_eq!(fill.spacing, 2.5);
+    assert_eq!(fill.unit, LengthUnit::Centimetre);
+    assert_eq!(fill.angle, 45.0);
+    assert_eq!(fill.opacity, 0.25);
+}
+
+#[test]
+fn invalid_measurement_and_area_styles_are_rejected() {
+    let valid = || match DocumentFile::from_ron(VERSION_4_SAMPLE).unwrap() {
+        DocumentFile::V4(file) => file,
+        _ => unreachable!("the sample is version 4"),
+    };
+    type Corruption = fn(&mut DocumentV4);
+    let cases: [(Corruption, InvalidDocument); 5] = [
+        (
+            |f| f.measurements[0].line_opacity = 1.5,
+            InvalidDocument::BadOpacity(1.5),
+        ),
+        (
+            |f| f.areas[0].line_opacity = -0.5,
+            InvalidDocument::BadOpacity(-0.5),
+        ),
+        (
+            |f| f.areas[0].fill_opacity = 1.5,
+            InvalidDocument::BadOpacity(1.5),
+        ),
+        (
+            |f| f.areas[0].fill_spacing = 0.0,
+            InvalidDocument::NotPositive(0.0),
+        ),
+        (
+            |f| f.areas[0].fill_angle = 180.0,
+            InvalidDocument::BadFillAngle(180.0),
+        ),
+    ];
+
+    for (corrupt, expected) in cases {
+        let mut file = valid();
+        corrupt(&mut file);
+        assert_eq!(file.to_document(), Err(expected));
+    }
 }
 
 #[test]
 fn invalid_contents_are_rejected() {
     let valid = || match DocumentFile::from_ron(VERSION_1_SAMPLE).unwrap() {
-        DocumentFile::V1(file) => DocumentV3::from(DocumentV2::from(file)),
+        DocumentFile::V1(file) => DocumentV4::from(DocumentV3::from(DocumentV2::from(file))),
         _ => unreachable!("the sample is version 1"),
     };
-    type Corruption = fn(&mut DocumentV3);
+    type Corruption = fn(&mut DocumentV4);
     let cases: [(Corruption, InvalidDocument); 7] = [
         (|f| f.width = 0, InvalidDocument::EmptySize),
         (
@@ -612,7 +773,7 @@ fn loading_reports_what_went_wrong() {
 #[test]
 fn invalid_areas_are_rejected() {
     let valid = || match DocumentFile::from_ron(VERSION_2_SAMPLE).unwrap() {
-        DocumentFile::V2(file) => DocumentV3::from(file),
+        DocumentFile::V2(file) => DocumentV4::from(DocumentV3::from(file)),
         _ => unreachable!("the sample is version 2"),
     };
 

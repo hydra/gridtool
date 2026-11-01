@@ -4,7 +4,7 @@ use crate::geometry::{Bounds, Point};
 use crate::grid::Grid;
 use crate::imaging::DecodedImage;
 use crate::measurement::Measurement;
-use crate::object::{Identified, ObjectId};
+use crate::object::{Identified, ObjectId, ObjectKind};
 use crate::shape::DrawnShape;
 
 /// The image-space shape an object is drawn as, e.g. to tell whether it is in view.
@@ -139,6 +139,21 @@ impl Document {
     }
 
     /// Drawn shapes, in the order they were added.
+    /// What sort of object `id` is, or `None` if there is no such object.
+    pub fn object_kind(&self, id: ObjectId) -> Option<ObjectKind> {
+        if self.measurement_index(id).is_some() {
+            Some(ObjectKind::Measurement)
+        } else if self.area_index(id).is_some() {
+            Some(ObjectKind::Area)
+        } else if self.grid_index(id).is_some() {
+            Some(ObjectKind::Grid)
+        } else if self.shape_index(id).is_some() {
+            Some(ObjectKind::Shape)
+        } else {
+            None
+        }
+    }
+
     pub fn shapes(&self) -> &[Identified<DrawnShape>] {
         &self.shapes
     }

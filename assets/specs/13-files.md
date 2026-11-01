@@ -9,9 +9,10 @@ completely, so loading it re-creates the exact document state (`DOC-1`).
 - the image reference (`FILE-3`) and the image size in pixels
 - the origin (`ORIGIN-1`)
 - the calibration (`SCALE-20`): the point set and method, both distances and the unit
-- every measurement (`MEAS-1`), in list order, with its object id, endpoints, unit and
-  colour
-- every area (`AREA-6`), in list order, with its object id, points, unit and colour
+- every measurement (`MEAS-1`), in list order, with its object id, endpoints, unit, and
+  line style, colour and opacity
+- every area (`AREA-6`), in list order, with its object id, points, unit, line style, colour
+  and opacity, and fill style, colour, spacing, unit, angle and opacity
 - every grid (`GRID-1`), in list order, with its object id, alignment source (a scale
   line, or a measurement by object id, which may refer to a deleted measurement), shape,
   sizes A and B (both, even for square cells), unit, colour and opacity
@@ -41,7 +42,7 @@ failed save never leaves a half-written document.
 **FILE-5 — Versioned description, separate from runtime state.** The file holds a
 *description* of the document in a versioned format. It is not a dump of the runtime
 data structures:
-- **Tagged.** The top level names its version, for example `V3(( … ))`.
+- **Tagged.** The top level names its version, for example `V4(( … ))`.
 - **Converted on save.** Saving converts the runtime document to the current version's
   description.
 - **Converted on load.** Loading converts a description of **any** supported version back
@@ -72,7 +73,7 @@ data structures:
 Every other field is exactly as in version 1. A version 1 file is migrated to version 2
 by giving every measurement the default colour, blue (`MEAS-1`), and adding no areas.
 
-**FILE-6b — Version 3 (current).** Version 3 is version 2 with this change:
+**FILE-6b — Version 3.** (no longer written; still loaded) Version 3 is version 2 with this change:
 - `shapes`, after `grids`: a list of `(id, points: [(x, y), …], closed, line_style,
   line_color: (r, g, b), line_opacity, fill_style, fill_color: (r, g, b), fill_spacing,
   fill_unit, fill_angle, fill_opacity)`
@@ -84,6 +85,19 @@ by giving every measurement the default colour, blue (`MEAS-1`), and adding no a
 
 Every other field is exactly as in version 2. A version 2 file is migrated to version 3 by
 adding no shapes.
+
+**FILE-6c — Version 4 (current).** Version 4 is version 3 with these changes:
+- `measurements`: each is `(id, start, end, unit, line_style, line_color: (r, g, b),
+  line_opacity)`, in place of `color`
+- `areas`: each is `(id, points, unit, line_style, line_color: (r, g, b), line_opacity,
+  fill_style, fill_color: (r, g, b), fill_spacing, fill_unit, fill_angle, fill_opacity)`, in
+  place of `color`
+
+The new values are written as for shapes (`FILE-6b`). Every other field is exactly as in
+version 3. A version 3 file is migrated to version 4 keeping how each object looked:
+- a measurement gets a Thick line in its colour, at 100 % opacity
+- an area gets a Thick line in its colour, at 100 % opacity, and a Solid fill in its colour,
+  at 25 % opacity, with spacing 10 in the area's unit and angle 0
 
 **FILE-7 — Validation on load.** A loaded description is checked as strictly as actions
 check their inputs (`HIST-2`), so a hand-edited or damaged file cannot produce an invalid
@@ -221,11 +235,15 @@ and shows the dialogs.
   colour and an area's points, unit and colour. It has no shapes.
 - A literal version 3 sample loads with the expected values, including an open and a closed
   shape's points and styles.
+- A literal version 4 sample loads with the expected values, including a measurement's and an
+  area's styles.
+- Migrated files keep how their objects looked (`FILE-6c`).
 - Each `FILE-7` failure is rejected with its reason. This includes an area with 2 points, an area point outside
   the document, an area reusing a measurement's id, an open shape with 1 point, a closed
   shape with 2 points, a shape point outside the document, an open shape with a fill, a
-  shape opacity of 1.5, a fill spacing of 0, a fill angle of 180 or -1, and a shape reusing
-  another shape's id.
+  shape opacity of 1.5, a fill spacing of 0, a fill angle of 180 or -1, a shape reusing
+  another shape's id, and a measurement's or area's opacity, fill spacing or fill angle out of
+  range.
 - Image references:
   - `a.png` beside the document is stored as `a.png`
   - an image in `images/` below it is stored as `images/b.png`

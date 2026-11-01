@@ -18,9 +18,9 @@ Points are numbered from 1 in the UI. The default method is **3-point**.
 available units are **centimetres** (symbol `cm`, the default) and **metres** (symbol
 `m`).
 
-## Options row (Scale mode)
+## Tool controls (Scale mode)
 
-**SCALE-3.** In Scale mode the tool options row shows these groups, left to right. The
+**SCALE-3.** In Scale mode the tool controls row (`SHELL-2a`) shows these groups, left to right. The
 row wraps onto more lines if there is not enough width. Groups are separated by vertical
 separators.
 

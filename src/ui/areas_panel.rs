@@ -2,9 +2,10 @@
 //! total area, per-area units and colours, and delete buttons.
 
 use eframe::egui;
-use gridtool::action::Action;
+use gridtool::action::{Action, StyleTarget};
 use gridtool::area::Area;
 use gridtool::document::Document;
+use gridtool::style::{StyleEdit, Styled};
 
 use super::color_swatch;
 use super::format::format_length;
@@ -78,12 +79,15 @@ fn row(ui: &mut egui::Ui, document: &Document, index: usize, area: &Area) -> Opt
         color_swatch::show(
             ui,
             egui::Id::unique(("area_color", index)),
-            area.color(),
+            area.line().color,
             color_swatch::ROW_SWATCH_SIZE,
-            "Choose the colour of this area",
+            "Choose the line colour of this area",
         )
         .committed
-        .map(|color| Action::SetAreaColor { index, color }),
+        .map(|color| Action::SetStyle {
+            target: StyleTarget::Area(index),
+            edit: StyleEdit::LineColor(color),
+        }),
     );
 
     if ui

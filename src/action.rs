@@ -12,8 +12,27 @@ use crate::geometry::Point;
 use crate::grid::{CellDimension, CellShape, Grid, GridSource};
 use crate::measurement::{Endpoint, Measurement};
 use crate::object::{Identified, ObjectId};
-use crate::shape::{DrawnShape, FillStyle, LineStyle, is_valid_fill_angle};
+use crate::shape::DrawnShape;
+use crate::style::{InvalidStyle, StyleEdit, Styled};
 use crate::units::LengthUnit;
+
+/// The object a style edit applies to, by its place in its list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StyleTarget {
+    Measurement(usize),
+    Area(usize),
+    Shape(usize),
+}
+
+impl fmt::Display for StyleTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Measurement(index) => write!(f, "measurement {}", index + 1),
+            Self::Area(index) => write!(f, "area {}", index + 1),
+            Self::Shape(index) => write!(f, "shape {}", index + 1),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
@@ -43,8 +62,6 @@ pub enum Action {
     },
     /// Changes the unit a measurement's distance is reported in.
     SetMeasurementUnit { index: usize, unit: LengthUnit },
-    /// Changes a measurement's line colour.
-    SetMeasurementColor { index: usize, color: Rgb },
     /// Removes a measurement; later measurements move up one place.
     DeleteMeasurement { index: usize },
     /// Appends an exact copy of a measurement, with a new object id, to the end of the list.
@@ -62,8 +79,6 @@ pub enum Action {
     ResizeArea { index: usize, points: Vec<Point> },
     /// Changes the unit an area is reported in.
     SetAreaUnit { index: usize, unit: LengthUnit },
-    /// Changes an area's colour.
-    SetAreaColor { index: usize, color: Rgb },
     /// Removes an area; later areas move up one place.
     DeleteArea { index: usize },
     /// Appends an exact copy of an area, with a new object id, to the end of the list.
@@ -99,24 +114,11 @@ pub enum Action {
     /// Replaces every point of a shape at once (e.g. after resizing its bounding box). The
     /// number of points must stay the same.
     ResizeShape { index: usize, points: Vec<Point> },
-    /// Changes how a shape's line is drawn.
-    SetShapeLineStyle { index: usize, style: LineStyle },
-    /// Changes the colour of a shape's line.
-    SetShapeLineColor { index: usize, color: Rgb },
-    /// Changes the opacity of a shape's line (0 to 1).
-    SetShapeLineOpacity { index: usize, opacity: f32 },
-    /// Changes how a closed shape is filled.
-    SetShapeFillStyle { index: usize, style: FillStyle },
-    /// Changes the colour of a closed shape's fill.
-    SetShapeFillColor { index: usize, color: Rgb },
-    /// Changes the distance between a closed shape's fill lines, in its fill unit.
-    SetShapeFillSpacing { index: usize, spacing: f64 },
-    /// Changes the unit a closed shape's fill spacing is in, keeping the spacing value.
-    SetShapeFillUnit { index: usize, unit: LengthUnit },
-    /// Changes the direction of a closed shape's fill lines, in degrees in [0, 180).
-    SetShapeFillAngle { index: usize, degrees: f64 },
-    /// Changes the opacity of a closed shape's fill (0 to 1).
-    SetShapeFillOpacity { index: usize, opacity: f32 },
+    /// Changes how a measurement, area or drawn shape is drawn.
+    SetStyle {
+        target: StyleTarget,
+        edit: StyleEdit,
+    },
     /// Removes a shape; later shapes move up one place.
     DeleteShape { index: usize },
     /// Appends an exact copy of a shape, with a new object id, to the end of the list.
@@ -163,10 +165,8 @@ pub enum ActionError {
         expected: usize,
         actual: usize,
     },
-    /// Only a closed shape encloses an area to fill.
-    ShapeNotClosed {
-        index: usize,
-    },
+    /// Only an object that encloses an area can be filled.
+    HasNoFill(StyleTarget),
     InvalidFillSpacing(f64),
     InvalidFillAngle(f64),
     Calibration(CalibrationError),
@@ -219,8 +219,8 @@ impl fmt::Display for ActionError {
                 f,
                 "a shape with {expected} points cannot be given {actual} points"
             ),
-            Self::ShapeNotClosed { index } => {
-                write!(f, "shape {} is not closed, so has no fill", index + 1)
+            Self::HasNoFill(target) => {
+                write!(f, "{target} encloses no area, so has no fill")
             }
             Self::InvalidFillSpacing(spacing) => {
                 write!(f, "fill spacing must be a positive number, got {spacing}")
@@ -238,6 +238,16 @@ impl std::error::Error for ActionError {}
 impl From<CalibrationError> for ActionError {
     fn from(error: CalibrationError) -> Self {
         Self::Calibration(error)
+    }
+}
+
+impl From<InvalidStyle> for ActionError {
+    fn from(invalid: InvalidStyle) -> Self {
+        match invalid {
+            InvalidStyle::Opacity(opacity) => Self::InvalidOpacity(opacity),
+            InvalidStyle::FillSpacing(spacing) => Self::InvalidFillSpacing(spacing),
+            InvalidStyle::FillAngle(degrees) => Self::InvalidFillAngle(degrees),
+        }
     }
 }
 
@@ -276,6 +286,7 @@ impl Action {
                 for endpoint in Endpoint::ALL {
                     ensure_inside(document, measurement.point(endpoint))?;
                 }
+                measurement.line().validate()?;
                 let id = document.allocate_object_id();
                 document
                     .measurements_mut()
@@ -297,9 +308,6 @@ impl Action {
             Action::SetMeasurementUnit { index, unit } => {
                 measurement_mut(document, *index)?.set_unit(*unit);
             }
-            Action::SetMeasurementColor { index, color } => {
-                measurement_mut(document, *index)?.set_color(*color);
-            }
             Action::DeleteMeasurement { index } => {
                 measurement_mut(document, *index)?;
                 document.measurements_mut().remove(*index);
@@ -313,6 +321,8 @@ impl Action {
                 for &point in area.points() {
                     ensure_inside(document, point)?;
                 }
+                area.line().validate()?;
+                area.stored_fill().validate()?;
                 let id = document.allocate_object_id();
                 document.areas_mut().push(Identified::new(id, area.clone()));
             }
@@ -343,7 +353,6 @@ impl Action {
                 area.set_points(points.clone());
             }
             Action::SetAreaUnit { index, unit } => area_mut(document, *index)?.set_unit(*unit),
-            Action::SetAreaColor { index, color } => area_mut(document, *index)?.set_color(*color),
             Action::DeleteArea { index } => {
                 area_mut(document, *index)?;
                 document.areas_mut().remove(*index);
@@ -392,6 +401,8 @@ impl Action {
                 for &point in shape.points() {
                     ensure_inside(document, point)?;
                 }
+                shape.line().validate()?;
+                shape.stored_fill().validate()?;
                 let id = document.allocate_object_id();
                 document
                     .shapes_mut()
@@ -423,40 +434,19 @@ impl Action {
                 }
                 shape.set_points(points.clone());
             }
-            Action::SetShapeLineStyle { index, style } => {
-                shape_mut(document, *index)?.set_line_style(*style);
-            }
-            Action::SetShapeLineColor { index, color } => {
-                shape_mut(document, *index)?.set_line_color(*color);
-            }
-            Action::SetShapeLineOpacity { index, opacity } => {
-                ensure_valid_opacity(*opacity)?;
-                shape_mut(document, *index)?.set_line_opacity(*opacity);
-            }
-            Action::SetShapeFillStyle { index, style } => {
-                closed_shape_mut(document, *index)?.set_fill_style(*style);
-            }
-            Action::SetShapeFillColor { index, color } => {
-                closed_shape_mut(document, *index)?.set_fill_color(*color);
-            }
-            Action::SetShapeFillSpacing { index, spacing } => {
-                if !(spacing.is_finite() && *spacing > 0.0) {
-                    return Err(ActionError::InvalidFillSpacing(*spacing));
+            Action::SetStyle { target, edit } => {
+                edit.validate()?;
+                match *target {
+                    StyleTarget::Measurement(index) => {
+                        restyle(measurement_mut(document, index)?, *edit, *target)?;
+                    }
+                    StyleTarget::Area(index) => {
+                        restyle(area_mut(document, index)?, *edit, *target)?;
+                    }
+                    StyleTarget::Shape(index) => {
+                        restyle(shape_mut(document, index)?, *edit, *target)?;
+                    }
                 }
-                closed_shape_mut(document, *index)?.set_fill_spacing(*spacing);
-            }
-            Action::SetShapeFillUnit { index, unit } => {
-                closed_shape_mut(document, *index)?.set_fill_unit(*unit);
-            }
-            Action::SetShapeFillAngle { index, degrees } => {
-                if !is_valid_fill_angle(*degrees) {
-                    return Err(ActionError::InvalidFillAngle(*degrees));
-                }
-                closed_shape_mut(document, *index)?.set_fill_angle(*degrees);
-            }
-            Action::SetShapeFillOpacity { index, opacity } => {
-                ensure_valid_opacity(*opacity)?;
-                closed_shape_mut(document, *index)?.set_fill_opacity(*opacity);
             }
             Action::DeleteShape { index } => {
                 shape_mut(document, *index)?;
@@ -562,13 +552,16 @@ fn shape_mut(document: &mut Document, index: usize) -> Result<&mut DrawnShape, A
         .ok_or(ActionError::ShapeIndexOutOfRange { index, count })
 }
 
-fn closed_shape_mut(document: &mut Document, index: usize) -> Result<&mut DrawnShape, ActionError> {
-    let shape = shape_mut(document, index)?;
-    if shape.is_closed() {
-        Ok(shape)
-    } else {
-        Err(ActionError::ShapeNotClosed { index })
-    }
+/// Makes `edit` to `object`, which must have what it edits.
+fn restyle<T: Styled>(
+    object: &mut T,
+    edit: StyleEdit,
+    target: StyleTarget,
+) -> Result<(), ActionError> {
+    *object = object
+        .with_edit(edit)
+        .ok_or(ActionError::HasNoFill(target))?;
+    Ok(())
 }
 
 fn ensure_inside(document: &Document, point: Point) -> Result<(), ActionError> {
@@ -622,9 +615,6 @@ impl fmt::Display for Action {
             Action::SetMeasurementUnit { index, unit } => {
                 write!(f, "Set measurement {} units to {unit}", index + 1)
             }
-            Action::SetMeasurementColor { index, color } => {
-                write!(f, "Set measurement {} color to {color}", index + 1)
-            }
             Action::DeleteMeasurement { index } => {
                 write!(f, "Delete measurement {}", index + 1)
             }
@@ -635,9 +625,6 @@ impl fmt::Display for Action {
             Action::ResizeArea { index, .. } => write!(f, "Resize area {}", index + 1),
             Action::SetAreaUnit { index, unit } => {
                 write!(f, "Set area {} units to {unit}", index + 1)
-            }
-            Action::SetAreaColor { index, color } => {
-                write!(f, "Set area {} color to {color}", index + 1)
             }
             Action::DeleteArea { index } => write!(f, "Delete area {}", index + 1),
             Action::DuplicateArea { index } => write!(f, "Duplicate area {}", index + 1),
@@ -680,39 +667,7 @@ impl fmt::Display for Action {
                 write!(f, "Move shape {} point {} to {to}", index + 1, point + 1)
             }
             Action::ResizeShape { index, .. } => write!(f, "Resize shape {}", index + 1),
-            Action::SetShapeLineStyle { index, style } => {
-                write!(f, "Set shape {} line style to {}", index + 1, style.name())
-            }
-            Action::SetShapeLineColor { index, color } => {
-                write!(f, "Set shape {} line color to {color}", index + 1)
-            }
-            Action::SetShapeLineOpacity { index, opacity } => write!(
-                f,
-                "Set shape {} line opacity to {}%",
-                index + 1,
-                (opacity * 100.0).round()
-            ),
-            Action::SetShapeFillStyle { index, style } => {
-                write!(f, "Set shape {} fill style to {}", index + 1, style.name())
-            }
-            Action::SetShapeFillColor { index, color } => {
-                write!(f, "Set shape {} fill color to {color}", index + 1)
-            }
-            Action::SetShapeFillSpacing { index, spacing } => {
-                write!(f, "Set shape {} fill spacing to {spacing}", index + 1)
-            }
-            Action::SetShapeFillUnit { index, unit } => {
-                write!(f, "Set shape {} fill units to {unit}", index + 1)
-            }
-            Action::SetShapeFillAngle { index, degrees } => {
-                write!(f, "Set shape {} fill angle to {degrees}°", index + 1)
-            }
-            Action::SetShapeFillOpacity { index, opacity } => write!(
-                f,
-                "Set shape {} fill opacity to {}%",
-                index + 1,
-                (opacity * 100.0).round()
-            ),
+            Action::SetStyle { target, edit } => write!(f, "Set {target} {edit}"),
             Action::DeleteShape { index } => write!(f, "Delete shape {}", index + 1),
             Action::DuplicateShape { index } => write!(f, "Duplicate shape {}", index + 1),
         }

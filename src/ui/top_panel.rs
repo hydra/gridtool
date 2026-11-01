@@ -30,12 +30,20 @@ pub struct ToolBarState {
     pub can_redo: bool,
 }
 
-/// Draws the top tool bar, updating `mode` if the user picks a different tool, and
-/// returns the action the user triggered this frame, if any.
-pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> Option<TopPanelAction> {
+/// What came of drawing the tool bar.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TopPanel {
+    /// The action the user triggered this frame, if any.
+    pub action: Option<TopPanelAction>,
+    /// How tall the tool bar's contents are, without the panel's margins.
+    pub content_height: f32,
+}
+
+/// Draws the top tool bar, updating `mode` if the user picks a different tool.
+pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> TopPanel {
     egui::Panel::top("top_panel")
         .show(ui, |ui| {
-            ui.horizontal(|ui| {
+            let row = ui.horizontal(|ui| {
                 let mut action = None;
                 let mut button = |ui: &mut egui::Ui, icon, tooltip, enabled, clicked| {
                     if icon_button(ui, icon, tooltip, enabled) {
@@ -93,8 +101,11 @@ pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> Opti
                     TopPanelAction::Redo,
                 );
                 action
-            })
-            .inner
+            });
+            TopPanel {
+                action: row.inner,
+                content_height: row.response.rect.height(),
+            }
         })
         .inner
 }

@@ -6,6 +6,7 @@ use std::fmt;
 use crate::calibration::{Calibration, ScaleError};
 use crate::color::Rgb;
 use crate::geometry::{Bounds, BoundsHandle, Edge, Point};
+use crate::style::{FillAppearance, LineAppearance, LineStyle, Styled};
 use crate::units::LengthUnit;
 
 /// One end of a measurement line.
@@ -30,31 +31,29 @@ impl fmt::Display for Endpoint {
 
 /// The colour of a new measurement.
 pub const DEFAULT_COLOR: Rgb = Rgb::BLUE;
+/// The line of a new measurement.
+pub const DEFAULT_LINE: LineAppearance = LineAppearance::new(LineStyle::Thick, DEFAULT_COLOR);
 
 /// A measured line with its own display unit, independent of the calibration unit, and
-/// its own colour.
+/// its own line appearance.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Measurement {
     start: Point,
     end: Point,
     unit: LengthUnit,
-    color: Rgb,
+    line: LineAppearance,
 }
 
 impl Measurement {
-    /// A measurement from `start` to `end`, reported in `unit` and drawn in the default
-    /// colour.
+    /// A measurement from `start` to `end`, reported in `unit` and drawn with the default
+    /// line.
     pub fn new(start: Point, end: Point, unit: LengthUnit) -> Self {
         Self {
             start,
             end,
             unit,
-            color: DEFAULT_COLOR,
+            line: DEFAULT_LINE,
         }
-    }
-
-    pub fn color(&self) -> Rgb {
-        self.color
     }
 
     pub fn point(&self, endpoint: Endpoint) -> Point {
@@ -160,9 +159,24 @@ impl Measurement {
     pub(crate) fn set_unit(&mut self, unit: LengthUnit) {
         self.unit = unit;
     }
+}
 
-    pub(crate) fn set_color(&mut self, color: Rgb) {
-        self.color = color;
+/// A measurement encloses no area, so it has no fill.
+impl Styled for Measurement {
+    fn line(&self) -> LineAppearance {
+        self.line
+    }
+
+    fn fill(&self) -> Option<FillAppearance> {
+        None
+    }
+
+    fn line_mut(&mut self) -> &mut LineAppearance {
+        &mut self.line
+    }
+
+    fn fill_mut(&mut self) -> Option<&mut FillAppearance> {
+        None
     }
 }
 

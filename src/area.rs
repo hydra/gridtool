@@ -7,20 +7,31 @@ use crate::calibration::{Calibration, ScaleError};
 use crate::color::Rgb;
 use crate::geometry::{Bounds, BoundsHandle, Point};
 use crate::polygon;
+use crate::style::{FillAppearance, FillStyle, LineAppearance, LineStyle, Styled};
 use crate::units::LengthUnit;
 
 /// The fewest points that enclose an area.
 pub const MIN_POINTS: usize = 3;
 /// The colour of a new area.
 pub const DEFAULT_COLOR: Rgb = Rgb::CYAN;
+/// How opaque the fill of a new area is.
+pub const DEFAULT_FILL_OPACITY: f32 = 0.25;
+/// The line of a new area.
+pub const DEFAULT_LINE: LineAppearance = LineAppearance::new(LineStyle::Thick, DEFAULT_COLOR);
+
+/// The fill of a new area, whose fill line distance is in `unit`.
+pub const fn default_fill(unit: LengthUnit) -> FillAppearance {
+    FillAppearance::new(FillStyle::Solid, DEFAULT_COLOR, DEFAULT_FILL_OPACITY, unit)
+}
 
 /// A closed outline through three or more points (convex or concave), with its own
-/// display unit and colour.
+/// display unit, line and fill.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Area {
     points: Vec<Point>,
     unit: LengthUnit,
-    color: Rgb,
+    line: LineAppearance,
+    fill: FillAppearance,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,8 +50,8 @@ impl fmt::Display for TooFewPoints {
 impl std::error::Error for TooFewPoints {}
 
 impl Area {
-    /// An area through `points`, in order, reported in `unit` and drawn in the default
-    /// colour.
+    /// An area through `points`, in order, reported in `unit` and drawn with the default
+    /// line and fill.
     pub fn new(points: Vec<Point>, unit: LengthUnit) -> Result<Self, TooFewPoints> {
         if points.len() < MIN_POINTS {
             return Err(TooFewPoints(points.len()));
@@ -48,7 +59,8 @@ impl Area {
         Ok(Self {
             points,
             unit,
-            color: DEFAULT_COLOR,
+            line: DEFAULT_LINE,
+            fill: default_fill(unit),
         })
     }
 
@@ -62,8 +74,9 @@ impl Area {
         self.unit
     }
 
-    pub fn color(&self) -> Rgb {
-        self.color
+    /// The fill; unlike [`Styled::fill`], an area is known to have one.
+    pub fn stored_fill(&self) -> FillAppearance {
+        self.fill
     }
 
     /// Real-world area enclosed by the outline, in [`Self::unit`] squared, using the
@@ -125,9 +138,23 @@ impl Area {
     pub(crate) fn set_unit(&mut self, unit: LengthUnit) {
         self.unit = unit;
     }
+}
 
-    pub(crate) fn set_color(&mut self, color: Rgb) {
-        self.color = color;
+impl Styled for Area {
+    fn line(&self) -> LineAppearance {
+        self.line
+    }
+
+    fn fill(&self) -> Option<FillAppearance> {
+        Some(self.fill)
+    }
+
+    fn line_mut(&mut self) -> &mut LineAppearance {
+        &mut self.line
+    }
+
+    fn fill_mut(&mut self) -> Option<&mut FillAppearance> {
+        Some(&mut self.fill)
     }
 }
 
@@ -185,7 +212,7 @@ mod tests {
         let two = vec![Point::new(0.0, 0.0), Point::new(1.0, 1.0)];
 
         assert_eq!(Area::new(two, LengthUnit::Metre), Err(TooFewPoints(2)));
-        assert_eq!(rectangle(LengthUnit::Metre).color(), Rgb::CYAN);
+        assert_eq!(rectangle(LengthUnit::Metre).line().color, Rgb::CYAN);
     }
 
     #[test]

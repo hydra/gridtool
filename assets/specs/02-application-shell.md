@@ -17,19 +17,42 @@ Closing the window may first ask about unsaved changes (`FILE-17`).
 **SHELL-2.** The window is divided into these regions, from top to bottom:
 
 1. **Main tool bar.** One horizontal row, always visible.
-2. **Tool options row.** A second horizontal row directly below the tool bar. It is shown
-   only when the active tool mode has options *and* a document is open. Its contents
-   depend on the mode: see `VIEW-12` (Rotate), `SCALE-3` (Scale) and `GRID-8` (Grid).
-   The Pan & zoom, Measure distance, Measure area, Origin and Draw line modes have no
-   options row.
-3. **Object properties row.** Shown below the tool options row while the active object
-   has editable properties. Currently this means grids (`GRID-14`) and drawn shapes
-   (`DRAW-13`).
-4. Below the rows, side by side, from left to right:
+2. **Tool controls row.** A second row directly below the tool bar, always visible
+   (`SHELL-2a`).
+3. Below the rows, side by side, from left to right:
    - **Object panel.** Docked on the left-hand side (see `OBJ-3`).
    - **Canvas.** Fills the remaining space and shows the document (see `VIEW`, `SCALE`,
      `MEAS`, `OBJ`).
    - **Side panel.** Docked on the right-hand side (see `SHELL-11`).
+
+**SHELL-2a — Tool controls row.** The row under the tool bar is always shown, with or
+without a document, whatever it contains, so the canvas does not move when a tool or an
+object is chosen.
+- **Height.** Its minimum height is the height of the tool bar's contents, so with one row
+  of controls, or none, it is as tall as the tool bar. If the window is too narrow for the
+  controls they wrap onto more rows, making it taller. It returns to its minimum when they
+  fit again.
+- **Contents.** They are those of the active object if there is one, otherwise those of the
+  active tool:
+
+  | Active object | Contents |
+  |---|---|
+  | Measurement | `MEAS-16` |
+  | Area | `AREA-16` |
+  | Grid | `GRID-14` |
+  | Drawn shape | `DRAW-13` |
+
+  | Active tool, with no active object | Contents |
+  |---|---|
+  | Rotate | `VIEW-12` |
+  | Scale | `SCALE-3` |
+  | Measure distance | `MEAS-17` |
+  | Measure area | `AREA-17` |
+  | Grid | `GRID-8` |
+  | Draw line | `DRAW-17` |
+  | Pan & zoom, Origin | Nothing |
+
+  With no document open, the row is empty.
 
 **SHELL-3.** When no document is open, the canvas area shows the centred message
 "`Open an image to get started.`"
@@ -109,8 +132,9 @@ or changing the document:
   `OBJ-15`); the object keeps its shape and stays active
 - a rotate-handle drag in progress (`VIEW-13`); the view keeps the rotation it reached
 
-Escape and switching mode cancel exactly the same things. The tool mode does not change,
-and neither does the active object. Escape does **not** cancel the tool when it is meant
+Escape and switching mode cancel exactly the same things. Escape changes neither the tool
+mode nor the active object; switching mode also clears the active object (`OBJ-7a`). Escape
+does **not** cancel the tool when it is meant
 for something else:
 - while a dialog is open, Escape answers the dialog (`FILE-11`)
 - while a widget such as a text field has keyboard focus, Escape only takes the focus
@@ -155,6 +179,12 @@ widget such as a text field has keyboard focus.
 - In the tool bar, Measure distance comes directly after Scale, Measure area directly
   after Measure distance, and Grid directly after Measure area. Draw line comes directly
   after Origin and starts a new group.
+- Tool controls row (`SHELL-2a`):
+  - The canvas starts at the same place in every tool mode, and with a drawn shape active.
+  - Without a document, the row is still at least its minimum height.
+  - In a narrow window the controls wrap and the canvas starts lower; widening it again
+    returns the canvas to where it was.
+  - An active object's controls edit that object and leave the tool's own settings alone.
 - Cancelling (`SHELL-10a`):
   - Escape with nothing focused cancels; Escape in a focused text field does not, and
     the next Escape does.

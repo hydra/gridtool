@@ -10,8 +10,9 @@ called **point-to-point** measurements, to tell them apart from area measurement
 **MEAS-1 — Measurement.** A measurement consists of:
 - **start point** and **end point**, in image coordinates (`DOC-3`)
 - **unit**: the length unit its distance is reported in (`SCALE-2`)
-- **colour**: an RGB colour it is drawn in; **blue** (`#0000FF`) for a new measurement
-  (`MEAS-15`)
+- **line style**, **line colour** and **line opacity**, as for a drawn shape (`DRAW-8`):
+  Thick, **blue** (`#0000FF`) and 100 % for a new measurement, unless the tool's controls say
+  otherwise (`MEAS-17`)
 
 Each measurement's unit is independent of the calibration unit and of every other
 measurement's unit.
@@ -37,14 +38,14 @@ metresPer(target)`, where `metresPer(cm) = 0.01` and `metresPer(m) = 1`.
 - its button comes directly after the Scale button (`SHELL-5`)
 - its icon is a tape measure (`measuring_tape`, `SHELL-6`)
 - its tooltip is "`Measure distance`"
-- it has no tool options row
+- its controls are in the tool controls row (`MEAS-17`)
 
 **MEAS-6 — Adding a measurement.** In Measure mode, a primary click inside the document
 works like this:
 1. **First click.** Sets a *pending start point*. This is presentation state
    (`ARCH-5`), not an action.
 2. **Second click.** Sets the end point. One **Add measurement** action is committed,
-   containing both points and, as its unit, the calibration unit at that moment. The
+   containing both points, with the unit and line the tool's controls show (`MEAS-17`). The
    pending start is then cleared.
 
 Additional rules:
@@ -69,15 +70,16 @@ measurement's endpoints can now be dragged again (`OBJ-15`).
 and its outline, and above areas (`AREA-9`). Only the active measurement's end markers
 can be dragged (`OBJ-15`).
 
-**MEAS-9 — Appearance.** Everything is drawn in the measurement's colour (`MEAS-1`):
-- **Line.** A 2 px line from the start marker to the end marker.
+**MEAS-9 — Appearance.** Everything is drawn in the measurement's line colour (`MEAS-1`):
+- **Line.** From the start marker to the end marker, in its line style and at its line
+  opacity, drawn as a drawn shape's line is (`DRAW-11`). Only the line uses the opacity.
 - **End markers.** A filled circle with a 5 px radius at each end.
 - **Label.** Drawn in a 14 px proportional font, centred at the line's midpoint and
   offset 12 px along the perpendicular (the line direction rotated 90°). The text is
   "`<n>: <distance> <unit symbol>`", with the distance formatted by `FMT-7`, or just
   "`<n>`" when the distance is unavailable.
-- **Pending start.** Drawn as an end marker in the default colour, blue. While the
-  pointer is over the canvas, a blue 2 px dashed line (6 px dashes, 4 px gaps) runs
+- **Pending start.** Drawn as an end marker in the line colour the tool's controls show
+  (`MEAS-17`). While the pointer is over the canvas, a 2 px dashed line of that colour (6 px dashes, 4 px gaps) runs
   from the pending start to the pointer.
 
 ## Measurements table
@@ -100,7 +102,7 @@ and has one header row followed by one row per measurement in list order (`MEAS-
 | "`y2`" | An editable field for the end's y (`MEAS-12`) |
 | "`Distance`" | The calculated distance (`MEAS-3`), formatted by `FMT-7` and without a unit, or a weak "`—`" if unavailable. Hovering the "`—`" shows "`Scale: <reason>`" (`SCALE-18`) |
 | "`Units`" | A unit drop-down, 50 px wide, with the tooltip "`Units of this measurement`" (`MEAS-13`) |
-| "`Color`" | A colour swatch, 28 × 14 px, filled with the measurement's colour, with the tooltip "`Choose the colour of this measurement`" (`MEAS-15`) |
+| "`Color`" | A colour swatch, 28 × 14 px, filled with the measurement's line colour, with the tooltip "`Choose the line colour of this measurement`" (`MEAS-15`) |
 | (blank) | A delete button with a trash-can icon (`delete`, `SHELL-6`) at the inline icon size, and the tooltip "`Delete measurement`" (`MEAS-14`) |
 
 **MEAS-12 — Editing coordinates.** Each coordinate field is a commit-on-blur field
@@ -131,12 +133,31 @@ unit and the other measurements are not affected.
 **MEAS-14 — Deleting.** Clicking the delete button commits one **Delete measurement**
 action for that row.
 
-**MEAS-15 — Changing a measurement's colour.** Clicking the colour swatch opens a colour
+**MEAS-15 — Changing a measurement's line colour in the table.** Clicking the colour swatch opens a colour
 picker (opaque colours only) below it:
 - While it is open, the swatch shows the colour being chosen.
 - It closes when the user clicks outside it. If the chosen colour differs from the
-  measurement's colour, one **Set measurement colour** action is committed for that row.
-- Each time it opens, it starts from the measurement's current colour.
+  measurement's line colour, one **Set style** action is committed for that row.
+- Each time it opens, it starts from the measurement's current line colour.
+
+## Tool controls
+
+**MEAS-16 — Controls of the active measurement.** While the active object is a measurement,
+the tool controls row (`SHELL-2a`) shows, left to right, wrapping if the window is too narrow:
+1. "`Measurement <n>`" in strong text, then a separator.
+2. A drop-down of length units, with the tooltip "`Units of this measurement`". Picking a
+   different one commits one **Set measurement unit** action.
+3. A separator, then the line controls of `DRAW-13`, which commit as `DRAW-14` says.
+
+**MEAS-17 — Controls of the Measure distance tool.** With no active object, in Measure
+distance mode, the row shows:
+1. "`New measurement`" in strong text, then a separator.
+2. A drop-down of length units, with the tooltip "`Units of new measurements`".
+3. A separator, then the same line controls as `MEAS-16`.
+
+They decide what the next measurement gets. Changes take effect at once and are presentation
+state (`ARCH-5`): they are not actions, cannot be undone and are not saved. The unit shown
+follows the calibration unit until the user picks one here.
 
 ## Acceptance criteria
 
@@ -157,8 +178,10 @@ picker (opaque colours only) below it:
 - Moving an endpoint changes only that endpoint. Moving it outside the document is
   rejected.
 - Setting a measurement's unit changes only that measurement.
-- A new measurement is blue. Setting a measurement's colour changes only that
-  measurement, and duplicating keeps the colour.
+- A new measurement is Thick, blue and opaque. Setting its style changes only that
+  measurement, and duplicating keeps it. A fill change is rejected, since a measurement has
+  no fill.
+- The next measurement gets the unit and line chosen in the tool's controls.
 - Deleting the middle of three measurements leaves the first and third, in order.
 - Move, set-unit and delete with an index that does not exist are rejected, and the
   document is unchanged.

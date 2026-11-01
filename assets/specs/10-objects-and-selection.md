@@ -120,6 +120,18 @@ leaf as selected:
 - Because selection uses ids, deleting an *earlier* measurement leaves the same
   measurement active, even though its list position changes.
 
+**OBJ-7a — The active object and the active tool.** An object belongs to the tool that adds
+it: a measurement to Measure distance, an area to Measure area, a grid to Grid and a drawn
+shape to Draw line.
+- When a **different** object becomes active by any means (picked in the tree, duplicated,
+  or just added and activated), its tool becomes the active tool mode, and anything a tool
+  was part-way through is abandoned (`SHELL-10a`). The tool controls row shows the object's
+  controls (`SHELL-2a`).
+- Choosing a **different** tool mode in the tool bar clears the active object. Choosing the
+  mode already active changes nothing.
+- When the active object stops being active, the tool stays as it is, and the row shows the
+  tool's controls.
+
 **OBJ-8 — Selection box.** While there is an active object that has a bounding box
 (measurements, areas and drawn shapes; grids do not, see `GRID-12`), the canvas draws the following on
 top of everything else, in every tool mode:
@@ -195,9 +207,18 @@ release without dragging) whose position lies **outside** the selection box clea
 active object. An active object without a selection box (a grid) is cleared by any
 primary click on the canvas (`GRID-12`). "Outside" means outside the bounding box grown by `8 + 5` screen px on
 every side (padding plus half a handle).
-- Clicks inside keep the active object.
+- Clicks inside keep the active object, unless the click starts a new object (`OBJ-10a`).
 - The click is still passed to the active tool. In Measure mode, for example, it also
   places a point.
+
+**OBJ-10a — Starting a new object clears the active object.** When a tool places the first
+point of a new measurement, area or drawn shape, the active object is cleared, even if the
+click was inside its selection box. While a new object is being placed there is therefore no
+active object, and no selection box, handles or points to drag.
+- A click on one of the active object's points or resize handles (within the ranges of
+  `OBJ-9` and `OBJ-15`) places nothing and keeps it active, since those are for dragging.
+- Grids have no such points: any click clears an active grid (`OBJ-10`), and a click on an
+  alignment line adds the new grid, which then becomes active (`GRID-12`).
 
 **OBJ-11 — Withdrawn.** Measurement endpoints could not be dragged directly in any mode.
 This is replaced by dragging the active object's points (`OBJ-15`); the endpoints of a
@@ -259,6 +280,17 @@ or drawn shape.
   grabbed.
 
 ## Acceptance criteria
+
+- The active object and the tool (`OBJ-7a`):
+  - Each kind of object belongs to its tool. An object newly active brings its tool once,
+    and anything being placed is abandoned.
+  - Leaving a tool abandons what it was placing and clears the active object.
+- Starting a new object (`OBJ-10a`), with a measurement active, in Measure distance, Measure
+  area and Draw line modes:
+  - A click inside its box, away from its grips, clears it and starts a new object. In every
+    other mode, such a click keeps it active.
+  - After that first point, dragging where its handles were commits nothing.
+  - A click on one of its points or handles keeps it active and starts nothing.
 
 - Bringing into view (`OBJ-5a`), with an 800 × 600 canvas, a 4000 × 3000 document at
   zoom 1 and no rotation (image region (1600, 1200)–(2400, 1800) visible):

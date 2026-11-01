@@ -6,17 +6,17 @@ use eframe::egui::{
     Stroke, TextureHandle, Vec2,
 };
 use gridtool::action::Action;
-use gridtool::calibration::{CalibrationMethod, Line};
+use gridtool::calibration::{CalibrationMethod, Line, Scale};
 use gridtool::document::Document;
 use gridtool::geometry::{Bounds, BoundsHandle, Point};
 use gridtool::grid::GridSource;
 use gridtool::imaging::DecodedImage;
-use gridtool::measurement::{self, Endpoint};
+use gridtool::measurement::Endpoint;
 use gridtool::polygon;
-use gridtool::shape;
+use gridtool::style::{ObjectStyle, Styled};
 
 use super::area_tool::AreaTool;
-use super::color::{to_color32, with_opacity};
+use super::color::to_color32;
 use super::document_view::DocumentView;
 use super::format::format_length;
 use super::grid_display::paint_grids;
@@ -30,7 +30,7 @@ use super::pending_outline::{PendingOutline, PointHit};
 use super::rotate_handle;
 use super::scale_tool::ScaleTool;
 use super::selection::Selection;
-use super::shape_display::paint_shapes;
+use super::shape_display::{paint_fill, paint_line, paint_shapes};
 use super::tool_mode::ToolMode;
 use super::viewport::{DocumentTransform, Viewport};
 
@@ -46,10 +46,8 @@ const SCALE_STROKE: Stroke = Stroke {
     width: 1.5,
     color: Color32::RED,
 };
-/// Measurement lines and area outlines, drawn in the object's colour.
-const OBJECT_LINE_WIDTH: f32 = 2.0;
-/// How opaque an area's fill is, over its own colour.
-const AREA_FILL_OPACITY: f32 = 0.25;
+/// The line on to the pointer from an object being placed, whatever its style.
+const PENDING_LINE_WIDTH: f32 = 2.0;
 const SELECTION_COLOR: Color32 = Color32::from_rgb(128, 0, 128);
 const SELECTION_STROKE: Stroke = Stroke {
     width: 1.5,
@@ -116,8 +114,8 @@ pub fn show(
     // The active object's points and resize handles take priority over every tool.
     let selection_input = handle_selection(ui, &response, transform, document, &mut view.selection);
     let action = match selection_input {
-        SelectionInput::Dragging(action) => action,
-        SelectionInput::NotDragging => match mode {
+        SelectionInput::Handled(action) => action,
+        SelectionInput::NotHandled => match mode {
             ToolMode::Pan => {
                 handle_pan(ui, &response, &mut view.viewport);
                 None
@@ -140,6 +138,10 @@ pub fn show(
             }
         },
     };
+    // Adding a new object and editing the active one at the same time would be confusing.
+    if view.is_placing_new_object() {
+        view.selection.select(None);
+    }
     if mode != ToolMode::Grid {
         view.grid_tool.set_hovered(None);
     }
@@ -180,6 +182,8 @@ pub fn show(
         | ToolMode::DrawLine => {}
     }
     paint_active_grid_source(&painter, transform, document, &view.selection);
+    let scale = document.calibration().scale().ok();
+    let calibration_unit = document.calibration().unit();
     match mode {
         ToolMode::Rotate => {
             paint_rotate_handle(
@@ -191,15 +195,23 @@ pub fn show(
         ToolMode::Origin => paint_origin(&painter, transform, document.origin()),
         ToolMode::Measure => {
             if let Some(start) = view.measure_tool.pending_start() {
-                paint_pending_measurement(&painter, transform, start, response.hover_pos());
+                let style = view.measure_tool.settings.style(calibration_unit);
+                paint_pending_measurement(
+                    &painter,
+                    transform,
+                    start,
+                    style.line.color,
+                    response.hover_pos(),
+                );
             }
         }
         ToolMode::Area => {
             paint_pending_outline(
                 &painter,
                 transform,
+                scale,
                 &view.area_tool.outline,
-                gridtool::area::DEFAULT_COLOR,
+                view.area_tool.settings.style(calibration_unit),
                 response.hover_pos(),
             );
         }
@@ -207,8 +219,9 @@ pub fn show(
             paint_pending_outline(
                 &painter,
                 transform,
+                scale,
                 &view.line_tool.outline,
-                shape::DEFAULT_LINE_COLOR,
+                view.line_tool.settings.style(calibration_unit),
                 response.hover_pos(),
             );
         }
@@ -269,9 +282,9 @@ fn handle_grid(
 /// Whether the active object's grips are handling the primary button.
 enum SelectionInput {
     /// A drag of a point or resize handle is in progress (or just ended, with its
-    /// action); tools must ignore input.
-    Dragging(Option<Action>),
-    NotDragging,
+    /// action), or one was clicked; tools must ignore input.
+    Handled(Option<Action>),
+    NotHandled,
 }
 
 /// Dragging the active object's points or resize handles, and clearing the selection
@@ -284,7 +297,7 @@ fn handle_selection(
     selection: &mut Selection,
 ) -> SelectionInput {
     if selection.active().is_none() {
-        return SelectionInput::NotDragging;
+        return SelectionInput::NotHandled;
     }
     let Some(bounds) = selection.active_bounds(document) else {
         // Objects without a selection box (grids cover the whole document): any click
@@ -292,7 +305,7 @@ fn handle_selection(
         if response.clicked() {
             selection.select(None);
         }
-        return SelectionInput::NotDragging;
+        return SelectionInput::NotHandled;
     };
 
     if response.drag_started_by(PointerButton::Primary)
@@ -313,12 +326,16 @@ fn handle_selection(
             .drag_stopped_by(PointerButton::Primary)
             .then(|| selection.end_drag(document))
             .flatten();
-        return SelectionInput::Dragging(action);
+        return SelectionInput::Handled(action);
     }
 
     if response.clicked()
         && let Some(position) = response.interact_pointer_pos()
     {
+        // A grip is for dragging: a click that did not move must not place a point there.
+        if grip_at(transform, document, selection, position).is_some() {
+            return SelectionInput::Handled(None);
+        }
         let margin = transform.screen_to_image_length(SELECTION_PADDING + RESIZE_HANDLE_SIZE / 2.0);
         if !bounds
             .expanded(margin)
@@ -327,7 +344,7 @@ fn handle_selection(
             selection.select(None);
         }
     }
-    SelectionInput::NotDragging
+    SelectionInput::NotHandled
 }
 
 /// The grip of the active object under screen `position`: the nearer of its nearest
@@ -824,7 +841,7 @@ fn paint_highlighted_source(
     }
 }
 
-/// Draws every measurement as a labelled line with a handle at each end, in its colour.
+/// Draws every measurement as a labelled line in its style, with a handle at each end.
 fn paint_measurements(
     painter: &egui::Painter,
     transform: DocumentTransform,
@@ -844,14 +861,10 @@ fn paint_measurements(
             ),
             Err(_) => (index + 1).to_string(),
         };
-        let color = to_color32(measurement.color());
-        paint_labelled_line(
-            painter,
-            start,
-            end,
-            Stroke::new(OBJECT_LINE_WIDTH, color),
-            label,
-        );
+        let line = measurement.line();
+        let color = to_color32(line.color);
+        paint_line(painter, line, &[start, end], false);
+        paint_line_label(painter, start, end, label, color);
         for position in [start, end] {
             paint_point_handle(painter, position, color);
         }
@@ -863,14 +876,15 @@ fn paint_pending_measurement(
     painter: &egui::Painter,
     transform: DocumentTransform,
     start: Point,
+    rgb: gridtool::color::Rgb,
     pointer: Option<Pos2>,
 ) {
-    let color = to_color32(measurement::DEFAULT_COLOR);
+    let color = to_color32(rgb);
     let start = transform.image_to_screen(start);
     if let Some(pointer) = pointer {
         painter.extend(Shape::dashed_line(
             &[start, pointer],
-            Stroke::new(OBJECT_LINE_WIDTH, color),
+            Stroke::new(PENDING_LINE_WIDTH, color),
             DASH_LENGTH,
             DASH_GAP,
         ));
@@ -878,19 +892,28 @@ fn paint_pending_measurement(
     paint_point_handle(painter, start, color);
 }
 
-/// Draws every area as a filled outline with a handle at each corner and its area
-/// written at its centre, in its colour.
+/// Draws every area as an outline in its line and fill styles, with a handle at each corner
+/// and its area written at its centre, in its line colour.
 fn paint_areas(
     painter: &egui::Painter,
     transform: DocumentTransform,
     document: &Document,
     selection: &Selection,
 ) {
+    let scale = document.calibration().scale().ok();
     for (index, stored) in document.areas().iter().enumerate() {
         let area = selection.displayed_area(stored.id(), stored);
-        let color = to_color32(area.color());
+        let color = to_color32(area.line().color);
         let on_screen = to_screen(transform, area.points());
-        paint_filled_outline(painter, area.points(), &on_screen, area.color());
+        paint_fill(
+            painter,
+            transform,
+            scale,
+            area.stored_fill(),
+            area.points(),
+            &on_screen,
+        );
+        paint_line(painter, area.line(), &on_screen, true);
         for &position in &on_screen {
             paint_point_handle(painter, position, color);
         }
@@ -912,14 +935,15 @@ fn paint_areas(
     }
 }
 
-/// Draws an outline being placed, in `rgb`: the points so far joined by solid lines, and a
+/// Draws an outline being placed: the points so far joined by a line in `style`, and a
 /// dashed line on to the pointer. Over the first point, once the outline can be closed, the
-/// dashed line closes the outline and the area is shown filled.
+/// outline is shown closed and filled, as it will be drawn.
 fn paint_pending_outline(
     painter: &egui::Painter,
     transform: DocumentTransform,
+    scale: Option<Scale>,
     outline: &PendingOutline,
-    rgb: gridtool::color::Rgb,
+    style: ObjectStyle,
     pointer: Option<Pos2>,
 ) {
     let points = outline.points();
@@ -927,16 +951,19 @@ fn paint_pending_outline(
     let (Some(&first), Some(&last)) = (on_screen.first(), on_screen.last()) else {
         return;
     };
-    let stroke = Stroke::new(OBJECT_LINE_WIDTH, to_color32(rgb));
+    let stroke = Stroke::new(PENDING_LINE_WIDTH, to_color32(style.line.color));
     let closing = outline.can_close()
         && pointer
             .and_then(|pointer| PendingOutline::hit_at(&on_screen, pointer, POINT_GRAB_RADIUS))
             == Some(PointHit::First);
 
     if closing {
-        paint_filled_outline(painter, points, &on_screen, rgb);
+        if let Some(fill) = style.fill {
+            paint_fill(painter, transform, scale, fill, points, &on_screen);
+        }
+        paint_line(painter, style.line, &on_screen, true);
     } else {
-        painter.add(Shape::line(on_screen.clone(), stroke));
+        paint_line(painter, style.line, &on_screen, false);
         if let Some(pointer) = pointer {
             painter.extend(Shape::dashed_line(
                 &[last, pointer],
@@ -952,26 +979,6 @@ fn paint_pending_outline(
     if outline.can_close() {
         painter.circle_stroke(first, CLOSE_TARGET_RADIUS, stroke);
     }
-}
-
-/// Fills the outline through `points` (image coordinates, drawn at `on_screen`) with a
-/// translucent `color`, then strokes its edges.
-fn paint_filled_outline(
-    painter: &egui::Painter,
-    points: &[Point],
-    on_screen: &[Pos2],
-    color: gridtool::color::Rgb,
-) {
-    fill_outline(
-        painter,
-        points,
-        on_screen,
-        with_opacity(color, AREA_FILL_OPACITY),
-    );
-    painter.add(Shape::closed_line(
-        on_screen.to_vec(),
-        Stroke::new(OBJECT_LINE_WIDTH, to_color32(color)),
-    ));
 }
 
 /// Fills the outline through `points` (image coordinates, drawn at `on_screen`) with
@@ -1009,12 +1016,23 @@ fn paint_labelled_line(
     label: String,
 ) {
     painter.line_segment([start, end], stroke);
+    paint_line_label(painter, start, end, label, stroke.color);
+}
+
+/// Writes `label` beside the midpoint of the line from `start` to `end`.
+fn paint_line_label(
+    painter: &egui::Painter,
+    start: Pos2,
+    end: Pos2,
+    label: String,
+    color: Color32,
+) {
     let normal = (end - start).normalized().rot90();
     paint_label(
         painter,
         start.lerp(end, 0.5) + normal * LABEL_OFFSET,
         label,
-        stroke.color,
+        color,
     );
 }
 
@@ -1355,11 +1373,60 @@ mod tests {
             let mut harness = Harness::new(mode);
             harness.select_measurement();
 
-            harness.click(MEASUREMENT_MIDDLE_ON_SCREEN);
-            assert!(harness.view.selection.active().is_some(), "{mode:?} inside");
-
             harness.click(EMPTY_SPOT);
             assert_eq!(harness.view.selection.active(), None, "{mode:?} outside");
+        }
+    }
+
+    /// Modes in which a click starts placing a new object.
+    const PLACING_MODES: [ToolMode; 3] = [ToolMode::Measure, ToolMode::Area, ToolMode::DrawLine];
+
+    #[test]
+    fn clicking_inside_the_selection_box_keeps_it_unless_a_tool_starts_a_new_object() {
+        for mode in ToolMode::ALL {
+            let mut harness = Harness::new(mode);
+            harness.select_measurement();
+
+            // On the line, but clear of its handles.
+            harness.click(MEASUREMENT_MIDDLE_ON_SCREEN - Vec2::new(30.0, 0.0));
+
+            let active = harness.view.selection.active();
+            if PLACING_MODES.contains(&mode) {
+                assert_eq!(active, None, "{mode:?}");
+                assert!(harness.view.is_placing_new_object(), "{mode:?}");
+            } else {
+                assert!(active.is_some(), "{mode:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn placing_a_new_object_leaves_nothing_to_drag() {
+        for mode in PLACING_MODES {
+            let mut harness = Harness::new(mode);
+            harness.select_measurement();
+
+            harness.click(MEASUREMENT_MIDDLE_ON_SCREEN + Vec2::new(0.0, 30.0));
+            assert_eq!(harness.view.selection.active(), None, "{mode:?}");
+
+            let before = harness.actions.len();
+            harness.drag(PointerButton::Primary, RIGHT_RESIZE_HANDLE, DRAG_BY);
+            assert_eq!(harness.actions.len(), before, "{mode:?} dragged something");
+        }
+    }
+
+    #[test]
+    fn clicking_a_grip_of_the_active_object_places_nothing_and_keeps_it() {
+        for mode in PLACING_MODES {
+            let mut harness = Harness::new(mode);
+            harness.select_measurement();
+
+            for grip in [MEASUREMENT_START_ON_SCREEN, RIGHT_RESIZE_HANDLE] {
+                harness.click(grip);
+
+                assert!(harness.view.selection.active().is_some(), "{mode:?}");
+                assert!(!harness.view.is_placing_new_object(), "{mode:?}");
+            }
         }
     }
 
@@ -1620,7 +1687,8 @@ mod tests {
 
     #[test]
     fn every_fill_and_line_style_can_be_painted_at_any_zoom() {
-        use gridtool::shape::{FillStyle, LineStyle};
+        use gridtool::action::StyleTarget;
+        use gridtool::style::{FillStyle, LineStyle, StyleEdit};
 
         let mut harness = Harness::new(ToolMode::Pan);
         harness.select_new_shape();
@@ -1628,13 +1696,13 @@ mod tests {
             for fill in FillStyle::ALL {
                 for line in LineStyle::ALL {
                     for action in [
-                        Action::SetShapeFillStyle {
-                            index: 0,
-                            style: fill,
+                        Action::SetStyle {
+                            target: StyleTarget::Shape(0),
+                            edit: StyleEdit::FillStyle(fill),
                         },
-                        Action::SetShapeLineStyle {
-                            index: 0,
-                            style: line,
+                        Action::SetStyle {
+                            target: StyleTarget::Shape(0),
+                            edit: StyleEdit::LineStyle(line),
                         },
                     ] {
                         action.apply(&mut harness.document).unwrap();
@@ -1673,9 +1741,9 @@ mod tests {
                 line: gridtool::calibration::Line::B,
                 distance: Some(40.0),
             },
-            Action::SetShapeFillAngle {
-                index: 0,
-                degrees: 30.0,
+            Action::SetStyle {
+                target: StyleTarget::Shape(0),
+                edit: StyleEdit::FillAngle(30.0),
             },
         ] {
             action.apply(&mut harness.document).unwrap();

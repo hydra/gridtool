@@ -11,6 +11,7 @@ use gridtool::grid::Grid;
 use gridtool::measurement::Measurement;
 use gridtool::object::ObjectId;
 use gridtool::shape::DrawnShape;
+use gridtool::style::{StyleEdit, Styled};
 
 use super::object_drag::{Grip, ObjectDrag, Shape};
 
@@ -21,9 +22,9 @@ pub struct Selection {
     /// Uncommitted style edits (colour, opacity) of the active grid, shown live while
     /// the user is still choosing.
     grid_preview: Option<Grid>,
-    /// Uncommitted style edits (opacities) of the active drawn shape, shown live while the
-    /// user is still choosing.
-    drawn_preview: Option<DrawnShape>,
+    /// An uncommitted style edit of the active measurement, area or drawn shape, shown live
+    /// while the user is still choosing.
+    style_preview: Option<StyleEdit>,
 }
 
 impl Selection {
@@ -37,7 +38,7 @@ impl Selection {
         if self.active != id {
             self.drag = None;
             self.grid_preview = None;
-            self.drawn_preview = None;
+            self.style_preview = None;
         }
         self.active = id;
     }
@@ -50,7 +51,7 @@ impl Selection {
         }
         self.drag = None;
         self.grid_preview = None;
-        self.drawn_preview = None;
+        self.style_preview = None;
     }
 
     /// Abandons a drag in progress, without committing anything.
@@ -86,46 +87,53 @@ impl Selection {
             .map(ObjectDrag::preview)
     }
 
+    /// `object`, which has `id`, with any style edit being previewed.
+    fn with_style_preview<T: Styled>(&self, id: ObjectId, object: T) -> T {
+        self.style_preview
+            .filter(|_| self.active == Some(id))
+            .and_then(|edit| object.with_edit(edit))
+            .unwrap_or(object)
+    }
+
     /// How to display the measurement with `id`: the drag preview if it is being
-    /// dragged, otherwise the measurement itself.
+    /// dragged, otherwise the measurement itself, with any style edit being previewed.
     pub fn displayed(&self, id: ObjectId, measurement: &Measurement) -> Measurement {
-        match self.previewed(id) {
+        let shown = match self.previewed(id) {
             Some(Shape::Measurement(preview)) => preview.clone(),
             _ => measurement.clone(),
-        }
+        };
+        self.with_style_preview(id, shown)
     }
 
     /// How to display the area with `id`: the drag preview if it is being dragged,
-    /// otherwise the area itself.
+    /// otherwise the area itself, with any style edit being previewed.
     pub fn displayed_area(&self, id: ObjectId, area: &Area) -> Area {
-        match self.previewed(id) {
+        let shown = match self.previewed(id) {
             Some(Shape::Area(preview)) => preview.clone(),
             _ => area.clone(),
-        }
+        };
+        self.with_style_preview(id, shown)
     }
 
     /// How to display the drawn shape with `id`: the drag preview if it is being dragged,
-    /// otherwise the style preview if it is active and has uncommitted edits, otherwise the
-    /// shape itself.
+    /// otherwise the shape itself, with any style edit being previewed.
     pub fn displayed_drawn(&self, id: ObjectId, drawn: &DrawnShape) -> DrawnShape {
-        if let Some(Shape::Drawn(preview)) = self.previewed(id) {
-            return preview.clone();
-        }
-        match &self.drawn_preview {
-            Some(preview) if self.active == Some(id) => preview.clone(),
+        let shown = match self.previewed(id) {
+            Some(Shape::Drawn(preview)) => preview.clone(),
             _ => drawn.clone(),
-        }
+        };
+        self.with_style_preview(id, shown)
     }
 
-    /// Shows `drawn` in place of the active shape until the preview is cleared.
-    pub fn preview_drawn(&mut self, drawn: DrawnShape) {
+    /// Shows the active object with `edit` made, until the preview is cleared.
+    pub fn preview_style(&mut self, edit: StyleEdit) {
         if self.active.is_some() {
-            self.drawn_preview = Some(drawn);
+            self.style_preview = Some(edit);
         }
     }
 
-    pub fn clear_drawn_preview(&mut self) {
-        self.drawn_preview = None;
+    pub fn clear_style_preview(&mut self) {
+        self.style_preview = None;
     }
 
     /// The active object's shape as currently displayed, if it has one (measurements, areas
@@ -474,26 +482,26 @@ mod tests {
     }
 
     #[test]
-    fn a_drawn_shape_preview_shows_only_for_the_active_shape_until_dropped() {
+    fn a_style_preview_shows_only_for_the_active_object_until_dropped() {
         let (document, id) = document_with_drawn_line();
         let stored = &document.shapes()[0];
         let mut selection = Selection::default();
 
-        selection.preview_drawn(stored.with_line_opacity(0.1));
+        selection.preview_style(StyleEdit::LineOpacity(0.1));
         assert_eq!(selection.displayed_drawn(id, stored), **stored);
 
         selection.select(Some(id));
-        selection.preview_drawn(stored.with_line_opacity(0.1));
-        assert_eq!(selection.displayed_drawn(id, stored).line_opacity(), 0.1);
+        selection.preview_style(StyleEdit::LineOpacity(0.1));
+        assert_eq!(selection.displayed_drawn(id, stored).line().opacity, 0.1);
 
-        selection.clear_drawn_preview();
+        selection.clear_style_preview();
         assert_eq!(selection.displayed_drawn(id, stored), **stored);
 
-        selection.preview_drawn(stored.with_line_opacity(0.1));
+        selection.preview_style(StyleEdit::LineOpacity(0.1));
         selection.sync_to(&document);
         assert_eq!(selection.displayed_drawn(id, stored), **stored);
 
-        selection.preview_drawn(stored.with_line_opacity(0.1));
+        selection.preview_style(StyleEdit::LineOpacity(0.1));
         selection.select(None);
         selection.select(Some(id));
         assert_eq!(selection.displayed_drawn(id, stored), **stored);

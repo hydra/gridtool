@@ -29,36 +29,29 @@ impl ScaleBar {
         tool: &mut ScaleTool,
     ) -> Option<Action> {
         let calibration = document.calibration();
-        egui::Panel::top("scale_bar")
-            .show(ui, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    method_buttons(ui, tool);
-                    ui.separator();
-                    point_coordinates(ui, tool, calibration);
-                    ui.separator();
+        method_buttons(ui, tool);
+        ui.separator();
+        point_coordinates(ui, tool, calibration);
+        ui.separator();
 
-                    // Every widget must be drawn each frame, so collect actions eagerly.
-                    let mut actions = Vec::new();
-                    for line in Line::ALL {
-                        actions.extend(self.distance_field(ui, line, calibration.distance(line)));
-                    }
-                    actions.extend(
-                        unit_picker::show(
-                            ui,
-                            "scale_unit",
-                            calibration.unit(),
-                            "Units of distances A and B",
-                        )
-                        .map(Action::SetUnit),
-                    );
+        // Every widget must be drawn each frame, so collect actions eagerly.
+        let mut actions = Vec::new();
+        for line in Line::ALL {
+            actions.extend(self.distance_field(ui, line, calibration.distance(line)));
+        }
+        actions.extend(
+            unit_picker::show(
+                ui,
+                "scale_unit",
+                calibration.unit(),
+                "Units of distances A and B",
+            )
+            .map(Action::SetUnit),
+        );
 
-                    ui.separator();
-                    scale_result(ui, calibration);
-                    actions.into_iter().next()
-                })
-                .inner
-            })
-            .inner
+        ui.separator();
+        scale_result(ui, calibration);
+        actions.into_iter().next()
     }
 
     /// A labelled distance field. The value is committed as an action when editing ends.

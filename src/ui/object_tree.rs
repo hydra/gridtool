@@ -14,7 +14,7 @@ use super::format::format_length;
 use super::icon_button::icon_button;
 use super::icons::{DELETE as DELETE_ICON, DUPLICATE as DUPLICATE_ICON};
 use super::selection::Selection;
-use super::shape_bar;
+use super::tool_controls::shape_label;
 
 const DEFAULT_WIDTH: f32 = 220.0;
 
@@ -165,7 +165,7 @@ fn show_tree(
             builder.close_dir();
             builder.dir(TreeNode::Shapes, "Shapes");
             for (index, shape) in document.shapes().iter().enumerate() {
-                builder.leaf(TreeNode::Object(shape.id()), shape_bar::label(index, shape));
+                builder.leaf(TreeNode::Object(shape.id()), shape_label(index, shape));
             }
             builder.close_dir();
             builder.close_dir();

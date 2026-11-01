@@ -23,7 +23,7 @@ pub struct GridBar {
 }
 
 impl GridBar {
-    /// Shows the row if the active object is a grid, returning the action the user
+    /// Shows the controls if the active object is a grid, returning the action the user
     /// completed, if any. `zoom` is the canvas zoom, used to explain a hidden grid.
     pub fn show(
         &mut self,
@@ -36,30 +36,23 @@ impl GridBar {
         let index = document.grid_index(id)?;
         let stored: &Grid = &document.grids()[index];
 
-        egui::Panel::top("grid_bar")
-            .show(ui, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    // Every widget must be drawn each frame, so collect actions eagerly.
-                    let mut actions = Vec::new();
-                    ui.strong(format!("Grid {}", index + 1));
-                    ui.separator();
-                    actions.extend(shape_buttons(ui, index, stored));
-                    ui.separator();
-                    actions.extend(self.size_fields(ui, id, index, stored));
-                    ui.separator();
-                    actions.extend(color_picker(ui, id, index, stored, selection));
-                    ui.separator();
-                    actions.extend(grid_opacity(ui, id, index, stored, selection));
-                    let displayed = selection.displayed_grid(id, stored);
-                    if let Err(reason) = grid_display::visibility(&displayed, document, zoom) {
-                        ui.separator();
-                        ui.weak(format!("Grid not shown: {reason}"));
-                    }
-                    actions.into_iter().next()
-                })
-                .inner
-            })
-            .inner
+        // Every widget must be drawn each frame, so collect actions eagerly.
+        let mut actions = Vec::new();
+        ui.strong(format!("Grid {}", index + 1));
+        ui.separator();
+        actions.extend(shape_buttons(ui, index, stored));
+        ui.separator();
+        actions.extend(self.size_fields(ui, id, index, stored));
+        ui.separator();
+        actions.extend(color_picker(ui, id, index, stored, selection));
+        ui.separator();
+        actions.extend(grid_opacity(ui, id, index, stored, selection));
+        let displayed = selection.displayed_grid(id, stored);
+        if let Err(reason) = grid_display::visibility(&displayed, document, zoom) {
+            ui.separator();
+            ui.weak(format!("Grid not shown: {reason}"));
+        }
+        actions.into_iter().next()
     }
 
     fn size_fields(
