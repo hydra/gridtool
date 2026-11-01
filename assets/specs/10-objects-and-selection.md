@@ -123,8 +123,10 @@ leaf as selected:
 **OBJ-7a — The active object and the active tool.** An object belongs to the tool that adds
 it: a measurement to Measure distance, an area to Measure area, a grid to Grid and a drawn
 shape to Draw line.
-- When a **different** object becomes active by any means (picked in the tree, duplicated,
-  or just added and activated), its tool becomes the active tool mode, and anything a tool
+- Adding a measurement, area, grid or drawn shape, or duplicating an object, makes the new
+  object active.
+- When a **different** object becomes active by any means (picked in the tree, duplicated
+  or just added), its tool becomes the active tool mode, and anything a tool
   was part-way through is abandoned (`SHELL-10a`). The tool controls row shows the object's
   controls (`SHELL-2a`).
 - Choosing a **different** tool mode in the tool bar clears the active object. Choosing the
@@ -282,6 +284,8 @@ or drawn shape.
 ## Acceptance criteria
 
 - The active object and the tool (`OBJ-7a`):
+  - A new measurement, area or drawn shape becomes the active object, and its tool stays the
+    active tool. Undoing the addition clears the active object.
   - Each kind of object belongs to its tool. An object newly active brings its tool once,
     and anything being placed is abandoned.
   - Leaving a tool abandons what it was placing and clears the active object.

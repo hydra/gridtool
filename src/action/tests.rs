@@ -655,7 +655,7 @@ fn finds_the_duplicate_and_delete_actions_for_an_object() {
 }
 
 #[test]
-fn only_adding_grids_and_duplicating_activate_the_new_object() {
+fn only_adding_and_duplicating_activate_the_new_object() {
     assert!(Action::DuplicateMeasurement { index: 0 }.activates_new_object());
     assert!(Action::DuplicateGrid { index: 0 }.activates_new_object());
     assert!(
@@ -665,7 +665,7 @@ fn only_adding_grids_and_duplicating_activate_the_new_object() {
         ))
         .activates_new_object()
     );
-    assert!(!Action::AddMeasurement(measurement(1.0, 2.0)).activates_new_object());
+    assert!(Action::AddMeasurement(measurement(1.0, 2.0)).activates_new_object());
     assert!(!Action::DeleteGrid { index: 0 }.activates_new_object());
 }
 
@@ -954,7 +954,7 @@ fn finds_the_duplicate_and_delete_actions_for_an_area() {
         Some(Action::DeleteArea { index: 0 })
     );
     assert!(Action::DuplicateArea { index: 0 }.activates_new_object());
-    assert!(!Action::AddArea(triangle(0.0)).activates_new_object());
+    assert!(Action::AddArea(triangle(0.0)).activates_new_object());
 }
 
 #[test]

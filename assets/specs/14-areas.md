@@ -34,13 +34,14 @@ outline, once at least **3** points are placed:
 1. One **Add area** action (`HIST-2`) is committed, with the placed points in order and the
    unit, line and fill the tool's controls show (`AREA-17`).
 2. The placed points are cleared, ready for the next outline.
+3. The new area becomes the active object (`OBJ-7a`), so that its controls (`AREA-16`) and its
+   tree leaf are selected straight away.
 
 Further rules:
 - With fewer than 3 points, a click on the first point does nothing. With a single
   point, the first point is also the last, so a click on it removes it (`AREA-3`).
 - When the first and the last point are both within 10 px of the click, the nearer one
   counts. On a tie, the last point counts.
-- The new area does not become the active object.
 
 **AREA-5 — Cursor.** While hovering over the canvas in Measure area mode, the cursor is:
 - a pointing hand over the last point, or over the first point once the outline can be

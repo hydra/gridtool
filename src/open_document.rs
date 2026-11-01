@@ -106,7 +106,7 @@ impl OpenDocument {
         let document = self.editor.document();
         self.view.selection.sync_to(document);
         if activates_new_object && changed {
-            // A newly added grid or a duplicate becomes the active object.
+            // A newly added object or a duplicate becomes the active object.
             self.view.selection.select(document.newest_object());
         }
     }
@@ -149,5 +149,85 @@ impl OpenDocument {
             .scale_tool
             .sync_to(self.editor.document().calibration());
         self.view.selection.sync_to(self.editor.document());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gridtool::area::Area;
+    use gridtool::geometry::Point;
+    use gridtool::measurement::Measurement;
+    use gridtool::shape::DrawnShape;
+    use gridtool::units::LengthUnit;
+
+    use crate::ui::tool_mode::ToolMode;
+
+    const UNIT: LengthUnit = LengthUnit::Centimetre;
+
+    fn open_document() -> OpenDocument {
+        let image = DecodedImage {
+            width: 100,
+            height: 100,
+            rgba: vec![255; 4 * 100 * 100],
+        };
+        let opened = OpenedImage {
+            path: PathBuf::from("plan.png"),
+            image,
+        };
+        OpenDocument::from_image(&egui::Context::default(), opened)
+    }
+
+    fn triangle() -> Vec<Point> {
+        vec![
+            Point::new(1.0, 1.0),
+            Point::new(20.0, 1.0),
+            Point::new(10.0, 20.0),
+        ]
+    }
+
+    #[test]
+    fn a_new_measurement_area_or_shape_becomes_active_and_keeps_its_tool() {
+        let cases = [
+            (
+                Action::AddMeasurement(Measurement::new(
+                    Point::new(1.0, 1.0),
+                    Point::new(9.0, 9.0),
+                    UNIT,
+                )),
+                ToolMode::Measure,
+            ),
+            (
+                Action::AddArea(Area::new(triangle(), UNIT).unwrap()),
+                ToolMode::Area,
+            ),
+            (
+                Action::AddShape(DrawnShape::closed(triangle(), UNIT).unwrap()),
+                ToolMode::DrawLine,
+            ),
+        ];
+        for (action, tool) in cases {
+            let mut open = open_document();
+
+            open.perform(action);
+
+            let document = open.editor.document();
+            assert!(document.newest_object().is_some(), "{tool:?}");
+            assert_eq!(open.view.selection.active(), document.newest_object());
+            assert_eq!(
+                open.view.tool_of_new_active_object(open.editor.document()),
+                Some(tool)
+            );
+        }
+    }
+
+    #[test]
+    fn undoing_the_addition_of_the_active_object_clears_it() {
+        let mut open = open_document();
+        open.perform(Action::AddArea(Area::new(triangle(), UNIT).unwrap()));
+
+        open.undo();
+
+        assert_eq!(open.view.selection.active(), None);
     }
 }

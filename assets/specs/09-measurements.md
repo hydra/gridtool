@@ -46,7 +46,8 @@ works like this:
    (`ARCH-5`), not an action.
 2. **Second click.** Sets the end point. One **Add measurement** action is committed,
    containing both points, with the unit and line the tool's controls show (`MEAS-17`). The
-   pending start is then cleared.
+   pending start is then cleared, and the new measurement becomes the active object (`OBJ-7a`),
+   so that its controls (`MEAS-16`) and its tree leaf are selected straight away.
 
 Additional rules:
 - A second click at exactly the pending start point is ignored, and the start stays
@@ -155,7 +156,9 @@ distance mode, the row shows:
 2. A drop-down of length units, with the tooltip "`Units of new measurements`".
 3. A separator, then the same line controls as `MEAS-16`.
 
-They decide what the next measurement gets. Changes take effect at once and are presentation
+The row shows them again as soon as the first point of the next measurement is placed, which
+clears the object just added (`OBJ-10a`), or whenever nothing is active. They decide what the
+next measurement gets; changing the active measurement does not change them. Changes take effect at once and are presentation
 state (`ARCH-5`): they are not actions, cannot be undone and are not saved. The unit shown
 follows the calibration unit until the user picks one here.
 

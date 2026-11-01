@@ -499,7 +499,9 @@ impl Action {
     pub fn activates_new_object(&self) -> bool {
         matches!(
             self,
-            Action::AddGrid(_)
+            Action::AddMeasurement(_)
+                | Action::AddArea(_)
+                | Action::AddGrid(_)
                 | Action::AddShape(_)
                 | Action::DuplicateMeasurement { .. }
                 | Action::DuplicateArea { .. }
