@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
+mod crash_report;
 mod file_picker;
 mod open_document;
 mod open_image;
@@ -16,6 +17,8 @@ const APP_NAME: &str = "GridTool";
 const APP_ICON_PNG: &[u8] = include_bytes!("../assets/icons/gridtool.png");
 
 fn main() -> eframe::Result {
+    crash_report::install();
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(APP_NAME)

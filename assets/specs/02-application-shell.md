@@ -21,6 +21,18 @@ from the same image.
 **SHELL-1b — No console window.** On Windows, a release build opens only the application window,
 with no console window beside it. A development build MAY keep one for diagnostics.
 
+**SHELL-1c — Crash reports.** When a release build panics, it saves a crash report file to the
+system's temporary folder, then shows a modal error dialog before closing:
+- **Title:** "`GridTool crashed`"
+- **Message:** that it had a problem and has to close and that unsaved changes are lost, the full
+  path of the report, where to report the problem, and that nothing is sent automatically. If the
+  report could not be saved, it says so instead.
+- **Report first.** The report is saved before the dialog is shown, so it is kept even if showing
+  the dialog fails.
+- **Development.** A development build, or a build run with the `RUST_BACKTRACE` environment
+  variable set, shows the usual panic output instead.
+- A test MUST check the message with and without a report.
+
 ## Layout
 
 **SHELL-2.** The window is divided into these regions, from top to bottom:

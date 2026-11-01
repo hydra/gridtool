@@ -3,6 +3,7 @@ name = "gridtool"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/hydra/gridtool"
 
 [dependencies]
 eframe = { version = "0.37.0", features = ["persistence"] }
@@ -10,6 +11,7 @@ egui = "0.37.0"
 egui_ltreeview = "0.9.0"
 egui_tiles = "0.18.0"
 egui_material_icons = "0.9.0"
+human-panic = { version = "2.0.8", default-features = false }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "bmp"] }
 rfd = "0.17.2"
 ron = "0.12.2"

@@ -113,3 +113,4 @@ must satisfy them.
 | 2026-11-01 | A typed fill angle below 0, or of 360 or more, now wraps around a full turn instead of being rejected, so `-45` gives 315 and `361` gives 1 (`DRAW-14`). |
 | 2026-11-01 | The Windows installer program now shows the application icon (`SHELL-1a`). |
 | 2026-11-01 | A release build no longer opens a console window on Windows (`SHELL-1b`). |
+| 2026-11-01 | A panic in a release build now saves a crash report and shows a dialog saying where it is (`SHELL-1c`). |
