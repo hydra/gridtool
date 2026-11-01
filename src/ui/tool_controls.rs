@@ -1,6 +1,7 @@
 //! The row under the tool bar. It is always there, at least as tall as the tool bar, so the
 //! canvas does not move when its contents change. It shows the controls of the active object
-//! or, with none, of the active tool, and wraps onto more rows when they do not fit.
+//! or, with none, of the active tool, and wraps onto more rows when they do not fit. A tool
+//! with no controls shows help text instead.
 
 use eframe::egui;
 use gridtool::action::{Action, StyleTarget};
@@ -18,6 +19,10 @@ use super::selection::Selection;
 use super::style_controls::{StyleControls, StyleEvents};
 use super::tool_mode::ToolMode;
 use super::unit_picker;
+
+const PAN_HELP: &str = "Drag to pan the view. Scroll to zoom.";
+const ORIGIN_HELP: &str =
+    "Click on the image to move the origin, the point the view rotates about.";
 
 /// "Shape <n> (line)" or "Shape <n> (area)".
 pub fn shape_label(index: usize, shape: &DrawnShape) -> String {
@@ -182,7 +187,14 @@ impl ToolControls {
         document: &Document,
     ) -> Option<Action> {
         match mode {
-            ToolMode::Pan | ToolMode::Origin => None,
+            ToolMode::Pan => {
+                ui.weak(PAN_HELP);
+                None
+            }
+            ToolMode::Origin => {
+                ui.weak(ORIGIN_HELP);
+                None
+            }
             ToolMode::Rotate => {
                 self.rotation_bar.show(ui, &mut view.viewport, document);
                 None
@@ -365,6 +377,28 @@ mod tests {
             (action, canvas_top)
         }
 
+        /// Whether a frame of the row draws a line of text containing `text`.
+        fn shows_text(&mut self, text: &str) -> bool {
+            let input = RawInput {
+                screen_rect: Some(Rect::from_min_max(Pos2::ZERO, Pos2::new(self.width, 800.0))),
+                ..Default::default()
+            };
+            let ctx = self.ctx.clone();
+            let mut output = ctx.run_ui(input, |ui| {
+                self.controls.show(
+                    ui,
+                    self.mode,
+                    MIN_HEIGHT,
+                    Some((&mut self.view, &self.document)),
+                );
+            });
+            output.textures_delta.clear();
+            output.shapes.iter().any(|clipped| match &clipped.shape {
+                egui::Shape::Text(shape) => shape.galley.job.text.contains(text),
+                _ => false,
+            })
+        }
+
         /// The canvas's top once the row has settled.
         fn settled_canvas_top(&mut self) -> f32 {
             self.frame(Vec::new());
@@ -420,6 +454,42 @@ mod tests {
 
         let mut harness = Harness::new(ToolMode::Pan).with_active_shape(FillStyle::Solid);
         assert_eq!(harness.settled_canvas_top(), top, "active shape");
+    }
+
+    #[test]
+    fn only_tools_with_no_controls_show_help() {
+        for mode in ToolMode::ALL {
+            let mut harness = Harness::new(mode);
+            harness.settled_canvas_top();
+
+            assert_eq!(
+                harness.shows_text(PAN_HELP),
+                mode == ToolMode::Pan,
+                "{mode:?}"
+            );
+            assert_eq!(
+                harness.shows_text(ORIGIN_HELP),
+                mode == ToolMode::Origin,
+                "{mode:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_active_objects_controls_replace_the_help() {
+        let mut harness = Harness::new(ToolMode::Pan).with_active_shape(FillStyle::Solid);
+        harness.settled_canvas_top();
+
+        assert!(!harness.shows_text(PAN_HELP));
+    }
+
+    #[test]
+    fn help_wraps_in_a_narrow_window() {
+        let mut harness = Harness::new(ToolMode::Origin);
+        let wide = harness.settled_canvas_top();
+
+        harness.width = 150.0;
+        assert!(harness.settled_canvas_top() > wide);
     }
 
     #[test]

@@ -50,9 +50,10 @@ object is chosen.
   | Measure area | `AREA-17` |
   | Grid | `GRID-8` |
   | Draw line | `DRAW-17` |
-  | Pan & zoom, Origin | Nothing |
+  | Pan & zoom | Help text: "`Drag to pan the view. Scroll to zoom.`" |
+  | Origin | Help text: "`Click on the image to move the origin, the point the view rotates about.`" |
 
-  With no document open, the row is empty.
+  Help text is in weak text, and wraps like controls. With no document open, the row is empty.
 
 **SHELL-3.** When no document is open, the canvas area shows the centred message
 "`Open an image to get started.`"
@@ -189,6 +190,8 @@ presence shows whether something can be scrolled.
 - Tool controls row (`SHELL-2a`):
   - The canvas starts at the same place in every tool mode, and with a drawn shape active.
   - Without a document, the row is still at least its minimum height.
+  - Only Pan & zoom and Origin show help text, and an active object's controls replace it. In a
+    narrow window it wraps.
   - In a narrow window the controls wrap and the canvas starts lower; widening it again
     returns the canvas to where it was.
   - An active object's controls edit that object and leave the tool's own settings alone.
