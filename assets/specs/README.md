@@ -102,3 +102,4 @@ must satisfy them.
 | 2026-11-01 | The open and grabbing hand cursors (`VIEW-11`, `VIEW-11a`, `VIEW-14`, `OBJ-15`) are now real hands on Windows, not a four-way arrow, so they differ from the cursor for moving an object (`OBJ-17`). Windows has no such system cursors, so winit 0.30.13 is vendored and patched to draw them (`vendor/winit/PATCHES.md`). |
 | 2026-11-01 | The tool controls row shows help text for the tools with no controls, Pan & zoom and Origin (`SHELL-2a`). |
 | 2026-11-01 | With no document open there is now no active tool: every mode button is disabled and none is selected, and Pan & zoom becomes active when a document next opens (`SHELL-8`, `SHELL-9`). The tool controls row then says "`Open an image to get started`" (`SHELL-2a`). |
+| 2026-11-01 | The application has one icon, used for the window, task bar or dock, executable file and release packages (`SHELL-1a`). |

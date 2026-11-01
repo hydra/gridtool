@@ -14,6 +14,11 @@ rfd = "0.17.2"
 ron = "0.12.2"
 serde = { version = "1.0.229", features = ["derive"] }
 
+[build-dependencies]
+ico = "0.6.0"
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+winresource = "0.1.34"
+
 # Release packages, built with cargo-packager (see .github/workflows/release.yml).
 [package.metadata.packager]
 product-name = "GridTool"
