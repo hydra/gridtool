@@ -10,7 +10,7 @@ use crate::polygon::{self, HatchDirection};
 use crate::units::LengthUnit;
 
 /// Real-world distance between fill lines by default, in the fill's unit.
-pub const DEFAULT_FILL_SPACING: f64 = 10.0;
+pub const DEFAULT_FILL_SPACING: f64 = 1.0;
 /// Fill lines are horizontal by default.
 pub const DEFAULT_FILL_ANGLE: f64 = 0.0;
 /// Fill lines repeat every half turn, so angles are kept below this.
@@ -384,8 +384,20 @@ mod tests {
         ]
     }
 
+    /// A fill whose lines are 10 cm apart.
     fn fill(style: FillStyle) -> FillAppearance {
-        FillAppearance::new(style, ORANGE, 0.5, CM)
+        FillAppearance {
+            spacing: 10.0,
+            ..FillAppearance::new(style, ORANGE, 0.5, CM)
+        }
+    }
+
+    #[test]
+    fn a_new_fill_has_its_lines_1_unit_apart() {
+        assert_eq!(
+            FillAppearance::new(FillStyle::Lines, ORANGE, 0.5, CM).spacing,
+            1.0
+        );
     }
 
     fn near(a: f64, b: f64) -> bool {
