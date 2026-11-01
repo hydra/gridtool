@@ -1,0 +1,2 @@
+# Bash cannot run scripts with CRLF line endings, whatever the platform's default.
+*.sh text eol=lf

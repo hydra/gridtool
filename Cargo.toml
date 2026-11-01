@@ -14,6 +14,14 @@ rfd = "0.17.2"
 ron = "0.12.2"
 serde = { version = "1.0.229", features = ["derive"] }
 
+# Release packages, built with cargo-packager (see .github/workflows/release.yml).
+[package.metadata.packager]
+product-name = "GridTool"
+identifier = "com.github.hydra.gridtool"
+description = "Measure real-world objects from an image, and overlay real-world grids."
+before-packaging-command = "cargo build --release --locked"
+out-dir = "target/packages"
+
 [patch.crates-io]
 # Upstream egui_ltreeview 0.9.0 requires egui 0.36; this copy is patched for egui 0.37.
 egui_ltreeview = { path = "vendor/egui_ltreeview" }
