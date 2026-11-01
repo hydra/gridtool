@@ -41,7 +41,8 @@ pub fn show(
 
     let swatch = ui
         .add(egui::Button::new("").fill(color).min_size(size))
-        .on_hover_text(tooltip);
+        .on_hover_text(tooltip)
+        .on_disabled_hover_text(tooltip);
     let mut changed = false;
     Popup::menu(&swatch)
         .id(popup_id)

@@ -15,19 +15,13 @@ pub const MIN_OPEN_POINTS: usize = 2;
 /// The fewest points that enclose an area.
 pub const MIN_CLOSED_POINTS: usize = 3;
 pub const DEFAULT_LINE_COLOR: Rgb = Rgb::new(255, 128, 0);
-pub const DEFAULT_FILL_COLOR: Rgb = DEFAULT_LINE_COLOR;
 pub const DEFAULT_FILL_OPACITY: f32 = 0.5;
 /// The line of a new shape.
 pub const DEFAULT_LINE: LineAppearance = LineAppearance::new(LineStyle::Thin, DEFAULT_LINE_COLOR);
 
 /// The fill of a new shape, whose fill line distance is in `unit`.
 pub const fn default_fill(unit: LengthUnit) -> FillAppearance {
-    FillAppearance::new(
-        FillStyle::None,
-        DEFAULT_FILL_COLOR,
-        DEFAULT_FILL_OPACITY,
-        unit,
-    )
+    FillAppearance::new(FillStyle::None, DEFAULT_FILL_OPACITY, unit)
 }
 
 /// A line through two or more points, or a closed outline through three or more.
@@ -207,8 +201,8 @@ mod tests {
         assert_eq!(shape.line().opacity, 1.0);
         let fill = shape.fill().unwrap();
         assert_eq!(fill.style, FillStyle::None);
-        assert_eq!(fill.color, Rgb::new(255, 128, 0));
-        assert_eq!(fill.spacing, 10.0);
+        assert_eq!(fill.color, None);
+        assert_eq!(fill.spacing, 1.0);
         assert_eq!(fill.unit, LengthUnit::Metre);
         assert_eq!(fill.angle, 0.0);
         assert_eq!(fill.opacity, 0.5);

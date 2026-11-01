@@ -9,6 +9,7 @@ mod v1;
 mod v2;
 mod v3;
 mod v4;
+mod v5;
 
 use std::fmt;
 use std::fs;
@@ -26,6 +27,7 @@ pub use v1::DocumentV1;
 pub use v2::DocumentV2;
 pub use v3::DocumentV3;
 pub use v4::DocumentV4;
+pub use v5::DocumentV5;
 
 /// The extension of document files, without the dot.
 pub const EXTENSION: &str = "ron";
@@ -38,12 +40,13 @@ pub enum DocumentFile {
     V2(DocumentV2),
     V3(DocumentV3),
     V4(DocumentV4),
+    V5(DocumentV5),
 }
 
 impl DocumentFile {
     /// Describes `document` in the current format version.
     pub fn describe(document: &Document, image: String) -> Self {
-        Self::V4(DocumentV4::describe(document, image))
+        Self::V5(DocumentV5::describe(document, image))
     }
 
     /// The stored image reference.
@@ -53,6 +56,7 @@ impl DocumentFile {
             Self::V2(file) => &file.image,
             Self::V3(file) => &file.image,
             Self::V4(file) => &file.image,
+            Self::V5(file) => &file.image,
         }
     }
 
@@ -61,11 +65,15 @@ impl DocumentFile {
         match self {
             Self::V1(file) => {
                 let v2 = DocumentV2::from(file.clone());
-                DocumentV4::from(DocumentV3::from(v2)).to_document()
+                DocumentV5::from(DocumentV4::from(DocumentV3::from(v2))).to_document()
             }
-            Self::V2(file) => DocumentV4::from(DocumentV3::from(file.clone())).to_document(),
-            Self::V3(file) => DocumentV4::from(file.clone()).to_document(),
-            Self::V4(file) => file.to_document(),
+            Self::V2(file) => {
+                let v3 = DocumentV3::from(file.clone());
+                DocumentV5::from(DocumentV4::from(v3)).to_document()
+            }
+            Self::V3(file) => DocumentV5::from(DocumentV4::from(file.clone())).to_document(),
+            Self::V4(file) => DocumentV5::from(file.clone()).to_document(),
+            Self::V5(file) => file.to_document(),
         }
     }
 

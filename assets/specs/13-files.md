@@ -42,7 +42,7 @@ failed save never leaves a half-written document.
 **FILE-5 — Versioned description, separate from runtime state.** The file holds a
 *description* of the document in a versioned format. It is not a dump of the runtime
 data structures:
-- **Tagged.** The top level names its version, for example `V4(( … ))`.
+- **Tagged.** The top level names its version, for example `V5(( … ))`.
 - **Converted on save.** Saving converts the runtime document to the current version's
   description.
 - **Converted on load.** Loading converts a description of **any** supported version back
@@ -86,7 +86,7 @@ by giving every measurement the default colour, blue (`MEAS-1`), and adding no a
 Every other field is exactly as in version 2. A version 2 file is migrated to version 3 by
 adding no shapes.
 
-**FILE-6c — Version 4 (current).** Version 4 is version 3 with these changes:
+**FILE-6c — Version 4.** (no longer written; still loaded) Version 4 is version 3 with these changes:
 - `measurements`: each is `(id, start, end, unit, line_style, line_color: (r, g, b),
   line_opacity)`, in place of `color`
 - `areas`: each is `(id, points, unit, line_style, line_color: (r, g, b), line_opacity,
@@ -98,6 +98,11 @@ version 3. A version 3 file is migrated to version 4 keeping how each object loo
 - a measurement gets a Thick line in its colour, at 100 % opacity
 - an area gets a Thick line in its colour, at 100 % opacity, and a Solid fill in its colour,
   at 25 % opacity, with spacing 10 in the area's unit and angle 0
+
+**FILE-6d — Version 5 (current).** Version 5 is version 4 with one change: `fill_color` of
+`areas` and `shapes` is optional, written `None` or `Some((r, g, b))` (`DRAW-8`). Every other
+field is exactly as in version 4. A version 4 file is migrated to version 5 with each fill
+keeping its colour, so each object looks as it did.
 
 **FILE-7 — Validation on load.** A loaded description is checked as strictly as actions
 check their inputs (`HIST-2`), so a hand-edited or damaged file cannot produce an invalid
@@ -237,7 +242,9 @@ and shows the dialogs.
   shape's points and styles.
 - A literal version 4 sample loads with the expected values, including a measurement's and an
   area's styles.
-- Migrated files keep how their objects looked (`FILE-6c`).
+- A literal version 5 sample loads with the expected values, including a fill with no colour
+  and one with a colour. A fill with no colour is still none after saving and loading.
+- Migrated files keep how their objects looked (`FILE-6c`, `FILE-6d`).
 - Each `FILE-7` failure is rejected with its reason. This includes an area with 2 points, an area point outside
   the document, an area reusing a measurement's id, an open shape with 1 point, a closed
   shape with 2 points, a shape point outside the document, an open shape with a fill, a

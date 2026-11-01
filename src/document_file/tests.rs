@@ -86,7 +86,7 @@ fn rich_document() -> Document {
         },
         Action::SetStyle {
             target: StyleTarget::Area(1),
-            edit: StyleEdit::FillColor(Rgb::new(7, 8, 9)),
+            edit: StyleEdit::FillColor(Some(Rgb::new(7, 8, 9))),
         },
         Action::SetStyle {
             target: StyleTarget::Area(1),
@@ -168,7 +168,7 @@ fn rich_document() -> Document {
         },
         Action::SetStyle {
             target: StyleTarget::Shape(1),
-            edit: StyleEdit::FillColor(Rgb::new(40, 50, 60)),
+            edit: StyleEdit::FillColor(Some(Rgb::new(40, 50, 60))),
         },
         Action::SetStyle {
             target: StyleTarget::Shape(1),
@@ -238,7 +238,7 @@ fn files_are_tagged_with_their_format_version() {
         .to_ron()
         .unwrap();
 
-    assert!(text.starts_with("V4("), "{text}");
+    assert!(text.starts_with("V5("), "{text}");
 }
 
 /// A version 1 file exactly as the first release writes it. It must always load.
@@ -386,7 +386,7 @@ fn version_3_files_load() {
     assert!(closed.is_closed());
     assert_eq!(closed.line().style, LineStyle::Thick);
     assert_eq!(closed.stored_fill().style, FillStyle::Crosshatch);
-    assert_eq!(closed.stored_fill().color, Rgb::new(4, 5, 6));
+    assert_eq!(closed.stored_fill().color, Some(Rgb::new(4, 5, 6)));
     assert_eq!(closed.stored_fill().spacing, 2.5);
     assert_eq!(closed.stored_fill().unit, LengthUnit::Metre);
     assert_eq!(closed.stored_fill().angle, 45.0);
@@ -407,10 +407,10 @@ fn version_2_files_load_without_shapes() {
 #[test]
 fn invalid_shapes_are_rejected() {
     let valid = || match DocumentFile::from_ron(VERSION_3_SAMPLE).unwrap() {
-        DocumentFile::V3(file) => DocumentV4::from(file),
+        DocumentFile::V3(file) => DocumentV5::from(DocumentV4::from(file)),
         _ => unreachable!("the sample is version 3"),
     };
-    type Corruption = fn(&mut DocumentV4);
+    type Corruption = fn(&mut DocumentV5);
     let cases: [(Corruption, InvalidDocument); 9] = [
         (
             |f| f.shapes[0].points.truncate(1),
@@ -490,7 +490,7 @@ fn earlier_files_keep_how_their_measurements_and_areas_looked() {
     assert_eq!(area.line().opacity, 1.0);
     let fill = area.stored_fill();
     assert_eq!(fill.style, FillStyle::Solid);
-    assert_eq!(fill.color, Rgb::CYAN);
+    assert_eq!(fill.color, Some(Rgb::CYAN));
     assert_eq!(fill.opacity, 0.25);
     assert_eq!(fill.spacing, 10.0);
     assert_eq!(fill.unit, area.unit());
@@ -556,20 +556,104 @@ fn version_4_files_load() {
     assert_eq!(area.line().opacity, 0.5);
     let fill = area.stored_fill();
     assert_eq!(fill.style, FillStyle::Crosshatch);
-    assert_eq!(fill.color, Rgb::new(7, 8, 9));
+    assert_eq!(fill.color, Some(Rgb::new(7, 8, 9)));
     assert_eq!(fill.spacing, 2.5);
     assert_eq!(fill.unit, LengthUnit::Centimetre);
     assert_eq!(fill.angle, 45.0);
     assert_eq!(fill.opacity, 0.25);
 }
 
+/// A version 5 file exactly as the release that made fill colours optional writes it. It
+/// must always load.
+const VERSION_5_SAMPLE: &str = r#"V5((
+    image: "photo.png",
+    width: 200,
+    height: 100,
+    origin: (x: 100.0, y: 50.0),
+    calibration: (
+        points: None,
+        distance_a: None,
+        distance_b: None,
+        unit: Centimetre,
+    ),
+    measurements: [],
+    areas: [(
+        id: 1,
+        points: [(x: 10.0, y: 10.0), (x: 50.0, y: 10.0), (x: 30.0, y: 40.0)],
+        unit: Metre,
+        line_style: Thin,
+        line_color: (r: 4, g: 5, b: 6),
+        line_opacity: 0.5,
+        fill_style: Solid,
+        fill_color: None,
+        fill_spacing: 2.5,
+        fill_unit: Centimetre,
+        fill_angle: 45.0,
+        fill_opacity: 0.25,
+    )],
+    grids: [],
+    shapes: [(
+        id: 2,
+        points: [(x: 10.0, y: 10.0), (x: 50.0, y: 10.0), (x: 30.0, y: 40.0)],
+        closed: true,
+        line_style: Dashed,
+        line_color: (r: 1, g: 2, b: 3),
+        line_opacity: 1.0,
+        fill_style: Lines,
+        fill_color: Some((r: 7, g: 8, b: 9)),
+        fill_spacing: 1.0,
+        fill_unit: Metre,
+        fill_angle: 0.0,
+        fill_opacity: 0.5,
+    )],
+    next_object_id: 3,
+))"#;
+
+#[test]
+fn version_5_files_load_with_and_without_a_fill_colour() {
+    let document = DocumentFile::from_ron(VERSION_5_SAMPLE)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    assert_eq!(document.areas()[0].stored_fill().color, None);
+    assert_eq!(
+        document.shapes()[0].stored_fill().color,
+        Some(Rgb::new(7, 8, 9))
+    );
+}
+
+#[test]
+fn a_fill_without_a_colour_of_its_own_stays_that_way_when_saved() {
+    let mut document = Document::new(200, 100);
+    let points = vec![
+        Point::new(1.0, 1.0),
+        Point::new(20.0, 1.0),
+        Point::new(10.0, 20.0),
+    ];
+    Action::AddArea(Area::new(points, LengthUnit::Metre).unwrap())
+        .apply(&mut document)
+        .unwrap();
+
+    let text = DocumentFile::describe(&document, "a.png".to_owned())
+        .to_ron()
+        .unwrap();
+    let loaded = DocumentFile::from_ron(&text)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    assert_eq!(loaded, document);
+    assert_eq!(loaded.areas()[0].stored_fill().color, None);
+}
+
 #[test]
 fn invalid_measurement_and_area_styles_are_rejected() {
     let valid = || match DocumentFile::from_ron(VERSION_4_SAMPLE).unwrap() {
-        DocumentFile::V4(file) => file,
+        DocumentFile::V4(file) => DocumentV5::from(file),
         _ => unreachable!("the sample is version 4"),
     };
-    type Corruption = fn(&mut DocumentV4);
+    type Corruption = fn(&mut DocumentV5);
     let cases: [(Corruption, InvalidDocument); 5] = [
         (
             |f| f.measurements[0].line_opacity = 1.5,
@@ -603,10 +687,12 @@ fn invalid_measurement_and_area_styles_are_rejected() {
 #[test]
 fn invalid_contents_are_rejected() {
     let valid = || match DocumentFile::from_ron(VERSION_1_SAMPLE).unwrap() {
-        DocumentFile::V1(file) => DocumentV4::from(DocumentV3::from(DocumentV2::from(file))),
+        DocumentFile::V1(file) => {
+            DocumentV5::from(DocumentV4::from(DocumentV3::from(DocumentV2::from(file))))
+        }
         _ => unreachable!("the sample is version 1"),
     };
-    type Corruption = fn(&mut DocumentV4);
+    type Corruption = fn(&mut DocumentV5);
     let cases: [(Corruption, InvalidDocument); 7] = [
         (|f| f.width = 0, InvalidDocument::EmptySize),
         (
@@ -773,7 +859,7 @@ fn loading_reports_what_went_wrong() {
 #[test]
 fn invalid_areas_are_rejected() {
     let valid = || match DocumentFile::from_ron(VERSION_2_SAMPLE).unwrap() {
-        DocumentFile::V2(file) => DocumentV4::from(DocumentV3::from(file)),
+        DocumentFile::V2(file) => DocumentV5::from(DocumentV4::from(DocumentV3::from(file))),
         _ => unreachable!("the sample is version 2"),
     };
 

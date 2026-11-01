@@ -16,6 +16,18 @@ pub fn icon_button(ui: &mut egui::Ui, icon: MaterialIcon, tooltip: &str, enabled
         .clicked()
 }
 
+/// A selectable icon button with a tooltip; returns whether it was clicked.
+pub fn selectable_icon_button(
+    ui: &mut egui::Ui,
+    icon: MaterialIcon,
+    selected: bool,
+    tooltip: &str,
+) -> bool {
+    ui.selectable_label(selected, icon_text(icon))
+        .on_hover_text(tooltip)
+        .clicked()
+}
+
 /// `icon` at the tool bar icon size.
 pub fn icon_text(icon: MaterialIcon) -> egui::RichText {
     icon.rich_text().size(ICON_SIZE)

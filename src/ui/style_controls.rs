@@ -12,7 +12,7 @@ use gridtool::style::{
 use super::color_swatch;
 use super::commit_field::CommitField;
 use super::format::{format_length, parse_number};
-use super::icon_button::icon_button;
+use super::icon_button::{icon_button, selectable_icon_button};
 use super::icons;
 use super::opacity_slider;
 use super::unit_picker;
@@ -38,6 +38,14 @@ impl StyleEvents {
     }
 }
 
+/// The colour of the line of what is being edited.
+#[derive(Clone, Copy)]
+struct LineColor {
+    stored: Rgb,
+    /// With any edit being previewed.
+    displayed: Rgb,
+}
+
 #[derive(Default)]
 pub struct StyleControls {
     fields: CommitField,
@@ -59,7 +67,11 @@ impl StyleControls {
         self.line(ui, id, stored.line(), displayed.line(), &mut events);
         if let (Some(fill), Some(shown)) = (stored.fill(), displayed.fill()) {
             ui.separator();
-            self.fill(ui, id, fill, shown, &mut events);
+            let line_color = LineColor {
+                stored: stored.line().color,
+                displayed: displayed.line().color,
+            };
+            self.fill(ui, id, fill, shown, line_color, &mut events);
             if fill.style.has_lines()
                 && let Some(reason) = scale_problem
             {
@@ -110,6 +122,7 @@ impl StyleControls {
         id: egui::Id,
         stored: FillAppearance,
         displayed: FillAppearance,
+        line_color: LineColor,
         events: &mut StyleEvents,
     ) {
         ui.label("Fill:");
@@ -122,15 +135,7 @@ impl StyleControls {
             self.fill_angle(ui, id, stored, events);
         }
         if stored.style != FillStyle::None {
-            color(
-                ui,
-                id.with("fill_color"),
-                "Fill color:",
-                "Choose the colour of the fill",
-                stored.color,
-                StyleEdit::FillColor,
-                events,
-            );
+            fill_color(ui, id.with("fill_color"), stored.color, line_color, events);
             opacity(
                 ui,
                 "Fill opacity:",
@@ -251,8 +256,7 @@ fn style_buttons<S: Copy + PartialEq>(
     picked
 }
 
-/// A labelled colour swatch. The colour previews while the picker is open and is committed
-/// once when it closes.
+/// A labelled colour swatch.
 fn color(
     ui: &mut egui::Ui,
     id: egui::Id,
@@ -263,6 +267,65 @@ fn color(
     events: &mut StyleEvents,
 ) {
     ui.add(egui::Label::new(label).extend());
+    swatch(ui, id, tooltip, stored, edit, events);
+}
+
+/// The fill's colour: a padlock, selected while the fill has no colour of its own, and a
+/// swatch that can only be used while it does.
+fn fill_color(
+    ui: &mut egui::Ui,
+    id: egui::Id,
+    stored: Option<Rgb>,
+    line_color: LineColor,
+    events: &mut StyleEvents,
+) {
+    ui.add(egui::Label::new("Fill color:").extend());
+    let (icon, tooltip, swatch_tooltip) = match stored {
+        None => (
+            icons::LOCKED,
+            "The fill uses the line's colour. Click to choose its own",
+            "Click the padlock to choose the colour of the fill",
+        ),
+        Some(_) => (
+            icons::UNLOCKED,
+            "The fill has its own colour. Click to use the line's colour, forgetting this one",
+            "Choose the colour of the fill",
+        ),
+    };
+    if selectable_icon_button(ui, icon, stored.is_none(), tooltip) {
+        events.commit(Some(padlock_edit(stored, line_color.stored)));
+    }
+    ui.add_enabled_ui(stored.is_some(), |ui| {
+        swatch(
+            ui,
+            id,
+            swatch_tooltip,
+            stored.unwrap_or(line_color.displayed),
+            |color| StyleEdit::FillColor(Some(color)),
+            events,
+        );
+    });
+}
+
+/// What clicking the padlock does to a fill whose own colour is `stored`, on an object whose
+/// line is `line_color`: it takes on the line's colour, or forgets its own.
+fn padlock_edit(stored: Option<Rgb>, line_color: Rgb) -> StyleEdit {
+    match stored {
+        None => StyleEdit::FillColor(Some(line_color)),
+        Some(_) => StyleEdit::FillColor(None),
+    }
+}
+
+/// A colour swatch. The colour previews while the picker is open and is committed once when
+/// it closes.
+fn swatch(
+    ui: &mut egui::Ui,
+    id: egui::Id,
+    tooltip: &str,
+    stored: Rgb,
+    edit: fn(Rgb) -> StyleEdit,
+    events: &mut StyleEvents,
+) {
     let swatch = color_swatch::show(ui, id, stored, color_swatch::BAR_SWATCH_SIZE, tooltip);
     if let Some(color) = swatch.preview {
         events.preview = Some(edit(color));
@@ -315,6 +378,88 @@ mod tests {
         assert_eq!(typed_angle(Some("180"), 0.0), None);
         assert_eq!(typed_angle(Some("abc"), 0.0), None);
         assert_eq!(typed_angle(None, 0.0), None);
+    }
+
+    #[test]
+    fn the_padlock_takes_on_the_line_colour_or_forgets_the_fills_own() {
+        assert_eq!(
+            padlock_edit(None, Rgb::CYAN),
+            StyleEdit::FillColor(Some(Rgb::CYAN))
+        );
+        assert_eq!(
+            padlock_edit(Some(Rgb::GREEN), Rgb::CYAN),
+            StyleEdit::FillColor(None)
+        );
+    }
+
+    /// Clicks along a row showing the fill colour controls, returning the edits they complete
+    /// and whether a colour picker ever opened.
+    fn click_along_fill_color(stored: Option<Rgb>) -> (Vec<StyleEdit>, bool) {
+        const ROW_Y: f32 = 10.0;
+        let line_color = LineColor {
+            stored: Rgb::CYAN,
+            displayed: Rgb::CYAN,
+        };
+        let ctx = egui::Context::default();
+        egui_material_icons::initialize(&ctx);
+        let mut edits = Vec::new();
+        let mut picker_opened = false;
+        for x in (0..200).step_by(4) {
+            let pos = egui::Pos2::new(x as f32, ROW_Y);
+            let button = |pressed| egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            };
+            for events in [
+                vec![egui::Event::PointerMoved(pos)],
+                vec![button(true)],
+                vec![button(false)],
+                Vec::new(),
+            ] {
+                let input = egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::Vec2::new(800.0, 600.0),
+                    )),
+                    events,
+                    ..Default::default()
+                };
+                let mut output = ctx.run_ui(input, |ui| {
+                    ui.horizontal(|ui| {
+                        let mut events = StyleEvents::default();
+                        fill_color(ui, ui.scope_id(), stored, line_color, &mut events);
+                        edits.extend(events.commit);
+                    });
+                });
+                output.textures_delta.clear();
+                picker_opened |= egui::Popup::is_any_open(&ctx);
+            }
+        }
+        (edits, picker_opened)
+    }
+
+    #[test]
+    fn with_no_fill_colour_the_padlock_sets_the_line_colour_and_the_swatch_is_disabled() {
+        let (edits, picker_opened) = click_along_fill_color(None);
+
+        assert!(!edits.is_empty());
+        assert!(
+            edits
+                .iter()
+                .all(|&edit| edit == StyleEdit::FillColor(Some(Rgb::CYAN))),
+            "{edits:?}"
+        );
+        assert!(!picker_opened);
+    }
+
+    #[test]
+    fn with_a_fill_colour_the_padlock_forgets_it_and_the_swatch_opens_the_picker() {
+        let (edits, picker_opened) = click_along_fill_color(Some(Rgb::GREEN));
+
+        assert!(edits.contains(&StyleEdit::FillColor(None)), "{edits:?}");
+        assert!(picker_opened);
     }
 
     #[test]

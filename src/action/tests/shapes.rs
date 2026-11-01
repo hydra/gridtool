@@ -113,7 +113,7 @@ fn sets_every_style_of_a_closed_shape() {
         },
         Action::SetStyle {
             target: StyleTarget::Shape(1),
-            edit: StyleEdit::FillColor(Rgb::new(4, 5, 6)),
+            edit: StyleEdit::FillColor(Some(Rgb::new(4, 5, 6))),
         },
         Action::SetStyle {
             target: StyleTarget::Shape(1),
@@ -140,7 +140,7 @@ fn sets_every_style_of_a_closed_shape() {
     assert_eq!(shape.line().color, Rgb::new(1, 2, 3));
     assert_eq!(shape.line().opacity, 0.25);
     assert_eq!(shape.stored_fill().style, FillStyle::Crosshatch);
-    assert_eq!(shape.stored_fill().color, Rgb::new(4, 5, 6));
+    assert_eq!(shape.stored_fill().color, Some(Rgb::new(4, 5, 6)));
     // Changing the unit keeps the value.
     assert_eq!(shape.stored_fill().spacing, 50.0);
     assert_eq!(shape.stored_fill().unit, LengthUnit::Metre);
@@ -233,7 +233,7 @@ fn rejects_invalid_shape_edits() {
         (
             Action::SetStyle {
                 target: StyleTarget::Shape(0),
-                edit: StyleEdit::FillColor(Rgb::new(1, 2, 3)),
+                edit: StyleEdit::FillColor(Some(Rgb::new(1, 2, 3))),
             },
             not_closed.clone(),
         ),
@@ -380,7 +380,7 @@ fn every_shape_action_can_be_undone_and_redone() {
         },
         Action::SetStyle {
             target: StyleTarget::Shape(0),
-            edit: StyleEdit::FillColor(Rgb::new(4, 5, 6)),
+            edit: StyleEdit::FillColor(Some(Rgb::new(4, 5, 6))),
         },
         Action::SetStyle {
             target: StyleTarget::Shape(0),
@@ -516,7 +516,7 @@ fn describes_shape_actions() {
         (
             Action::SetStyle {
                 target: StyleTarget::Shape(1),
-                edit: StyleEdit::FillColor(Rgb::new(255, 128, 0)),
+                edit: StyleEdit::FillColor(Some(Rgb::new(255, 128, 0))),
             },
             "Set shape 2 fill color to #FF8000",
         ),

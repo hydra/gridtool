@@ -910,6 +910,7 @@ fn paint_areas(
             transform,
             scale,
             area.stored_fill(),
+            area.stored_fill().drawn_color(area.line().color),
             area.points(),
             &on_screen,
         );
@@ -959,7 +960,8 @@ fn paint_pending_outline(
 
     if closing {
         if let Some(fill) = style.fill {
-            paint_fill(painter, transform, scale, fill, points, &on_screen);
+            let color = fill.drawn_color(style.line.color);
+            paint_fill(painter, transform, scale, fill, color, points, &on_screen);
         }
         paint_line(painter, style.line, &on_screen, true);
     } else {

@@ -21,7 +21,7 @@ pub const DEFAULT_LINE: LineAppearance = LineAppearance::new(LineStyle::Thick, D
 
 /// The fill of a new area, whose fill line distance is in `unit`.
 pub const fn default_fill(unit: LengthUnit) -> FillAppearance {
-    FillAppearance::new(FillStyle::Solid, DEFAULT_COLOR, DEFAULT_FILL_OPACITY, unit)
+    FillAppearance::new(FillStyle::Solid, DEFAULT_FILL_OPACITY, unit)
 }
 
 /// A closed outline through three or more points (convex or concave), with its own

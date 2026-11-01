@@ -3,6 +3,7 @@
 
 use eframe::egui::{self, Pos2, Rect, Shape, Stroke, Vec2};
 use gridtool::calibration::Scale;
+use gridtool::color::Rgb;
 use gridtool::document::Document;
 use gridtool::geometry::Point;
 use gridtool::style::{FillAppearance, FillStyle, LineAppearance, LineStyle, Styled};
@@ -32,7 +33,16 @@ pub fn paint_shapes(
         let drawn = selection.displayed_drawn(stored.id(), stored);
         let on_screen = to_screen(transform, drawn.points());
         if let Some(fill) = drawn.fill() {
-            paint_fill(painter, transform, scale, fill, drawn.points(), &on_screen);
+            let color = fill.drawn_color(drawn.line().color);
+            paint_fill(
+                painter,
+                transform,
+                scale,
+                fill,
+                color,
+                drawn.points(),
+                &on_screen,
+            );
         }
         paint_line(painter, drawn.line(), &on_screen, drawn.is_closed());
         if selection.active() == Some(stored.id()) {
@@ -43,17 +53,19 @@ pub fn paint_shapes(
     }
 }
 
-/// Fills the closed outline through `points` (image coordinates, drawn at `on_screen`).
-/// Fill lines are a real-world distance apart, so they are drawn only if there is a `scale`.
+/// Fills the closed outline through `points` (image coordinates, drawn at `on_screen`) in
+/// `color`. Fill lines are a real-world distance apart, so they are drawn only if there is a
+/// `scale`.
 pub fn paint_fill(
     painter: &egui::Painter,
     transform: DocumentTransform,
     scale: Option<Scale>,
     fill: FillAppearance,
+    color: Rgb,
     points: &[Point],
     on_screen: &[Pos2],
 ) {
-    let color = with_opacity(fill.color, fill.opacity);
+    let color = with_opacity(color, fill.opacity);
     if fill.style == FillStyle::Solid {
         fill_outline(painter, points, on_screen, color);
         return;

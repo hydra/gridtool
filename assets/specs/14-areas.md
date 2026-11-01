@@ -59,8 +59,8 @@ Further rules:
 - **line style**, **line colour** and **line opacity**, as for a drawn shape (`DRAW-8`):
   Thick, **cyan** (`#00FFFF`) and 100 % for a new area.
 - **fill style**, **fill colour**, **fill spacing**, **fill unit**, **fill angle** and
-  **fill opacity**, as for a drawn shape: Solid, cyan, 10 in the calibration's unit, 0 and
-  25 % for a new area.
+  **fill opacity**, as for a drawn shape: Solid, no colour, 1 in the calibration's unit, 0
+  and 25 % for a new area. A fill with no colour is drawn in the line colour (`DRAW-8`).
 
 The tool's controls can give a new area other values (`AREA-17`).
 
@@ -183,7 +183,8 @@ follow the calibration unit until the user picks one here.
 ## Acceptance criteria
 
 - The next area gets the unit, line and fill chosen in the tool's controls.
-- A new area has a Thick cyan line and a Solid cyan fill at 25 %.
+- A new area has a Thick cyan line and a Solid fill at 25 % with no colour of its own, so it is
+  drawn in cyan and follows any change to the line colour.
 
 - Calculation (`AREA-7`):
   - With sx = 0.5 and sy = 0.25 cm/px, the 40 × 80 px rectangle from (10, 20) is 400 cm²,

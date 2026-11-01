@@ -29,9 +29,11 @@ pub const DELETE: MaterialIcon = material::ICON_DELETE;
 pub const DUPLICATE: MaterialIcon = material::ICON_CONTENT_COPY;
 pub const ROTATE_90_LEFT: MaterialIcon = material::ICON_ROTATE_90_DEGREES_CCW;
 pub const ROTATE_90_RIGHT: MaterialIcon = material::ICON_ROTATE_90_DEGREES_CW;
+pub const LOCKED: MaterialIcon = material::ICON_LOCK;
+pub const UNLOCKED: MaterialIcon = material::ICON_LOCK_OPEN;
 
 #[cfg(test)]
-pub const ALL: [MaterialIcon; 19] = [
+pub const ALL: [MaterialIcon; 21] = [
     NEW,
     LOAD,
     SAVE,
@@ -51,6 +53,8 @@ pub const ALL: [MaterialIcon; 19] = [
     DUPLICATE,
     ROTATE_90_LEFT,
     ROTATE_90_RIGHT,
+    LOCKED,
+    UNLOCKED,
 ];
 
 #[cfg(test)]

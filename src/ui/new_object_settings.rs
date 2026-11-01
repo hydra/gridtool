@@ -124,10 +124,25 @@ mod tests {
         let areas = NewObjectSettings::for_areas().style(unit);
         assert_eq!(areas.line.style, LineStyle::Thick);
         assert_eq!(areas.fill.unwrap().style, FillStyle::Solid);
+        assert_eq!(areas.fill.unwrap().color, None);
 
         let shapes = NewObjectSettings::for_shapes().style(unit);
         assert_eq!(shapes.line.style, LineStyle::Thin);
         assert_eq!(shapes.fill.unwrap().style, FillStyle::None);
+        assert_eq!(shapes.fill.unwrap().color, None);
+    }
+
+    #[test]
+    fn the_next_objects_fill_can_be_given_a_colour_and_have_it_forgotten() {
+        let mut settings = NewObjectSettings::for_areas();
+
+        settings.apply(StyleEdit::FillColor(Some(Rgb::GREEN)));
+        let fill = settings.style(LengthUnit::Metre).fill.unwrap();
+        assert_eq!(fill.color, Some(Rgb::GREEN));
+
+        settings.apply(StyleEdit::FillColor(None));
+        let fill = settings.style(LengthUnit::Metre).fill.unwrap();
+        assert_eq!(fill.color, None);
     }
 
     #[test]

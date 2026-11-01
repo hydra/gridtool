@@ -152,7 +152,9 @@ impl LineAppearance {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FillAppearance {
     pub style: FillStyle,
-    pub color: Rgb,
+    /// The colour the user chose, if any; without one, the fill is drawn in the colour of
+    /// the object's line.
+    pub color: Option<Rgb>,
     /// Real-world distance between fill lines, in `unit`.
     pub spacing: f64,
     pub unit: LengthUnit,
@@ -164,16 +166,22 @@ pub struct FillAppearance {
 }
 
 impl FillAppearance {
-    /// A fill with horizontal fill lines the default distance apart, in `unit`.
-    pub const fn new(style: FillStyle, color: Rgb, opacity: f32, unit: LengthUnit) -> Self {
+    /// A fill with no colour of its own and horizontal fill lines the default distance apart,
+    /// in `unit`.
+    pub const fn new(style: FillStyle, opacity: f32, unit: LengthUnit) -> Self {
         Self {
             style,
-            color,
+            color: None,
             spacing: DEFAULT_FILL_SPACING,
             unit,
             angle: DEFAULT_FILL_ANGLE,
             opacity,
         }
+    }
+
+    /// The colour to draw the fill in, for an object whose line is `line_color`.
+    pub fn drawn_color(&self, line_color: Rgb) -> Rgb {
+        self.color.unwrap_or(line_color)
     }
 
     pub fn validate(&self) -> Result<(), InvalidStyle> {
@@ -232,7 +240,8 @@ pub enum StyleEdit {
     LineColor(Rgb),
     LineOpacity(f32),
     FillStyle(FillStyle),
-    FillColor(Rgb),
+    /// The fill's own colour, or `None` for it to have none.
+    FillColor(Option<Rgb>),
     /// The distance between fill lines, in the fill's unit.
     FillSpacing(f64),
     /// The unit of the distance between fill lines, keeping its value.
@@ -293,7 +302,8 @@ impl fmt::Display for StyleEdit {
             Self::LineColor(color) => write!(f, "line color to {color}"),
             Self::LineOpacity(opacity) => write!(f, "line opacity to {}%", percent(opacity)),
             Self::FillStyle(style) => write!(f, "fill style to {}", style.name()),
-            Self::FillColor(color) => write!(f, "fill color to {color}"),
+            Self::FillColor(Some(color)) => write!(f, "fill color to {color}"),
+            Self::FillColor(None) => f.write_str("fill color to none"),
             Self::FillSpacing(spacing) => write!(f, "fill spacing to {spacing}"),
             Self::FillUnit(unit) => write!(f, "fill units to {unit}"),
             Self::FillAngle(degrees) => write!(f, "fill angle to {degrees}°"),
@@ -388,16 +398,23 @@ mod tests {
     fn fill(style: FillStyle) -> FillAppearance {
         FillAppearance {
             spacing: 10.0,
-            ..FillAppearance::new(style, ORANGE, 0.5, CM)
+            ..FillAppearance::new(style, 0.5, CM)
         }
     }
 
     #[test]
     fn a_new_fill_has_its_lines_1_unit_apart() {
-        assert_eq!(
-            FillAppearance::new(FillStyle::Lines, ORANGE, 0.5, CM).spacing,
-            1.0
-        );
+        assert_eq!(FillAppearance::new(FillStyle::Lines, 0.5, CM).spacing, 1.0);
+    }
+
+    #[test]
+    fn a_fill_is_drawn_in_its_own_colour_or_else_the_lines() {
+        let mut fill = FillAppearance::new(FillStyle::Solid, 0.5, CM);
+        assert_eq!(fill.color, None);
+        assert_eq!(fill.drawn_color(Rgb::CYAN), Rgb::CYAN);
+
+        fill.color = Some(ORANGE);
+        assert_eq!(fill.drawn_color(Rgb::CYAN), ORANGE);
     }
 
     fn near(a: f64, b: f64) -> bool {
@@ -649,7 +666,8 @@ mod tests {
                 StyleEdit::FillStyle(FillStyle::Lines),
                 "fill style to Lines",
             ),
-            (StyleEdit::FillColor(ORANGE), "fill color to #FF8000"),
+            (StyleEdit::FillColor(Some(ORANGE)), "fill color to #FF8000"),
+            (StyleEdit::FillColor(None), "fill color to none"),
             (StyleEdit::FillSpacing(50.0), "fill spacing to 50"),
             (StyleEdit::FillUnit(LengthUnit::Metre), "fill units to m"),
             (StyleEdit::FillAngle(22.5), "fill angle to 22.5°"),
