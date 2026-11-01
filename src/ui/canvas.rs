@@ -1710,6 +1710,33 @@ mod tests {
     }
 
     #[test]
+    fn the_pan_cursor_grabs_while_hovering_and_dragging() {
+        let mut harness = Harness::new(ToolMode::Pan);
+
+        assert_eq!(harness.cursor_over(EMPTY_SPOT), CursorIcon::Grab);
+
+        harness.press_and_drag(EMPTY_SPOT, EMPTY_SPOT + DRAG_BY);
+        assert_eq!(harness.cursor, CursorIcon::Grabbing);
+    }
+
+    #[test]
+    fn right_dragging_shows_the_grabbing_cursor_in_every_mode() {
+        for mode in ToolMode::ALL {
+            let mut harness = Harness::new(mode);
+            harness.frame(vec![Event::PointerMoved(EMPTY_SPOT)]);
+            harness.frame(vec![Event::PointerButton {
+                pos: EMPTY_SPOT,
+                button: PointerButton::Secondary,
+                pressed: true,
+                modifiers: Modifiers::NONE,
+            }]);
+            harness.frame(vec![Event::PointerMoved(EMPTY_SPOT + DRAG_BY)]);
+
+            assert_eq!(harness.cursor, CursorIcon::Grabbing, "{mode:?}");
+        }
+    }
+
+    #[test]
     fn mouse_wheel_zooms_in_every_mode() {
         for mode in ToolMode::ALL {
             let mut harness = Harness::new(mode);
