@@ -53,7 +53,8 @@ object is chosen.
   | Pan & zoom | Help text: "`Drag to pan the view. Scroll to zoom.`" |
   | Origin | Help text: "`Click on the image to move the origin, the point the view rotates about.`" |
 
-  Help text is in weak text, and wraps like controls. With no document open, the row is empty.
+  With no document open, it is the help text "`Open an image to get started`", whichever
+  tool was active. Help text is in weak text, and wraps like controls.
 
 **SHELL-3.** When no document is open, the canvas area shows the centred message
 "`Open an image to get started.`"
@@ -111,13 +112,17 @@ one place.
 
 ## Tool modes
 
-**SHELL-8.** There is exactly one active tool mode at a time. The modes are **Pan &
+**SHELL-8.** While a document is open there is exactly one active tool mode. With no document
+open there is none, as every tool works on a document's image. The modes are **Pan &
 zoom**, **Rotate view**, **Scale**, **Measure distance**, **Measure area**, **Grid**,
-**Origin** and **Draw line**. **Pan & zoom is the default** when the application starts.
+**Origin** and **Draw line**. **Pan & zoom is the default**: it becomes active when a document
+opens with none open before.
 
 **SHELL-9.** The mode buttons work like a radio group. The active mode's button is shown
 as selected, and clicking a mode button makes that mode active. The active mode is
-application state and stays the same when a different image is opened.
+application state and stays the same when a different image is opened in place of an open
+document. With no document open, every mode button is disabled and none is shown as selected,
+and the mode chosen before is forgotten.
 
 **SHELL-10.** New modes will be added later. The list of modes, and which of them start a
 new group of buttons (`SHELL-5`), MUST be defined in one place, so that adding a mode needs
@@ -187,9 +192,14 @@ presence shows whether something can be scrolled.
 - In the tool bar, Measure distance comes directly after Scale, Measure area directly
   after Measure distance, and Grid directly after Measure area. Draw line comes directly
   after Origin and starts a new group.
+- Tool modes (`SHELL-8`, `SHELL-9`):
+  - With no document, no tool is active, clicking along the tool bar changes no mode, and only
+    New, Load and Open image respond. Undo and Redo are disabled (`HIST-9`).
+  - With a document, the chosen tool is active and every tool can be chosen.
 - Tool controls row (`SHELL-2a`):
   - The canvas starts at the same place in every tool mode, and with a drawn shape active.
-  - Without a document, the row is still at least its minimum height.
+  - Without a document, the row is still at least its minimum height and shows its help text,
+    which no tool mode shows with a document open.
   - Only Pan & zoom and Origin show help text, and an active object's controls replace it. In a
     narrow window it wraps.
   - In a narrow window the controls wrap and the canvas starts lower; widening it again

@@ -318,7 +318,7 @@ fn fill_color(
             "Choose the colour of the fill",
         ),
     };
-    if selectable_icon_button(ui, icon, stored.is_none(), tooltip) {
+    if selectable_icon_button(ui, icon, stored.is_none(), tooltip, true) {
         events.commit(Some(padlock_edit(stored, line_color.stored)));
     }
     ui.add_enabled_ui(stored.is_some(), |ui| {

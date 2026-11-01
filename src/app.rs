@@ -122,6 +122,10 @@ impl Default for GridToolApp {
 impl eframe::App for GridToolApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        // With no document there is no active tool, so the next document starts afresh.
+        if self.session.document().is_none() {
+            self.mode = ToolMode::default();
+        }
         self.handle_close_request(&ctx);
         let state = self.tool_bar_state();
         // A dialog answers Escape itself.

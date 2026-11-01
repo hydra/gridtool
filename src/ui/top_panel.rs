@@ -1,6 +1,6 @@
 use eframe::egui;
 
-use super::icon_button::{icon_button, icon_text};
+use super::icon_button::{icon_button, selectable_icon_button};
 use super::icons;
 use super::tool_mode::ToolMode;
 
@@ -28,6 +28,14 @@ pub struct ToolBarState {
     pub has_unsaved_changes: bool,
     pub can_undo: bool,
     pub can_redo: bool,
+}
+
+impl ToolBarState {
+    /// The tool shown as active, given the `mode` last chosen. Every tool works on a document,
+    /// so without one no tool is active.
+    fn active_tool(self, mode: ToolMode) -> Option<ToolMode> {
+        self.has_document.then_some(mode)
+    }
 }
 
 /// What came of drawing the tool bar.
@@ -81,8 +89,11 @@ pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> TopP
                     if tool.starts_group() {
                         ui.add_space(SECTION_SPACING);
                     }
-                    ui.selectable_value(mode, tool, icon_text(tool.icon()))
-                        .on_hover_text(tool.name());
+                    let selected = state.active_tool(*mode) == Some(tool);
+                    let enabled = state.has_document;
+                    if selectable_icon_button(ui, tool.icon(), selected, tool.name(), enabled) {
+                        *mode = tool;
+                    }
                 }
 
                 ui.add_space(SECTION_SPACING);
@@ -108,4 +119,105 @@ pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> TopP
             }
         })
         .inner
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eframe::egui::{Event, Modifiers, PointerButton, Pos2, RawInput, Rect};
+
+    const WIDTH: f32 = 900.0;
+    /// Inside the row of buttons.
+    const ROW_Y: f32 = 16.0;
+
+    /// Clicks along the tool bar, a few points apart, returning the modes it chose along the
+    /// way and the actions it triggered, each once however many clicks landed on its button.
+    fn click_along_the_tool_bar(state: ToolBarState) -> (Vec<ToolMode>, Vec<TopPanelAction>) {
+        let ctx = egui::Context::default();
+        egui_material_icons::initialize(&ctx);
+        let (mut mode, mut modes, mut actions) = (ToolMode::Origin, Vec::new(), Vec::new());
+        for x in (0..WIDTH as u32).step_by(6) {
+            let pos = Pos2::new(x as f32, ROW_Y);
+            let button = |pressed| Event::PointerButton {
+                pos,
+                button: PointerButton::Primary,
+                pressed,
+                modifiers: Modifiers::NONE,
+            };
+            for events in [
+                vec![Event::PointerMoved(pos)],
+                vec![button(true)],
+                vec![button(false)],
+                Vec::new(),
+            ] {
+                let input = RawInput {
+                    screen_rect: Some(Rect::from_min_max(Pos2::ZERO, Pos2::new(WIDTH, 600.0))),
+                    events,
+                    ..Default::default()
+                };
+                let mut output = ctx.run_ui(input, |ui| {
+                    if let Some(action) = show(ui, &mut mode, state).action
+                        && actions.last() != Some(&action)
+                    {
+                        actions.push(action);
+                    }
+                });
+                output.textures_delta.clear();
+                if modes.last() != Some(&mode) {
+                    modes.push(mode);
+                }
+            }
+        }
+        (modes, actions)
+    }
+
+    #[test]
+    fn with_no_document_no_tool_is_active_and_only_opening_buttons_work() {
+        let state = ToolBarState::default();
+        assert_eq!(state.active_tool(ToolMode::Pan), None);
+
+        let (modes, actions) = click_along_the_tool_bar(state);
+
+        assert_eq!(modes, [ToolMode::Origin], "the mode cannot change");
+        assert_eq!(
+            actions,
+            [
+                TopPanelAction::New,
+                TopPanelAction::Load,
+                TopPanelAction::OpenImage
+            ]
+        );
+    }
+
+    #[test]
+    fn undo_and_redo_work_when_the_state_says_they_can() {
+        let state = ToolBarState {
+            has_document: true,
+            can_undo: true,
+            can_redo: true,
+            ..Default::default()
+        };
+
+        let (_, actions) = click_along_the_tool_bar(state);
+
+        assert!(actions.contains(&TopPanelAction::Undo), "{actions:?}");
+        assert!(actions.contains(&TopPanelAction::Redo), "{actions:?}");
+    }
+
+    #[test]
+    fn with_a_document_the_chosen_tool_is_active_and_every_tool_can_be_chosen() {
+        let state = ToolBarState {
+            has_document: true,
+            ..Default::default()
+        };
+        assert_eq!(state.active_tool(ToolMode::Grid), Some(ToolMode::Grid));
+
+        let (modes, actions) = click_along_the_tool_bar(state);
+
+        for tool in ToolMode::ALL {
+            assert!(modes.contains(&tool), "{tool:?} in {modes:?}");
+        }
+        assert!(!actions.contains(&TopPanelAction::Undo));
+        assert!(!actions.contains(&TopPanelAction::Redo));
+    }
 }

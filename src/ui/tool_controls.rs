@@ -20,6 +20,7 @@ use super::style_controls::{StyleControls, StyleEvents};
 use super::tool_mode::ToolMode;
 use super::unit_picker;
 
+const NO_DOCUMENT_HELP: &str = "Open an image to get started";
 const PAN_HELP: &str = "Drag to pan the view. Scroll to zoom.";
 const ORIGIN_HELP: &str =
     "Click on the image to move the origin, the point the view rotates about.";
@@ -40,7 +41,7 @@ pub struct ToolControls {
 
 impl ToolControls {
     /// Shows the row, at least `min_height` tall, returning the action the user completed,
-    /// if any. There is nothing to control without an open document.
+    /// if any. There is nothing to control without an open document, so it says how to open one.
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
@@ -53,7 +54,10 @@ impl ToolControls {
                 ui.set_min_height(min_height);
                 ui.horizontal_wrapped(|ui| {
                     ui.set_row_height(min_height);
-                    let (view, document) = open?;
+                    let Some((view, document)) = open else {
+                        ui.weak(NO_DOCUMENT_HELP);
+                        return None;
+                    };
                     let active = view.selection.active().and_then(|id| {
                         let kind = document.object_kind(id)?;
                         Some((id, kind))
@@ -506,6 +510,31 @@ mod tests {
         }
 
         assert!(canvas_top >= MIN_HEIGHT, "{canvas_top}");
+    }
+
+    #[test]
+    fn without_a_document_the_row_says_how_to_get_started() {
+        let ctx = egui::Context::default();
+        let mut controls = ToolControls::default();
+        let mut output = ctx.run_ui(RawInput::default(), |ui| {
+            controls.show(ui, ToolMode::Pan, MIN_HEIGHT, None);
+        });
+        output.textures_delta.clear();
+
+        assert!(output.shapes.iter().any(|clipped| match &clipped.shape {
+            egui::Shape::Text(shape) => shape.galley.job.text.contains(NO_DOCUMENT_HELP),
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn with_a_document_the_row_does_not_say_how_to_get_started() {
+        for mode in ToolMode::ALL {
+            let mut harness = Harness::new(mode);
+            harness.settled_canvas_top();
+
+            assert!(!harness.shows_text(NO_DOCUMENT_HELP), "{mode:?}");
+        }
     }
 
     #[test]

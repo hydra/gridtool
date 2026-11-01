@@ -16,15 +16,18 @@ pub fn icon_button(ui: &mut egui::Ui, icon: MaterialIcon, tooltip: &str, enabled
         .clicked()
 }
 
-/// A selectable icon button with a tooltip; returns whether it was clicked.
+/// A selectable icon button with a tooltip (shown even while disabled); returns whether it
+/// was clicked.
 pub fn selectable_icon_button(
     ui: &mut egui::Ui,
     icon: MaterialIcon,
     selected: bool,
     tooltip: &str,
+    enabled: bool,
 ) -> bool {
-    ui.selectable_label(selected, icon_text(icon))
+    ui.add_enabled(enabled, egui::Button::selectable(selected, icon_text(icon)))
         .on_hover_text(tooltip)
+        .on_disabled_hover_text(tooltip)
         .clicked()
 }
 
