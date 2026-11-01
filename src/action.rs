@@ -238,7 +238,7 @@ impl fmt::Display for ActionError {
                 write!(f, "fill spacing must be a positive number, got {spacing}")
             }
             Self::InvalidFillAngle(degrees) => {
-                write!(f, "fill angle must be from 0 up to 180, got {degrees}")
+                write!(f, "fill angle must be from 0 up to 360, got {degrees}")
             }
             Self::Calibration(error) => error.fmt(f),
         }

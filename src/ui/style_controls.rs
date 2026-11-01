@@ -6,7 +6,7 @@
 use eframe::egui;
 use gridtool::color::Rgb;
 use gridtool::style::{
-    FillAngles, FillAppearance, FillStyle, LineAppearance, LineStyle, StyleEdit, Styled,
+    FULL_TURN, FillAngles, FillAppearance, FillStyle, LineAppearance, LineStyle, StyleEdit, Styled,
     normalized_fill_angle,
 };
 
@@ -20,7 +20,8 @@ use super::unit_picker;
 
 const SPACING_FIELD_WIDTH: f32 = 60.0;
 const ANGLE_FIELD_WIDTH: f32 = 45.0;
-const QUARTER_TURN: f64 = 90.0;
+/// How far one click of a rotate button turns the fill lines, in degrees.
+const FILL_ROTATION_STEP: f64 = 45.0;
 
 /// What the user did with the controls this frame.
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -198,7 +199,7 @@ impl StyleControls {
         );
     }
 
-    /// The direction of the fill lines: buttons that turn them a quarter turn, and a field
+    /// The direction of the fill lines: buttons that turn them by a fixed step, and a field
     /// for any other angle.
     fn fill_angle(
         &mut self,
@@ -210,20 +211,20 @@ impl StyleControls {
         let left = icon_button(
             ui,
             icons::ROTATE_90_LEFT,
-            "Rotate the fill lines 90° left",
+            &format!("Rotate the fill lines {FILL_ROTATION_STEP}° left"),
             true,
         );
         let right = icon_button(
             ui,
             icons::ROTATE_90_RIGHT,
-            "Rotate the fill lines 90° right",
+            &format!("Rotate the fill lines {FILL_ROTATION_STEP}° right"),
             true,
         );
         if left {
-            events.commit(Some(rotated_fill(fill.angle, -QUARTER_TURN)));
+            events.commit(Some(rotated_fill(fill.angle, -FILL_ROTATION_STEP)));
         }
         if right {
-            events.commit(Some(rotated_fill(fill.angle, QUARTER_TURN)));
+            events.commit(Some(rotated_fill(fill.angle, FILL_ROTATION_STEP)));
         }
 
         let tooltip = "Angle of the fill lines, in degrees clockwise from vertical";
@@ -247,10 +248,11 @@ fn typed_spacing(text: Option<&str>, current: f64) -> Option<f64> {
         .filter(|&spacing| spacing > 0.0 && spacing != current)
 }
 
-/// The angle to set from `text` typed in the field, as the equivalent angle within a half
-/// turn: only if that differs from `current`.
+/// The angle to set from `text` typed in the field: only a number from 0 to 360, where 360 means
+/// 0, that differs from `current`.
 fn typed_angle(text: Option<&str>, current: f64) -> Option<f64> {
     text.and_then(parse_number)
+        .filter(|degrees| (0.0..=FULL_TURN).contains(degrees))
         .map(normalized_fill_angle)
         .filter(|&degrees| degrees != current)
 }
@@ -396,12 +398,16 @@ mod tests {
     }
 
     #[test]
-    fn a_typed_angle_is_kept_within_a_half_turn() {
+    fn a_typed_angle_is_from_0_to_360_and_360_wraps_to_0() {
         assert_eq!(typed_angle(Some("45"), 0.0), Some(45.0));
-        assert_eq!(typed_angle(Some("225"), 0.0), Some(45.0));
-        assert_eq!(typed_angle(Some("-45"), 0.0), Some(135.0));
+        assert_eq!(typed_angle(Some("225"), 0.0), Some(225.0));
+        assert_eq!(typed_angle(Some("359.5"), 0.0), Some(359.5));
+        assert_eq!(typed_angle(Some("360"), 45.0), Some(0.0));
+        assert_eq!(typed_angle(Some("360"), 0.0), None);
+        assert_eq!(typed_angle(Some("-45"), 0.0), None);
+        assert_eq!(typed_angle(Some("361"), 0.0), None);
         // The same angle as the current one, or not a number.
-        assert_eq!(typed_angle(Some("180"), 0.0), None);
+        assert_eq!(typed_angle(Some("0"), 0.0), None);
         assert_eq!(typed_angle(Some("abc"), 0.0), None);
         assert_eq!(typed_angle(None, 0.0), None);
     }
@@ -520,9 +526,20 @@ mod tests {
     }
 
     #[test]
-    fn rotating_fill_lines_stays_within_a_half_turn() {
-        for by in [QUARTER_TURN, -QUARTER_TURN] {
-            assert_eq!(rotated_fill(120.0, by), StyleEdit::FillAngle(30.0));
+    fn rotating_fill_lines_adds_to_the_angle_and_wraps_around_a_full_turn() {
+        for (current, by, expected) in [
+            (10.0, FILL_ROTATION_STEP, 55.0),
+            (10.0, -FILL_ROTATION_STEP, 325.0),
+            (0.0, -FILL_ROTATION_STEP, 315.0),
+            (135.0, FILL_ROTATION_STEP, 180.0),
+            (315.0, FILL_ROTATION_STEP, 0.0),
+            (350.0, FILL_ROTATION_STEP, 35.0),
+        ] {
+            assert_eq!(
+                rotated_fill(current, by),
+                StyleEdit::FillAngle(expected),
+                "{current} by {by}"
+            );
         }
     }
 }

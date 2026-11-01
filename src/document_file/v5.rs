@@ -17,15 +17,15 @@ use crate::grid::{CellDimension, Grid};
 use crate::measurement::Measurement;
 use crate::object::{Identified, ObjectId};
 use crate::shape::{self, DrawnShape};
-use crate::style::{
-    FillAppearance, InvalidStyle, LineAppearance, ObjectStyle, Styled, is_valid_fill_angle,
-    normalized_fill_angle,
-};
+use crate::style::{FillAppearance, InvalidStyle, LineAppearance, ObjectStyle, Styled};
 
 use super::InvalidDocument;
 use super::v1::{CalibrationV1, ColorV1, GridV1, PointV1, ScalePointsV1, UnitV1};
 use super::v3::{FillStyleV3, LineStyleV3, ShapeV3};
 use super::v4::{AreaV4, DocumentV4, MeasurementV4};
+
+/// Versions up to 5 kept fill angles below this; version 6 does not (see [`DocumentV5::to_document`]).
+const HALF_TURN: f64 = 180.0;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DocumentV5 {
@@ -85,11 +85,15 @@ pub struct ShapeV5 {
     pub fill_opacity: f32,
 }
 
+fn is_within_half_turn(degrees: f64) -> bool {
+    (0.0..HALF_TURN).contains(&degrees)
+}
+
 /// The angle of fill lines `degrees` clockwise from the image's x axis, as version 4 stored it.
 /// An invalid angle stays invalid, so that loading rejects it.
 fn angle_from_vertical(degrees: f64) -> f64 {
-    if is_valid_fill_angle(degrees) {
-        normalized_fill_angle(degrees + 90.0)
+    if is_within_half_turn(degrees) {
+        (degrees + 90.0) % HALF_TURN
     } else {
         degrees
     }
@@ -153,6 +157,17 @@ impl From<DocumentV4> for DocumentV5 {
 }
 
 impl DocumentV5 {
+    /// Re-creates the runtime document from a file of version 5 or earlier, which is also not
+    /// valid with a fill angle of a half turn or more.
+    pub fn to_document_within_half_turn(&self) -> Result<Document, InvalidDocument> {
+        let areas = self.areas.iter().map(|area| area.fill_angle);
+        let shapes = self.shapes.iter().map(|shape| shape.fill_angle);
+        match areas.chain(shapes).find(|a| !is_within_half_turn(*a)) {
+            Some(degrees) => Err(InvalidDocument::BadFillAngle(degrees)),
+            None => self.to_document(),
+        }
+    }
+
     /// Describes `document`, whose image is referred to as `image`.
     pub fn describe(document: &Document, image: String) -> Self {
         let calibration = document.calibration();

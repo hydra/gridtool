@@ -99,7 +99,7 @@ version 3. A version 3 file is migrated to version 4 keeping how each object loo
 - an area gets a Thick line in its colour, at 100 % opacity, and a Solid fill in its colour,
   at 25 % opacity, with spacing 10 in the area's unit and angle 0
 
-**FILE-6d — Version 5 (current).** Version 5 is version 4 with two changes to `areas` and `shapes`:
+**FILE-6d — Version 5.** (no longer written; still loaded) Version 5 is version 4 with two changes to `areas` and `shapes`:
 - `fill_color` is optional, written `None` or `Some((r, g, b))` (`DRAW-8`)
 - `fill_angle` is measured clockwise from vertical, so 0 is vertical and 90 is horizontal, instead
   of clockwise from the image's x axis
@@ -107,6 +107,11 @@ version 3. A version 3 file is migrated to version 4 keeping how each object loo
 Every other field is exactly as in version 4. A version 4 file is migrated to version 5 keeping
 how each object looks: each fill keeps its colour, and each fill angle has 90 added, within a half
 turn. An angle that was not valid stays invalid, so loading still rejects it (`FILE-7`).
+
+**FILE-6e — Version 6 (current).** Version 6 has the same fields as version 5, with one change:
+`fill_angle` may be from 0 up to but not including 360 (`DRAW-8`). A version 5 file is migrated to
+version 6 unchanged. Fill angles in files of version 5 and earlier are still limited as those
+versions say, so one of a half turn or more is rejected there (`FILE-7`).
 
 **FILE-7 — Validation on load.** A loaded description is checked as strictly as actions
 check their inputs (`HIST-2`), so a hand-edited or damaged file cannot produce an invalid
@@ -120,7 +125,7 @@ document. Loading fails when:
 - the number of scale points does not match the method
 - a distance, cell size or fill spacing is not finite and > 0
 - an opacity is outside [0, 1]
-- a fill angle is not from 0 up to but not including 180
+- a fill angle is not from 0 up to but not including 360 or, in a file of version 5 or earlier, 180
 - an object id is 0, used twice, or not below `next_object_id`
 
 **FILE-8 — Loading the image.** After the description is valid, the referenced image is
@@ -246,7 +251,7 @@ and shows the dialogs.
   - a styled open line, and a closed shape with every style changed
 
   Duplicating a grid then gives the same next id in both.
-- The written text starts with `V3(`.
+- The written text starts with `V6(`.
 - A literal version 1 sample loads with the expected values; its measurements are blue and
   it has no areas or shapes.
 - A literal version 2 sample loads with the expected values, including a measurement's
@@ -255,6 +260,8 @@ and shows the dialogs.
   shape's points and styles.
 - A literal version 4 sample loads with the expected values, including a measurement's and an
   area's styles.
+- A fill angle of 225 loads from a version 6 file and is rejected from a version 5 file, and of 360
+  is rejected from both. A version 6 file otherwise reads as a version 5 file does.
 - A literal version 5 sample loads with the expected values, including a fill with no colour
   and one with a colour. A fill with no colour is still none after saving and loading.
 - Migrated files keep how their objects looked (`FILE-6c`, `FILE-6d`): a version 4 fill angle of
@@ -262,7 +269,7 @@ and shows the dialogs.
 - Each `FILE-7` failure is rejected with its reason. This includes an area with 2 points, an area point outside
   the document, an area reusing a measurement's id, an open shape with 1 point, a closed
   shape with 2 points, a shape point outside the document, an open shape with a fill, a
-  shape opacity of 1.5, a fill spacing of 0, a fill angle of 180 or -1, a shape reusing
+  shape opacity of 1.5, a fill spacing of 0, a fill angle of 360 or -1 (or of 180 in a file of version 5 or earlier), a shape reusing
   another shape's id, and a measurement's or area's opacity, fill spacing or fill angle out of
   range.
 - Image references:

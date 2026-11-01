@@ -41,12 +41,14 @@ pub enum DocumentFile {
     V3(DocumentV3),
     V4(DocumentV4),
     V5(DocumentV5),
+    /// The fields of version 5, with fill angles allowed up to a full turn.
+    V6(DocumentV5),
 }
 
 impl DocumentFile {
     /// Describes `document` in the current format version.
     pub fn describe(document: &Document, image: String) -> Self {
-        Self::V5(DocumentV5::describe(document, image))
+        Self::V6(DocumentV5::describe(document, image))
     }
 
     /// The stored image reference.
@@ -56,7 +58,7 @@ impl DocumentFile {
             Self::V2(file) => &file.image,
             Self::V3(file) => &file.image,
             Self::V4(file) => &file.image,
-            Self::V5(file) => &file.image,
+            Self::V5(file) | Self::V6(file) => &file.image,
         }
     }
 
@@ -65,15 +67,19 @@ impl DocumentFile {
         match self {
             Self::V1(file) => {
                 let v2 = DocumentV2::from(file.clone());
-                DocumentV5::from(DocumentV4::from(DocumentV3::from(v2))).to_document()
+                DocumentV5::from(DocumentV4::from(DocumentV3::from(v2)))
+                    .to_document_within_half_turn()
             }
             Self::V2(file) => {
                 let v3 = DocumentV3::from(file.clone());
-                DocumentV5::from(DocumentV4::from(v3)).to_document()
+                DocumentV5::from(DocumentV4::from(v3)).to_document_within_half_turn()
             }
-            Self::V3(file) => DocumentV5::from(DocumentV4::from(file.clone())).to_document(),
-            Self::V4(file) => DocumentV5::from(file.clone()).to_document(),
-            Self::V5(file) => file.to_document(),
+            Self::V3(file) => {
+                DocumentV5::from(DocumentV4::from(file.clone())).to_document_within_half_turn()
+            }
+            Self::V4(file) => DocumentV5::from(file.clone()).to_document_within_half_turn(),
+            Self::V5(file) => file.to_document_within_half_turn(),
+            Self::V6(file) => file.to_document(),
         }
     }
 
@@ -219,7 +225,7 @@ impl fmt::Display for InvalidDocument {
             }
             Self::NotPositive(value) => write!(f, "{value} should be a positive number"),
             Self::BadOpacity(value) => write!(f, "opacity {value} is not between 0 and 1"),
-            Self::BadFillAngle(value) => write!(f, "fill angle {value} is not from 0 up to 180"),
+            Self::BadFillAngle(value) => write!(f, "fill angle {value} is out of range"),
             Self::BadObjectId(id) => write!(f, "object id {id} is invalid or used twice"),
         }
     }

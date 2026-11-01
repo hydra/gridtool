@@ -238,7 +238,7 @@ fn files_are_tagged_with_their_format_version() {
         .to_ron()
         .unwrap();
 
-    assert!(text.starts_with("V5("), "{text}");
+    assert!(text.starts_with("V6("), "{text}");
 }
 
 /// A version 1 file exactly as the first release writes it. It must always load.
@@ -437,8 +437,8 @@ fn invalid_shapes_are_rejected() {
             InvalidDocument::NotPositive(0.0),
         ),
         (
-            |f| f.shapes[1].fill_angle = 180.0,
-            InvalidDocument::BadFillAngle(180.0),
+            |f| f.shapes[1].fill_angle = 360.0,
+            InvalidDocument::BadFillAngle(360.0),
         ),
         (
             |f| f.shapes[1].fill_angle = -1.0,
@@ -698,8 +698,8 @@ fn invalid_measurement_and_area_styles_are_rejected() {
             InvalidDocument::NotPositive(0.0),
         ),
         (
-            |f| f.areas[0].fill_angle = 180.0,
-            InvalidDocument::BadFillAngle(180.0),
+            |f| f.areas[0].fill_angle = 360.0,
+            InvalidDocument::BadFillAngle(360.0),
         ),
     ];
 
@@ -909,4 +909,37 @@ fn invalid_areas_are_rejected() {
         reused_id.to_document(),
         Err(InvalidDocument::BadObjectId(1))
     );
+}
+
+#[test]
+fn only_version_6_allows_a_fill_angle_of_a_half_turn_or_more() {
+    let DocumentFile::V5(mut file) = DocumentFile::from_ron(VERSION_5_SAMPLE).unwrap() else {
+        unreachable!("the sample is version 5");
+    };
+    file.areas[0].fill_angle = 225.0;
+
+    assert_eq!(
+        DocumentFile::V5(file.clone()).to_document(),
+        Err(InvalidDocument::BadFillAngle(225.0))
+    );
+    let document = DocumentFile::V6(file.clone()).to_document().unwrap();
+    assert_eq!(document.areas()[0].stored_fill().angle, 225.0);
+
+    file.areas[0].fill_angle = 360.0;
+    assert_eq!(
+        DocumentFile::V6(file).to_document(),
+        Err(InvalidDocument::BadFillAngle(360.0))
+    );
+}
+
+#[test]
+fn a_version_6_file_reads_as_version_5_does_apart_from_its_tag() {
+    let text = VERSION_5_SAMPLE.replacen("V5(", "V6(", 1);
+
+    let version_6 = DocumentFile::from_ron(&text).unwrap().to_document();
+    let version_5 = DocumentFile::from_ron(VERSION_5_SAMPLE)
+        .unwrap()
+        .to_document();
+
+    assert_eq!(version_6, version_5);
 }

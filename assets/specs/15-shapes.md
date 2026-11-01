@@ -74,7 +74,8 @@ for Measure area (`AREA-5`).
   unit, > 0. 1 for a new shape.
 - **fill unit**: cm or m. The calibration's unit (`SCALE-20`) when the shape is added.
 - **fill angle**: the real-world direction of the fill lines, in degrees clockwise from
-  vertical, from 0 up to but not including 180, so 0 is vertical and 90 is horizontal. A shape
+  vertical, from 0 up to but not including 360, so 0 is vertical and 90 is horizontal. Lines look
+  the same every half turn, so 45 and 225 draw the same lines but are different values. A shape
   stores one fill angle, for its current fill style. It starts at 90 for Lines (and for None and
   Solid) and 45 for Crosshatch, unless the tool says otherwise (`DRAW-20`).
 - **fill opacity**: 0 to 1. 0.5 (50 %) for a new shape.
@@ -169,9 +170,9 @@ For a **closed** shape only, these follow, after a separator:
      written as a grid's cell size is (`GRID-14`), with the tooltip
      "`Distance between the fill lines`", then a drop-down of the fill unit ("`cm`", "`m`"),
      with the tooltip "`Units of the distance between the fill lines`".
-   - Two icon buttons that turn the fill lines a quarter turn: rotate 90° left
-     (`rotate_90_degrees_ccw`, tooltip "`Rotate the fill lines 90° left`") and rotate 90°
-     right (`rotate_90_degrees_cw`, tooltip "`Rotate the fill lines 90° right`").
+   - Two icon buttons that turn the fill lines 45°: rotate left
+     (`rotate_90_degrees_ccw`, tooltip "`Rotate the fill lines 45° left`") and rotate
+     right (`rotate_90_degrees_cw`, tooltip "`Rotate the fill lines 45° right`").
    - "`Angle:`", then a 45 px commit-on-blur field of the fill angle, then "`°`", with the
      tooltip "`Angle of the fill lines, in degrees clockwise from vertical`".
 7. For every style except None: "`Fill color:`", then a padlock (`DRAW-19`), then a
@@ -192,12 +193,13 @@ For a **closed** shape only, these follow, after a separator:
   differs from the current value. Anything else reverts the field.
 - Picking a different unit commits one action. The distance value is kept as it is and is not
   converted, as for a grid (`GRID-14`).
-- Clicking either rotate button commits one action, adding or subtracting 90° and then keeping
-  the result from 0 up to 180. Lines repeat every half turn, so both buttons give the same
-  result, and on a Crosshatch they change the stored angle without changing what is drawn.
-- Ending an edit of the angle field commits one action if the text is a number whose
-  equivalent from 0 up to 180 differs from the current value (for example, `225` and `-135`
-  both mean 45). Anything else reverts the field.
+- Clicking either rotate button commits one action, subtracting 45° from the current angle for left or
+  adding 45° for right, whatever the current angle is, and then wrapping the result around a full
+  turn to keep it from 0 up to but not including 360: 10 turned left is 325, 0 turned left is 315,
+  315 turned right is 0 and 350 turned right is 35.
+- Ending an edit of the angle field commits one action if the text is a number from 0 to 360
+  that differs from the current value, where exactly 360 wraps to 0. Anything else, including a
+  negative number or one above 360, reverts the field.
 - An opacity slider works as the grid's does (`GRID-16`): dragging previews live on the
   canvas and commits one action on release, and clicks and keyboard changes commit
   immediately. The percentage is rounded to a whole number. Nothing is committed if the value
@@ -272,8 +274,8 @@ undone and redone (`HIST-9`).
 - A line needs at least 2 points and a closed shape at least 3. A new shape is Thin, orange
   at 100 % line opacity, with no fill, no fill colour, spacing 1 in the given unit,
   angle 90 and 50 % fill opacity.
-- Fill angles: 180 becomes 0, 270 becomes 90, -90 becomes 90, -30 becomes 150, and a tiny
-  negative angle becomes 0. 180, -1 and NaN are not valid stored angles.
+- Fill angles: 180 and 270 stay as they are, 360 becomes 0, 395 becomes 35, -35 becomes 325, and
+  a tiny negative angle becomes 0. 360, -1 and NaN are not valid stored angles.
 - Centre (`DRAW-9`): the open shape (0, 0), (6, 0), (0, 3) has its centre at (3, 1.5), and
   the same points closed at (2, 1). A closed shape through (0, 0), (2, 2), (4, 4) has its
   centre at (2, 2).
@@ -305,7 +307,7 @@ undone and redone (`HIST-9`).
   - Changing the fill unit keeps the spacing value.
   - These are rejected and leave the document unchanged: a point number that does not
     exist, a position outside the document, a resize with a different number of points, an
-    opacity outside [0, 1], a fill spacing of 0, a fill angle of 180 or -1, any fill change
+    opacity outside [0, 1], a fill spacing of 0, a fill angle of 360 or -1, any fill change
     on an open shape, and any shape action with an index that does not exist.
   - Duplicating copies every property with a new id, and the copy becomes the newest
     object. Deleting the middle of three shapes leaves the first and third, in order.
@@ -327,11 +329,12 @@ undone and redone (`HIST-9`).
     and a click on the swatch opens the picker (`DRAW-19`).
   - A typed distance must be a new number > 0: `0`, `-1`, text and the current value commit
     nothing.
-  - A typed angle of `225` commits 45, `-45` commits 135, and `180` at angle 0, or text,
-    commits nothing.
-  - Clicking along the row of a Lines fill reaches both rotate buttons, each committing angle
-    0 from angle 90. A Crosshatch has them too, and a Solid fill does not.
-  - From angle 120, either rotate button commits angle 30.
+  - A typed angle of `225` commits 225 and `360` commits 0. At angle 0, `360` commits nothing, and
+    `-45`, `361` and text commit nothing at any angle.
+  - Clicking along the row of a Lines fill reaches both rotate buttons, committing angles 45
+    and 135 from angle 90. A Crosshatch has them too, and a Solid fill does not.
+  - From angle 10, the rotate buttons commit 325 and 55. From angle 0, rotating left commits 315.
+    From angle 135, rotating right commits 180, from 315 it commits 0, and from 350 it commits 35.
 - Remembered fill angles (`DRAW-20`):
   - A new Lines fill is at 90, and a new Crosshatch at 45.
   - Changing an active object to Crosshatch commits the angle last set for Crosshatch, or 45 if

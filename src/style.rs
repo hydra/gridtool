@@ -11,21 +11,21 @@ use crate::units::LengthUnit;
 
 /// Real-world distance between fill lines by default, in the fill's unit.
 pub const DEFAULT_FILL_SPACING: f64 = 1.0;
-/// Fill lines repeat every half turn, so angles are kept below this.
-const HALF_TURN: f64 = 180.0;
+/// Fill angles are kept below this. 360 itself is the same as 0.
+pub const FULL_TURN: f64 = 360.0;
 /// How far a fill angle of 0, which is vertical, is from the image's x axis.
 const QUARTER_TURN: f64 = 90.0;
 
-/// `degrees` as the equivalent angle of parallel lines, in [0, 180).
+/// `degrees` wrapped around a full turn, into [0, 360).
 pub fn normalized_fill_angle(degrees: f64) -> f64 {
-    let angle = degrees.rem_euclid(HALF_TURN);
-    // The remainder of a tiny negative angle rounds up to the half turn itself.
-    if angle < HALF_TURN { angle } else { 0.0 }
+    let angle = degrees.rem_euclid(FULL_TURN);
+    // The remainder of a tiny negative angle rounds up to the full turn itself.
+    if angle < FULL_TURN { angle } else { 0.0 }
 }
 
-/// Whether `degrees` is a fill angle as stored: in [0, 180).
+/// Whether `degrees` is a fill angle as stored: in [0, 360).
 pub fn is_valid_fill_angle(degrees: f64) -> bool {
-    (0.0..HALF_TURN).contains(&degrees)
+    (0.0..FULL_TURN).contains(&degrees)
 }
 
 /// How a line is drawn.
@@ -486,8 +486,8 @@ mod tests {
         assert_eq!(edited.style, FillStyle::Crosshatch);
         assert_eq!(edited.angle, 30.0);
         assert_eq!(
-            StyleEdit::FillStyle(FillStyle::Lines, 180.0).validate(),
-            Err(InvalidStyle::FillAngle(180.0))
+            StyleEdit::FillStyle(FillStyle::Lines, 360.0).validate(),
+            Err(InvalidStyle::FillAngle(360.0))
         );
     }
 
@@ -511,19 +511,21 @@ mod tests {
     }
 
     #[test]
-    fn fill_angles_are_kept_within_a_half_turn() {
+    fn fill_angles_wrap_around_a_full_turn() {
         assert_eq!(normalized_fill_angle(0.0), 0.0);
         assert_eq!(normalized_fill_angle(45.0), 45.0);
-        assert_eq!(normalized_fill_angle(180.0), 0.0);
-        assert_eq!(normalized_fill_angle(270.0), 90.0);
-        assert_eq!(normalized_fill_angle(-90.0), 90.0);
-        assert_eq!(normalized_fill_angle(-30.0), 150.0);
-        // Rounds up to exactly 180 if taken naively.
+        assert_eq!(normalized_fill_angle(180.0), 180.0);
+        assert_eq!(normalized_fill_angle(270.0), 270.0);
+        assert_eq!(normalized_fill_angle(360.0), 0.0);
+        assert_eq!(normalized_fill_angle(395.0), 35.0);
+        assert_eq!(normalized_fill_angle(-35.0), 325.0);
+        // Rounds up to exactly 360 if taken naively.
         assert_eq!(normalized_fill_angle(-1e-20), 0.0);
 
         assert!(is_valid_fill_angle(0.0));
-        assert!(is_valid_fill_angle(179.5));
-        assert!(!is_valid_fill_angle(180.0));
+        assert!(is_valid_fill_angle(180.0));
+        assert!(is_valid_fill_angle(359.5));
+        assert!(!is_valid_fill_angle(360.0));
         assert!(!is_valid_fill_angle(-1.0));
         assert!(!is_valid_fill_angle(f64::NAN));
     }
@@ -539,8 +541,8 @@ mod tests {
             Err(InvalidStyle::FillSpacing(0.0))
         );
         assert_eq!(
-            StyleEdit::FillAngle(180.0).validate(),
-            Err(InvalidStyle::FillAngle(180.0))
+            StyleEdit::FillAngle(360.0).validate(),
+            Err(InvalidStyle::FillAngle(360.0))
         );
         assert_eq!(StyleEdit::FillOpacity(0.5).validate(), Ok(()));
 
@@ -620,10 +622,11 @@ mod tests {
         let lines = crosshatch.lines(&rectangle(), UNIT_SCALE, 0.0, EVERYWHERE);
 
         let slope_of = |(a, b): &(Point, Point)| (b.y - a.y).atan2(b.x - a.x).to_degrees();
+        // A line looks the same turned by a half turn.
         let mut angles: Vec<f64> = lines
             .iter()
             .map(slope_of)
-            .map(normalized_fill_angle)
+            .map(|slope| slope.rem_euclid(180.0))
             .collect();
         angles.sort_by(f64::total_cmp);
         assert!(near(angles[0], 30.0), "{angles:?}");

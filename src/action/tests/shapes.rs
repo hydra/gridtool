@@ -268,9 +268,9 @@ fn rejects_invalid_shape_edits() {
         (
             Action::SetStyle {
                 target: StyleTarget::Shape(1),
-                edit: StyleEdit::FillAngle(180.0),
+                edit: StyleEdit::FillAngle(360.0),
             },
-            ActionError::InvalidFillAngle(180.0),
+            ActionError::InvalidFillAngle(360.0),
         ),
         (
             Action::SetStyle {

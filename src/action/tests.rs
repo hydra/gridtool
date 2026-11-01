@@ -1124,8 +1124,8 @@ fn rejects_invalid_style_edits_of_measurements_and_areas() {
         ),
         (
             StyleTarget::Area(0),
-            StyleEdit::FillAngle(180.0),
-            ActionError::InvalidFillAngle(180.0),
+            StyleEdit::FillAngle(360.0),
+            ActionError::InvalidFillAngle(360.0),
         ),
         (
             StyleTarget::Area(9),

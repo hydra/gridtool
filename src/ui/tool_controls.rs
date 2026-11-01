@@ -582,17 +582,39 @@ mod tests {
     }
 
     #[test]
-    fn the_rotate_buttons_turn_the_fill_lines_a_quarter_turn() {
+    fn the_rotate_buttons_turn_the_fill_lines_45_degrees_each_way() {
         let mut harness = Harness::new(ToolMode::Pan).with_active_shape(FillStyle::Lines);
 
         let actions = harness.actions_from_clicking_along_the_row();
 
-        let rotate = Action::SetStyle {
+        for angle in [45.0, 135.0] {
+            let rotate = Action::SetStyle {
+                target: StyleTarget::Shape(0),
+                edit: StyleEdit::FillAngle(angle),
+            };
+            assert!(actions.contains(&rotate), "{angle}: {actions:?}");
+        }
+    }
+
+    #[test]
+    fn the_rotate_buttons_add_to_and_subtract_from_the_current_angle() {
+        let mut harness = Harness::new(ToolMode::Pan).with_active_shape(FillStyle::Lines);
+        Action::SetStyle {
             target: StyleTarget::Shape(0),
-            edit: StyleEdit::FillAngle(0.0),
-        };
-        let rotations = actions.iter().filter(|&action| *action == rotate);
-        assert!(rotations.count() >= 2, "{actions:?}");
+            edit: StyleEdit::FillAngle(10.0),
+        }
+        .apply(&mut harness.document)
+        .unwrap();
+
+        let actions = harness.actions_from_clicking_along_the_row();
+
+        for angle in [55.0, 325.0] {
+            let rotate = Action::SetStyle {
+                target: StyleTarget::Shape(0),
+                edit: StyleEdit::FillAngle(angle),
+            };
+            assert!(actions.contains(&rotate), "{angle}: {actions:?}");
+        }
     }
 
     #[test]
@@ -654,12 +676,13 @@ mod tests {
         assert!(actions.iter().any(|action| matches!(
             action,
             Action::SetStyle {
-                edit: StyleEdit::FillAngle(0.0),
+                edit: StyleEdit::FillAngle(135.0),
                 ..
             }
         )));
+        // The last rotate button clicked along the row is the right one.
         let angles = harness.view.line_tool.settings.fill_angles();
-        assert_eq!(angles.for_style(FillStyle::Lines), Some(0.0));
+        assert_eq!(angles.for_style(FillStyle::Lines), Some(135.0));
         assert_eq!(angles.for_style(FillStyle::Crosshatch), Some(45.0));
     }
 

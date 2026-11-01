@@ -166,7 +166,7 @@ mod tests {
         settings.apply(StyleEdit::FillStyle(FillStyle::Crosshatch, 45.0));
 
         settings.apply(StyleEdit::FillAngle(30.0));
-        settings.apply(StyleEdit::FillAngle(200.0));
+        settings.apply(StyleEdit::FillAngle(400.0));
 
         let angles = settings.fill_angles();
         assert_eq!(angles.for_style(FillStyle::Crosshatch), Some(30.0));
