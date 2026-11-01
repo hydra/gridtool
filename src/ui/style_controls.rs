@@ -6,7 +6,7 @@
 use eframe::egui;
 use gridtool::color::Rgb;
 use gridtool::style::{
-    FULL_TURN, FillAngles, FillAppearance, FillStyle, LineAppearance, LineStyle, StyleEdit, Styled,
+    FillAngles, FillAppearance, FillStyle, LineAppearance, LineStyle, StyleEdit, Styled,
     normalized_fill_angle,
 };
 
@@ -248,11 +248,10 @@ fn typed_spacing(text: Option<&str>, current: f64) -> Option<f64> {
         .filter(|&spacing| spacing > 0.0 && spacing != current)
 }
 
-/// The angle to set from `text` typed in the field: only a number from 0 to 360, where 360 means
-/// 0, that differs from `current`.
+/// The angle to set from `text` typed in the field: any number, wrapped around a full turn, that
+/// differs from `current`.
 fn typed_angle(text: Option<&str>, current: f64) -> Option<f64> {
     text.and_then(parse_number)
-        .filter(|degrees| (0.0..=FULL_TURN).contains(degrees))
         .map(normalized_fill_angle)
         .filter(|&degrees| degrees != current)
 }
@@ -398,14 +397,20 @@ mod tests {
     }
 
     #[test]
-    fn a_typed_angle_is_from_0_to_360_and_360_wraps_to_0() {
+    fn a_typed_angle_outside_0_up_to_360_wraps_around_a_full_turn() {
         assert_eq!(typed_angle(Some("45"), 0.0), Some(45.0));
         assert_eq!(typed_angle(Some("225"), 0.0), Some(225.0));
         assert_eq!(typed_angle(Some("359.5"), 0.0), Some(359.5));
         assert_eq!(typed_angle(Some("360"), 45.0), Some(0.0));
         assert_eq!(typed_angle(Some("360"), 0.0), None);
-        assert_eq!(typed_angle(Some("-45"), 0.0), None);
-        assert_eq!(typed_angle(Some("361"), 0.0), None);
+        assert_eq!(typed_angle(Some("-45"), 0.0), Some(315.0));
+        assert_eq!(typed_angle(Some("-405"), 0.0), Some(315.0));
+        assert_eq!(typed_angle(Some("-360"), 45.0), Some(0.0));
+        assert_eq!(typed_angle(Some("-360"), 0.0), None);
+        assert_eq!(typed_angle(Some("-45"), 315.0), None);
+        assert_eq!(typed_angle(Some("361"), 0.0), Some(1.0));
+        assert_eq!(typed_angle(Some("765"), 0.0), Some(45.0));
+        assert_eq!(typed_angle(Some("361"), 1.0), None);
         // The same angle as the current one, or not a number.
         assert_eq!(typed_angle(Some("0"), 0.0), None);
         assert_eq!(typed_angle(Some("abc"), 0.0), None);

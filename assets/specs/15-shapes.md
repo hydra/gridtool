@@ -197,9 +197,10 @@ For a **closed** shape only, these follow, after a separator:
   adding 45° for right, whatever the current angle is, and then wrapping the result around a full
   turn to keep it from 0 up to but not including 360: 10 turned left is 325, 0 turned left is 315,
   315 turned right is 0 and 350 turned right is 35.
-- Ending an edit of the angle field commits one action if the text is a number from 0 to 360
-  that differs from the current value, where exactly 360 wraps to 0. Anything else, including a
-  negative number or one above 360, reverts the field.
+- Ending an edit of the angle field commits one action if the text is a number that differs from
+  the current value once wrapped. A number below 0, or of 360 or more, wraps around a full turn to
+  keep it from 0 up to but not including 360, so `-45` and `-405` both mean 315, `360` and `-360`
+  both mean 0, and `361` means 1. Anything else reverts the field.
 - An opacity slider works as the grid's does (`GRID-16`): dragging previews live on the
   canvas and commits one action on release, and clicks and keyboard changes commit
   immediately. The percentage is rounded to a whole number. Nothing is committed if the value
@@ -329,8 +330,9 @@ undone and redone (`HIST-9`).
     and a click on the swatch opens the picker (`DRAW-19`).
   - A typed distance must be a new number > 0: `0`, `-1`, text and the current value commit
     nothing.
-  - A typed angle of `225` commits 225 and `360` commits 0. At angle 0, `360` commits nothing, and
-    `-45`, `361` and text commit nothing at any angle.
+  - A typed angle of `225` commits 225, `360` and `-360` commit 0, `-45` and `-405` commit 315,
+    `361` commits 1 and `765` commits 45. At angle 0, `360` and `-360` commit nothing, and at angle
+    315, `-45` commits nothing. Text commits nothing at any angle.
   - Clicking along the row of a Lines fill reaches both rotate buttons, committing angles 45
     and 135 from angle 90. A Crosshatch has them too, and a Solid fill does not.
   - From angle 10, the rotate buttons commit 325 and 55. From angle 0, rotating left commits 315.
