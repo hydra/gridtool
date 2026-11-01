@@ -7,8 +7,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::style::DEFAULT_FILL_ANGLE;
-
 use super::v1::{CalibrationV1, ColorV1, GridV1, PointV1, UnitV1};
 use super::v2::{AreaV2, MeasurementV2};
 use super::v3::{DocumentV3, FillStyleV3, LineStyleV3, ShapeV3};
@@ -17,6 +15,8 @@ use super::v3::{DocumentV3, FillStyleV3, LineStyleV3, ShapeV3};
 const V3_AREA_FILL_OPACITY: f32 = 0.25;
 /// The fill line distance given to areas from version 3 files, which had no fill lines.
 const V3_AREA_FILL_SPACING: f64 = 10.0;
+/// The fill line direction given to areas from version 3 files: along the image's x axis.
+const V3_AREA_FILL_ANGLE: f64 = 0.0;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DocumentV4 {
@@ -95,7 +95,7 @@ impl From<AreaV2> for AreaV4 {
             fill_color: area.color,
             fill_spacing: V3_AREA_FILL_SPACING,
             fill_unit: area.unit,
-            fill_angle: DEFAULT_FILL_ANGLE,
+            fill_angle: V3_AREA_FILL_ANGLE,
             fill_opacity: V3_AREA_FILL_OPACITY,
         }
     }

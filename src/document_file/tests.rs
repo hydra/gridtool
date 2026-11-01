@@ -82,7 +82,7 @@ fn rich_document() -> Document {
         },
         Action::SetStyle {
             target: StyleTarget::Area(1),
-            edit: StyleEdit::FillStyle(FillStyle::Lines),
+            edit: StyleEdit::FillStyle(FillStyle::Lines, 90.0),
         },
         Action::SetStyle {
             target: StyleTarget::Area(1),
@@ -164,7 +164,7 @@ fn rich_document() -> Document {
         },
         Action::SetStyle {
             target: StyleTarget::Shape(1),
-            edit: StyleEdit::FillStyle(FillStyle::Crosshatch),
+            edit: StyleEdit::FillStyle(FillStyle::Crosshatch, 90.0),
         },
         Action::SetStyle {
             target: StyleTarget::Shape(1),
@@ -389,7 +389,7 @@ fn version_3_files_load() {
     assert_eq!(closed.stored_fill().color, Some(Rgb::new(4, 5, 6)));
     assert_eq!(closed.stored_fill().spacing, 2.5);
     assert_eq!(closed.stored_fill().unit, LengthUnit::Metre);
-    assert_eq!(closed.stored_fill().angle, 45.0);
+    assert_eq!(closed.stored_fill().angle, 135.0);
     assert_eq!(closed.stored_fill().opacity, 0.25);
     assert_eq!(document.next_object_id(), 3);
 }
@@ -494,7 +494,7 @@ fn earlier_files_keep_how_their_measurements_and_areas_looked() {
     assert_eq!(fill.opacity, 0.25);
     assert_eq!(fill.spacing, 10.0);
     assert_eq!(fill.unit, area.unit());
-    assert_eq!(fill.angle, 0.0);
+    assert_eq!(fill.angle, 90.0);
 }
 
 /// A version 4 file exactly as the release that added measurement and area styles writes it.
@@ -559,7 +559,7 @@ fn version_4_files_load() {
     assert_eq!(fill.color, Some(Rgb::new(7, 8, 9)));
     assert_eq!(fill.spacing, 2.5);
     assert_eq!(fill.unit, LengthUnit::Centimetre);
-    assert_eq!(fill.angle, 45.0);
+    assert_eq!(fill.angle, 135.0);
     assert_eq!(fill.opacity, 0.25);
 }
 
@@ -621,6 +621,32 @@ fn version_5_files_load_with_and_without_a_fill_colour() {
         document.shapes()[0].stored_fill().color,
         Some(Rgb::new(7, 8, 9))
     );
+}
+
+#[test]
+fn version_5_files_keep_their_fill_angles_as_written() {
+    let document = DocumentFile::from_ron(VERSION_5_SAMPLE)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    assert_eq!(document.areas()[0].stored_fill().angle, 45.0);
+    assert_eq!(document.shapes()[0].stored_fill().angle, 0.0);
+}
+
+#[test]
+fn an_invalid_version_4_fill_angle_is_still_rejected() {
+    for degrees in [180.0, -1.0] {
+        let DocumentFile::V4(mut file) = DocumentFile::from_ron(VERSION_4_SAMPLE).unwrap() else {
+            unreachable!("the sample is version 4");
+        };
+        file.areas[0].fill_angle = degrees;
+
+        assert_eq!(
+            DocumentFile::V4(file).to_document(),
+            Err(InvalidDocument::BadFillAngle(degrees))
+        );
+    }
 }
 
 #[test]

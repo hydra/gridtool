@@ -73,16 +73,33 @@ impl DocumentView {
 
     /// If a different object has become active since the last call, the tool it belongs to,
     /// which is to become the active tool. Abandons anything a tool was part-way through, as
-    /// switching to that tool would.
+    /// switching to that tool would, and the tool takes the object's fill angle as the last
+    /// one set for its fill style.
     pub fn tool_of_new_active_object(&mut self, document: &Document) -> Option<ToolMode> {
         let active = self.selection.active();
         if active == self.last_active {
             return None;
         }
         self.last_active = active;
-        let kind = document.object_kind(active?)?;
+        let id = active?;
+        let kind = document.object_kind(id)?;
         self.cancel_tool();
+        self.remember_fill_angle_of(document, id);
         Some(ToolMode::for_object(kind))
+    }
+
+    fn remember_fill_angle_of(&mut self, document: &Document, id: ObjectId) {
+        if let Some(index) = document.area_index(id) {
+            let fill = document.areas()[index].stored_fill();
+            self.area_tool
+                .settings
+                .remember_fill_angle(fill.style, fill.angle);
+        } else if let Some(index) = document.shape_index(id) {
+            let fill = document.shapes()[index].stored_fill();
+            self.line_tool
+                .settings
+                .remember_fill_angle(fill.style, fill.angle);
+        }
     }
 
     /// Whether a tool has started placing a new measurement, area or shape.
@@ -109,10 +126,12 @@ impl DocumentView {
 mod tests {
     use super::*;
     use eframe::egui;
+    use gridtool::action::StyleTarget;
     use gridtool::area::Area;
     use gridtool::geometry::Point;
     use gridtool::imaging::DecodedImage;
     use gridtool::measurement::Measurement;
+    use gridtool::style::{FillStyle, StyleEdit};
 
     use crate::ui::canvas::upload_texture;
 
@@ -211,6 +230,33 @@ mod tests {
             view.tool_of_new_active_object(&document),
             Some(ToolMode::Measure)
         );
+    }
+
+    #[test]
+    fn a_newly_active_objects_fill_angle_becomes_the_last_set_for_its_style() {
+        let mut document = document_with_measurement_and_area();
+        for edit in [
+            StyleEdit::FillStyle(FillStyle::Crosshatch, 30.0),
+            StyleEdit::FillOpacity(0.5),
+        ] {
+            Action::SetStyle {
+                target: StyleTarget::Area(0),
+                edit,
+            }
+            .apply(&mut document)
+            .unwrap();
+        }
+        let mut view = view();
+
+        view.selection.select(Some(document.areas()[0].id()));
+        view.tool_of_new_active_object(&document);
+
+        let angles = view.area_tool.settings.fill_angles();
+        assert_eq!(angles.for_style(FillStyle::Crosshatch), Some(30.0));
+        assert_eq!(angles.for_style(FillStyle::Lines), Some(90.0));
+        // The draw tool's are its own.
+        let angles = view.line_tool.settings.fill_angles();
+        assert_eq!(angles.for_style(FillStyle::Crosshatch), Some(45.0));
     }
 
     #[test]

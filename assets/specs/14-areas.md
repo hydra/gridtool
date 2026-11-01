@@ -59,7 +59,7 @@ Further rules:
 - **line style**, **line colour** and **line opacity**, as for a drawn shape (`DRAW-8`):
   Thick, **cyan** (`#00FFFF`) and 100 % for a new area.
 - **fill style**, **fill colour**, **fill spacing**, **fill unit**, **fill angle** and
-  **fill opacity**, as for a drawn shape: Solid, no colour, 1 in the calibration's unit, 0
+  **fill opacity**, as for a drawn shape: Solid, no colour, 1 in the calibration's unit, 90
   and 25 % for a new area. A fill with no colour is drawn in the line colour (`DRAW-8`).
 
 The tool's controls can give a new area other values (`AREA-17`).

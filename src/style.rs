@@ -11,10 +11,10 @@ use crate::units::LengthUnit;
 
 /// Real-world distance between fill lines by default, in the fill's unit.
 pub const DEFAULT_FILL_SPACING: f64 = 1.0;
-/// Fill lines are horizontal by default.
-pub const DEFAULT_FILL_ANGLE: f64 = 0.0;
 /// Fill lines repeat every half turn, so angles are kept below this.
 const HALF_TURN: f64 = 180.0;
+/// How far a fill angle of 0, which is vertical, is from the image's x axis.
+const QUARTER_TURN: f64 = 90.0;
 
 /// `degrees` as the equivalent angle of parallel lines, in [0, 180).
 pub fn normalized_fill_angle(degrees: f64) -> f64 {
@@ -73,6 +73,15 @@ impl FillStyle {
             FillStyle::Solid => "Solid",
             FillStyle::Lines => "Lines",
             FillStyle::Crosshatch => "Crosshatch",
+        }
+    }
+
+    /// The fill angle a fill of this style starts with, unless one has been set: horizontal
+    /// lines, or a crosshatch of diamonds.
+    pub const fn default_angle(self) -> f64 {
+        match self {
+            FillStyle::None | FillStyle::Solid | FillStyle::Lines => 90.0,
+            FillStyle::Crosshatch => 45.0,
         }
     }
 
@@ -158,23 +167,23 @@ pub struct FillAppearance {
     /// Real-world distance between fill lines, in `unit`.
     pub spacing: f64,
     pub unit: LengthUnit,
-    /// Real-world direction of the fill lines, in degrees clockwise from the image's x axis
-    /// (see [`normalized_fill_angle`]).
+    /// Real-world direction of the fill lines, in degrees clockwise from vertical, so 90 is
+    /// horizontal (see [`normalized_fill_angle`]).
     pub angle: f64,
     /// From 0 (invisible) to 1 (opaque).
     pub opacity: f32,
 }
 
 impl FillAppearance {
-    /// A fill with no colour of its own and horizontal fill lines the default distance apart,
-    /// in `unit`.
+    /// A fill with no colour of its own, and fill lines the default distance apart, in `unit`,
+    /// at the style's default angle.
     pub const fn new(style: FillStyle, opacity: f32, unit: LengthUnit) -> Self {
         Self {
             style,
             color: None,
             spacing: DEFAULT_FILL_SPACING,
             unit,
-            angle: DEFAULT_FILL_ANGLE,
+            angle: style.default_angle(),
             opacity,
         }
     }
@@ -217,7 +226,7 @@ impl FillAppearance {
             .line_offsets()
             .iter()
             .flat_map(|offset| {
-                let direction = HatchDirection::at_angle(self.angle + offset);
+                let direction = HatchDirection::at_angle(self.angle - QUARTER_TURN + offset);
                 // Offsets along the world normal correspond to this normal in the image, so
                 // lines `spacing` apart are `spacing / |normal|` pixels apart.
                 let (normal_x, normal_y) = direction.normal();
@@ -233,13 +242,51 @@ impl FillAppearance {
     }
 }
 
+/// The fill angle last set for each fill style that has lines. A fill stores one angle, for
+/// its current style, so this is what its angle becomes when its style changes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FillAngles {
+    lines: f64,
+    crosshatch: f64,
+}
+
+impl Default for FillAngles {
+    fn default() -> Self {
+        Self {
+            lines: FillStyle::Lines.default_angle(),
+            crosshatch: FillStyle::Crosshatch.default_angle(),
+        }
+    }
+}
+
+impl FillAngles {
+    /// The angle for `style`, or `None` if it has no lines.
+    pub fn for_style(&self, style: FillStyle) -> Option<f64> {
+        match style {
+            FillStyle::None | FillStyle::Solid => None,
+            FillStyle::Lines => Some(self.lines),
+            FillStyle::Crosshatch => Some(self.crosshatch),
+        }
+    }
+
+    /// Remembers `degrees` for `style`; a style with no lines has nothing to remember.
+    pub fn remember(&mut self, style: FillStyle, degrees: f64) {
+        match style {
+            FillStyle::None | FillStyle::Solid => {}
+            FillStyle::Lines => self.lines = degrees,
+            FillStyle::Crosshatch => self.crosshatch = degrees,
+        }
+    }
+}
+
 /// One change to how an object, or the next object a tool adds, is drawn.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum StyleEdit {
     LineStyle(LineStyle),
     LineColor(Rgb),
     LineOpacity(f32),
-    FillStyle(FillStyle),
+    /// The fill style, and the fill angle that goes with it, in degrees in [0, 180).
+    FillStyle(FillStyle, f64),
     /// The fill's own colour, or `None` for it to have none.
     FillColor(Option<Rgb>),
     /// The distance between fill lines, in the fill's unit.
@@ -256,12 +303,10 @@ impl StyleEdit {
         match *self {
             Self::LineOpacity(opacity) | Self::FillOpacity(opacity) => ensure_opacity(opacity),
             Self::FillSpacing(spacing) => ensure_spacing(spacing),
-            Self::FillAngle(degrees) => ensure_angle(degrees),
-            Self::LineStyle(_)
-            | Self::LineColor(_)
-            | Self::FillStyle(_)
-            | Self::FillColor(_)
-            | Self::FillUnit(_) => Ok(()),
+            Self::FillStyle(_, degrees) | Self::FillAngle(degrees) => ensure_angle(degrees),
+            Self::LineStyle(_) | Self::LineColor(_) | Self::FillColor(_) | Self::FillUnit(_) => {
+                Ok(())
+            }
         }
     }
 
@@ -281,7 +326,10 @@ impl StyleEdit {
     pub fn applied_to_fill(&self, fill: FillAppearance) -> Option<FillAppearance> {
         let mut fill = fill;
         match *self {
-            Self::FillStyle(style) => fill.style = style,
+            Self::FillStyle(style, degrees) => {
+                fill.style = style;
+                fill.angle = degrees;
+            }
             Self::FillColor(color) => fill.color = color,
             Self::FillSpacing(spacing) => fill.spacing = spacing,
             Self::FillUnit(unit) => fill.unit = unit,
@@ -301,7 +349,7 @@ impl fmt::Display for StyleEdit {
             Self::LineStyle(style) => write!(f, "line style to {}", style.name()),
             Self::LineColor(color) => write!(f, "line color to {color}"),
             Self::LineOpacity(opacity) => write!(f, "line opacity to {}%", percent(opacity)),
-            Self::FillStyle(style) => write!(f, "fill style to {}", style.name()),
+            Self::FillStyle(style, _) => write!(f, "fill style to {}", style.name()),
             Self::FillColor(Some(color)) => write!(f, "fill color to {color}"),
             Self::FillColor(None) => f.write_str("fill color to none"),
             Self::FillSpacing(spacing) => write!(f, "fill spacing to {spacing}"),
@@ -394,12 +442,53 @@ mod tests {
         ]
     }
 
-    /// A fill whose lines are 10 cm apart.
+    /// A fill whose lines, or the first set of them, are horizontal and 10 cm apart.
     fn fill(style: FillStyle) -> FillAppearance {
         FillAppearance {
             spacing: 10.0,
+            angle: 90.0,
             ..FillAppearance::new(style, 0.5, CM)
         }
+    }
+
+    #[test]
+    fn a_new_fill_starts_with_the_default_angle_of_its_style() {
+        let angle = |style| FillAppearance::new(style, 0.5, CM).angle;
+
+        assert_eq!(angle(FillStyle::Lines), 90.0);
+        assert_eq!(angle(FillStyle::Crosshatch), 45.0);
+        assert!(is_valid_fill_angle(angle(FillStyle::None)));
+        assert!(is_valid_fill_angle(angle(FillStyle::Solid)));
+    }
+
+    #[test]
+    fn the_angle_of_each_fill_style_is_remembered_separately() {
+        let mut angles = FillAngles::default();
+        assert_eq!(angles.for_style(FillStyle::Lines), Some(90.0));
+        assert_eq!(angles.for_style(FillStyle::Crosshatch), Some(45.0));
+        assert_eq!(angles.for_style(FillStyle::Solid), None);
+        assert_eq!(angles.for_style(FillStyle::None), None);
+
+        angles.remember(FillStyle::Crosshatch, 30.0);
+        angles.remember(FillStyle::Solid, 10.0);
+
+        assert_eq!(angles.for_style(FillStyle::Lines), Some(90.0));
+        assert_eq!(angles.for_style(FillStyle::Crosshatch), Some(30.0));
+        assert_eq!(angles.for_style(FillStyle::Solid), None);
+    }
+
+    #[test]
+    fn changing_the_fill_style_changes_the_angle_too() {
+        let edit = StyleEdit::FillStyle(FillStyle::Crosshatch, 30.0);
+
+        let edited = edit.applied_to_fill(fill(FillStyle::Lines)).unwrap();
+
+        assert_eq!(edited.style, FillStyle::Crosshatch);
+        assert_eq!(edited.angle, 30.0);
+        assert_eq!(
+            StyleEdit::FillStyle(FillStyle::Lines, 180.0).validate(),
+            Err(InvalidStyle::FillAngle(180.0))
+        );
     }
 
     #[test]
@@ -515,7 +604,7 @@ mod tests {
             assert_eq!(start.y, end.y);
         }
 
-        lines.angle = 90.0;
+        lines.angle = 0.0;
         let vertical = lines.lines(&rectangle(), UNIT_SCALE, 0.0, EVERYWHERE);
         assert_eq!(vertical.len(), 4);
         for (start, end) in vertical {
@@ -574,12 +663,12 @@ mod tests {
         let found = style.lines(&rectangle(), scale, 0.0, EVERYWHERE);
         assert!(near(found[1].0.y - found[0].0.y, 5.0));
 
-        style.angle = 90.0;
+        style.angle = 0.0;
         let found = style.lines(&rectangle(), scale, 0.0, EVERYWHERE);
         assert!(near((found[1].0.x - found[0].0.x).abs(), 20.0));
 
         // At 45° in the real world, the lines are 10 cm apart measured across them.
-        style.angle = 45.0;
+        style.angle = 135.0;
         let found = style.lines(&rectangle(), scale, 0.0, EVERYWHERE);
         let across = |point: Point| (point.y * 2.0 - point.x * 0.5) / 2f64.sqrt();
         for (start, end) in &found {
@@ -663,7 +752,7 @@ mod tests {
             (StyleEdit::LineColor(ORANGE), "line color to #FF8000"),
             (StyleEdit::LineOpacity(0.25), "line opacity to 25%"),
             (
-                StyleEdit::FillStyle(FillStyle::Lines),
+                StyleEdit::FillStyle(FillStyle::Lines, 90.0),
                 "fill style to Lines",
             ),
             (StyleEdit::FillColor(Some(ORANGE)), "fill color to #FF8000"),

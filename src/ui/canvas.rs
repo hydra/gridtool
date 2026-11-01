@@ -1700,7 +1700,7 @@ mod tests {
                     for action in [
                         Action::SetStyle {
                             target: StyleTarget::Shape(0),
-                            edit: StyleEdit::FillStyle(fill),
+                            edit: StyleEdit::FillStyle(fill, 90.0),
                         },
                         Action::SetStyle {
                             target: StyleTarget::Shape(0),

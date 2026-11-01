@@ -6,7 +6,8 @@
 use eframe::egui;
 use gridtool::color::Rgb;
 use gridtool::style::{
-    FillAppearance, FillStyle, LineAppearance, LineStyle, StyleEdit, Styled, normalized_fill_angle,
+    FillAngles, FillAppearance, FillStyle, LineAppearance, LineStyle, StyleEdit, Styled,
+    normalized_fill_angle,
 };
 
 use super::color_swatch;
@@ -46,6 +47,14 @@ struct LineColor {
     displayed: Rgb,
 }
 
+/// What the fill's controls need to know about other things than the fill.
+#[derive(Clone, Copy)]
+struct FillContext {
+    line_color: LineColor,
+    /// The angle that each fill style changes to.
+    angles: FillAngles,
+}
+
 #[derive(Default)]
 pub struct StyleControls {
     fields: CommitField,
@@ -54,7 +63,8 @@ pub struct StyleControls {
 impl StyleControls {
     /// Shows the controls for `stored`, each at its value in `displayed` (`stored` with any
     /// edit being previewed). `id` tells these controls apart from others. `scale_problem`
-    /// is why there is no scale, if there is none.
+    /// is why there is no scale, if there is none, and `angles` the fill angle that each fill
+    /// style changes to.
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
@@ -62,16 +72,20 @@ impl StyleControls {
         stored: &impl Styled,
         displayed: &impl Styled,
         scale_problem: Option<String>,
+        angles: FillAngles,
     ) -> StyleEvents {
         let mut events = StyleEvents::default();
         self.line(ui, id, stored.line(), displayed.line(), &mut events);
         if let (Some(fill), Some(shown)) = (stored.fill(), displayed.fill()) {
             ui.separator();
-            let line_color = LineColor {
-                stored: stored.line().color,
-                displayed: displayed.line().color,
+            let context = FillContext {
+                line_color: LineColor {
+                    stored: stored.line().color,
+                    displayed: displayed.line().color,
+                },
+                angles,
             };
-            self.fill(ui, id, fill, shown, line_color, &mut events);
+            self.fill(ui, id, fill, shown, context, &mut events);
             if fill.style.has_lines()
                 && let Some(reason) = scale_problem
             {
@@ -122,20 +136,26 @@ impl StyleControls {
         id: egui::Id,
         stored: FillAppearance,
         displayed: FillAppearance,
-        line_color: LineColor,
+        context: FillContext,
         events: &mut StyleEvents,
     ) {
         ui.label("Fill:");
         events.commit(
             style_buttons(ui, &FillStyle::ALL, stored.style, FillStyle::name)
-                .map(StyleEdit::FillStyle),
+                .map(|style| fill_style_edit(style, stored.angle, context.angles)),
         );
         if stored.style.has_lines() {
             self.fill_spacing(ui, id, stored, events);
             self.fill_angle(ui, id, stored, events);
         }
         if stored.style != FillStyle::None {
-            fill_color(ui, id.with("fill_color"), stored.color, line_color, events);
+            fill_color(
+                ui,
+                id.with("fill_color"),
+                stored.color,
+                context.line_color,
+                events,
+            );
             opacity(
                 ui,
                 "Fill opacity:",
@@ -206,7 +226,7 @@ impl StyleControls {
             events.commit(Some(rotated_fill(fill.angle, QUARTER_TURN)));
         }
 
-        let tooltip = "Angle of the fill lines, in degrees clockwise from horizontal";
+        let tooltip = "Angle of the fill lines, in degrees clockwise from vertical";
         let label = ui.label("Angle:").on_hover_text(tooltip);
         let (field, committed) = self.fields.show(
             ui,
@@ -233,6 +253,12 @@ fn typed_angle(text: Option<&str>, current: f64) -> Option<f64> {
     text.and_then(parse_number)
         .map(normalized_fill_angle)
         .filter(|&degrees| degrees != current)
+}
+
+/// Changes to fill style `style`: its lines take the angle last set for it. A style with no
+/// lines has no angle of its own, so the fill keeps the one it has, `current`.
+fn fill_style_edit(style: FillStyle, current: f64, angles: FillAngles) -> StyleEdit {
+    StyleEdit::FillStyle(style, angles.for_style(style).unwrap_or(current))
 }
 
 fn rotated_fill(current: f64, by: f64) -> StyleEdit {
@@ -460,6 +486,37 @@ mod tests {
 
         assert!(edits.contains(&StyleEdit::FillColor(None)), "{edits:?}");
         assert!(picker_opened);
+    }
+
+    #[test]
+    fn a_new_fill_style_takes_the_angle_last_set_for_it_or_else_its_default() {
+        let mut angles = FillAngles::default();
+        assert_eq!(
+            fill_style_edit(FillStyle::Crosshatch, 10.0, angles),
+            StyleEdit::FillStyle(FillStyle::Crosshatch, 45.0)
+        );
+        assert_eq!(
+            fill_style_edit(FillStyle::Lines, 10.0, angles),
+            StyleEdit::FillStyle(FillStyle::Lines, 90.0)
+        );
+
+        angles.remember(FillStyle::Crosshatch, 30.0);
+        assert_eq!(
+            fill_style_edit(FillStyle::Crosshatch, 10.0, angles),
+            StyleEdit::FillStyle(FillStyle::Crosshatch, 30.0)
+        );
+    }
+
+    #[test]
+    fn a_fill_style_without_lines_keeps_the_angle() {
+        let angles = FillAngles::default();
+
+        for style in [FillStyle::Solid, FillStyle::None] {
+            assert_eq!(
+                fill_style_edit(style, 10.0, angles),
+                StyleEdit::FillStyle(style, 10.0)
+            );
+        }
     }
 
     #[test]

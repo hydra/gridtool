@@ -109,7 +109,7 @@ fn sets_every_style_of_a_closed_shape() {
         },
         Action::SetStyle {
             target: StyleTarget::Shape(1),
-            edit: StyleEdit::FillStyle(FillStyle::Crosshatch),
+            edit: StyleEdit::FillStyle(FillStyle::Crosshatch, 90.0),
         },
         Action::SetStyle {
             target: StyleTarget::Shape(1),
@@ -226,7 +226,7 @@ fn rejects_invalid_shape_edits() {
         (
             Action::SetStyle {
                 target: StyleTarget::Shape(0),
-                edit: StyleEdit::FillStyle(FillStyle::Solid),
+                edit: StyleEdit::FillStyle(FillStyle::Solid, 90.0),
             },
             not_closed.clone(),
         ),
@@ -325,7 +325,7 @@ fn duplicates_and_deletes_shapes() {
     let mut document = document_with_shapes();
     Action::SetStyle {
         target: StyleTarget::Shape(1),
-        edit: StyleEdit::FillStyle(FillStyle::Solid),
+        edit: StyleEdit::FillStyle(FillStyle::Solid, 90.0),
     }
     .apply(&mut document)
     .unwrap();
@@ -376,7 +376,7 @@ fn every_shape_action_can_be_undone_and_redone() {
         },
         Action::SetStyle {
             target: StyleTarget::Shape(0),
-            edit: StyleEdit::FillStyle(FillStyle::Lines),
+            edit: StyleEdit::FillStyle(FillStyle::Lines, 90.0),
         },
         Action::SetStyle {
             target: StyleTarget::Shape(0),
@@ -392,7 +392,7 @@ fn every_shape_action_can_be_undone_and_redone() {
         },
         Action::SetStyle {
             target: StyleTarget::Shape(0),
-            edit: StyleEdit::FillAngle(90.0),
+            edit: StyleEdit::FillAngle(30.0),
         },
         Action::SetStyle {
             target: StyleTarget::Shape(0),
@@ -509,7 +509,7 @@ fn describes_shape_actions() {
         (
             Action::SetStyle {
                 target: StyleTarget::Shape(1),
-                edit: StyleEdit::FillStyle(FillStyle::Lines),
+                edit: StyleEdit::FillStyle(FillStyle::Lines, 90.0),
             },
             "Set shape 2 fill style to Lines",
         ),

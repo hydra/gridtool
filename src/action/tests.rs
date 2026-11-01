@@ -1088,7 +1088,7 @@ fn styles_a_measurement_and_an_area() {
         },
         Action::SetStyle {
             target: StyleTarget::Area(0),
-            edit: StyleEdit::FillStyle(FillStyle::Crosshatch),
+            edit: StyleEdit::FillStyle(FillStyle::Crosshatch, 90.0),
         },
     ] {
         action.apply(&mut document).unwrap();

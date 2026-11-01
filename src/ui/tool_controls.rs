@@ -96,9 +96,10 @@ impl ToolControls {
                 ui.separator();
                 let displayed = selection.displayed(id, stored);
                 let target = StyleTarget::Measurement(index);
-                actions.extend(
-                    self.object_style(ui, id, target, &**stored, &displayed, selection, document),
-                );
+                let settings = &mut view.measure_tool.settings;
+                actions.extend(self.object_style(
+                    ui, id, target, &**stored, &displayed, selection, settings, document,
+                ));
             }
             ObjectKind::Area => {
                 let index = document.area_index(id)?;
@@ -117,9 +118,10 @@ impl ToolControls {
                 ui.separator();
                 let displayed = selection.displayed_area(id, stored);
                 let target = StyleTarget::Area(index);
-                actions.extend(
-                    self.object_style(ui, id, target, &**stored, &displayed, selection, document),
-                );
+                let settings = &mut view.area_tool.settings;
+                actions.extend(self.object_style(
+                    ui, id, target, &**stored, &displayed, selection, settings, document,
+                ));
             }
             ObjectKind::Shape => {
                 let index = document.shape_index(id)?;
@@ -128,16 +130,18 @@ impl ToolControls {
                 ui.separator();
                 let displayed = selection.displayed_drawn(id, stored);
                 let target = StyleTarget::Shape(index);
-                actions.extend(
-                    self.object_style(ui, id, target, &**stored, &displayed, selection, document),
-                );
+                let settings = &mut view.line_tool.settings;
+                actions.extend(self.object_style(
+                    ui, id, target, &**stored, &displayed, selection, settings, document,
+                ));
             }
         }
         actions.into_iter().next()
     }
 
     /// The style controls of an object: edits being chosen preview on the canvas, and a
-    /// completed one becomes an action.
+    /// completed one becomes an action. The fill angles last set are kept with the `settings`
+    /// of the object's tool.
     #[allow(clippy::too_many_arguments)]
     fn object_style<T: Styled>(
         &mut self,
@@ -147,6 +151,7 @@ impl ToolControls {
         stored: &T,
         displayed: &T,
         selection: &mut Selection,
+        settings: &mut NewObjectSettings,
         document: &Document,
     ) -> Option<Action> {
         let events = self.style.show(
@@ -155,7 +160,11 @@ impl ToolControls {
             stored,
             displayed,
             scale_problem(document),
+            settings.fill_angles(),
         );
+        if let (Some(StyleEdit::FillAngle(degrees)), Some(fill)) = (events.commit, stored.fill()) {
+            settings.remember_fill_angle(fill.style, degrees);
+        }
         if events.clear_preview {
             selection.clear_style_preview();
         }
@@ -236,6 +245,7 @@ impl ToolControls {
             &style,
             &style,
             scale_problem(document),
+            settings.fill_angles(),
         );
         let edits: [Option<StyleEdit>; 2] = [preview, commit];
         for edit in edits.into_iter().flatten() {
@@ -257,6 +267,7 @@ fn scale_problem(document: &Document) -> Option<String> {
 mod tests {
     use super::*;
     use eframe::egui::{Event, Modifiers, PointerButton, Pos2, RawInput, Rect};
+    use gridtool::area::Area;
     use gridtool::color::Rgb;
     use gridtool::geometry::Point;
     use gridtool::imaging::DecodedImage;
@@ -320,7 +331,7 @@ mod tests {
                 .unwrap();
             Action::SetStyle {
                 target: StyleTarget::Shape(0),
-                edit: StyleEdit::FillStyle(style),
+                edit: StyleEdit::FillStyle(style, 90.0),
             }
             .apply(&mut self.document)
             .unwrap();
@@ -479,7 +490,7 @@ mod tests {
 
         let rotate = Action::SetStyle {
             target: StyleTarget::Shape(0),
-            edit: StyleEdit::FillAngle(90.0),
+            edit: StyleEdit::FillAngle(0.0),
         };
         let rotations = actions.iter().filter(|&action| *action == rotate);
         assert!(rotations.count() >= 2, "{actions:?}");
@@ -505,6 +516,52 @@ mod tests {
 
         assert!(rotates(FillStyle::Crosshatch));
         assert!(!rotates(FillStyle::Solid));
+    }
+
+    #[test]
+    fn changing_an_active_areas_fill_style_uses_the_angle_last_set_for_it() {
+        let mut harness = Harness::new(ToolMode::Area);
+        Action::AddArea(Area::new(triangle().points().to_vec(), LengthUnit::Centimetre).unwrap())
+            .apply(&mut harness.document)
+            .unwrap();
+        let id = harness.document.areas()[0].id();
+        harness.view.selection.select(Some(id));
+        let chose_crosshatch_at = |harness: &mut Harness, degrees| {
+            let edit = StyleEdit::FillStyle(FillStyle::Crosshatch, degrees);
+            harness
+                .actions_from_clicking_along_the_row()
+                .contains(&Action::SetStyle {
+                    target: StyleTarget::Area(0),
+                    edit,
+                })
+        };
+
+        assert!(chose_crosshatch_at(&mut harness, 45.0));
+
+        harness
+            .view
+            .area_tool
+            .settings
+            .remember_fill_angle(FillStyle::Crosshatch, 30.0);
+        assert!(chose_crosshatch_at(&mut harness, 30.0));
+    }
+
+    #[test]
+    fn setting_an_active_objects_fill_angle_is_remembered_by_its_tool() {
+        let mut harness = Harness::new(ToolMode::DrawLine).with_active_shape(FillStyle::Lines);
+
+        let actions = harness.actions_from_clicking_along_the_row();
+
+        assert!(actions.iter().any(|action| matches!(
+            action,
+            Action::SetStyle {
+                edit: StyleEdit::FillAngle(0.0),
+                ..
+            }
+        )));
+        let angles = harness.view.line_tool.settings.fill_angles();
+        assert_eq!(angles.for_style(FillStyle::Lines), Some(0.0));
+        assert_eq!(angles.for_style(FillStyle::Crosshatch), Some(45.0));
     }
 
     #[test]

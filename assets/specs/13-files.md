@@ -99,10 +99,14 @@ version 3. A version 3 file is migrated to version 4 keeping how each object loo
 - an area gets a Thick line in its colour, at 100 % opacity, and a Solid fill in its colour,
   at 25 % opacity, with spacing 10 in the area's unit and angle 0
 
-**FILE-6d — Version 5 (current).** Version 5 is version 4 with one change: `fill_color` of
-`areas` and `shapes` is optional, written `None` or `Some((r, g, b))` (`DRAW-8`). Every other
-field is exactly as in version 4. A version 4 file is migrated to version 5 with each fill
-keeping its colour, so each object looks as it did.
+**FILE-6d — Version 5 (current).** Version 5 is version 4 with two changes to `areas` and `shapes`:
+- `fill_color` is optional, written `None` or `Some((r, g, b))` (`DRAW-8`)
+- `fill_angle` is measured clockwise from vertical, so 0 is vertical and 90 is horizontal, instead
+  of clockwise from the image's x axis
+
+Every other field is exactly as in version 4. A version 4 file is migrated to version 5 keeping
+how each object looks: each fill keeps its colour, and each fill angle has 90 added, within a half
+turn. An angle that was not valid stays invalid, so loading still rejects it (`FILE-7`).
 
 **FILE-7 — Validation on load.** A loaded description is checked as strictly as actions
 check their inputs (`HIST-2`), so a hand-edited or damaged file cannot produce an invalid
@@ -244,7 +248,8 @@ and shows the dialogs.
   area's styles.
 - A literal version 5 sample loads with the expected values, including a fill with no colour
   and one with a colour. A fill with no colour is still none after saving and loading.
-- Migrated files keep how their objects looked (`FILE-6c`, `FILE-6d`).
+- Migrated files keep how their objects looked (`FILE-6c`, `FILE-6d`): a version 4 fill angle of
+  45 becomes 135, and of 0 becomes 90. A version 4 fill angle of 180 or -1 is rejected.
 - Each `FILE-7` failure is rejected with its reason. This includes an area with 2 points, an area point outside
   the document, an area reusing a measurement's id, an open shape with 1 point, a closed
   shape with 2 points, a shape point outside the document, an open shape with a fill, a

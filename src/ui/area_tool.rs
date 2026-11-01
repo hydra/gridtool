@@ -74,7 +74,8 @@ mod tests {
         const UNIT: LengthUnit = LengthUnit::Centimetre;
         let mut tool = AreaTool::default();
         tool.settings.set_unit(LengthUnit::Metre);
-        tool.settings.apply(StyleEdit::FillStyle(FillStyle::Lines));
+        tool.settings
+            .apply(StyleEdit::FillStyle(FillStyle::Lines, 90.0));
         tool.settings.apply(StyleEdit::FillSpacing(25.0));
         tool.settings.apply(StyleEdit::LineStyle(LineStyle::Thin));
         for corner in [

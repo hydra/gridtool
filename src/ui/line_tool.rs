@@ -114,7 +114,8 @@ mod tests {
     fn a_new_shape_gets_the_tools_style_and_only_a_closed_one_its_fill() {
         let settings = |tool: &mut LineTool| {
             tool.settings.apply(StyleEdit::LineStyle(LineStyle::Dashed));
-            tool.settings.apply(StyleEdit::FillStyle(FillStyle::Solid));
+            tool.settings
+                .apply(StyleEdit::FillStyle(FillStyle::Solid, 90.0));
         };
 
         let mut open = tool_with(&POINTS);

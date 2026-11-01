@@ -204,7 +204,7 @@ mod tests {
         assert_eq!(fill.color, None);
         assert_eq!(fill.spacing, 1.0);
         assert_eq!(fill.unit, LengthUnit::Metre);
-        assert_eq!(fill.angle, 0.0);
+        assert_eq!(fill.angle, 90.0);
         assert_eq!(fill.opacity, 0.5);
     }
 
