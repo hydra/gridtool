@@ -1,6 +1,7 @@
 //! Presentation layer. Reads the document and emits [`gridtool::action::Action`]s; never
 //! modifies the document directly.
 
+pub mod about_dialog;
 mod angle;
 pub mod app_style;
 mod area_tool;

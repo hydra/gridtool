@@ -4,6 +4,7 @@ use gridtool::action::Action;
 use crate::file_picker::{RfdDocumentPicker, RfdImagePicker};
 use crate::open_document::OpenDocument;
 use crate::session::{DocumentId, Session};
+use crate::ui::about_dialog::AboutDialog;
 use crate::ui::object_tree::TreePick;
 use crate::ui::tool_controls::ToolControls;
 use crate::ui::tool_keys::{ToolKeyPresses, ToolKeys};
@@ -32,6 +33,8 @@ pub struct GridToolApp {
     /// The document the user clicked. It becomes active after one more frame, in which a field
     /// the click took the focus from finishes its edit on the document it belongs to.
     activating: Option<DocumentId>,
+    /// The About dialog, while it is open.
+    about: Option<AboutDialog>,
 }
 
 impl GridToolApp {
@@ -44,6 +47,7 @@ impl GridToolApp {
             title: crate::APP_NAME.to_owned(),
             shown_document: None,
             activating: None,
+            about: None,
         }
     }
 
@@ -84,6 +88,7 @@ impl GridToolApp {
             TopPanelAction::Redo => session.document_mut().map_or((), OpenDocument::redo),
             TopPanelAction::TogglePanel(panel) => self.workspace.toggle(panel),
             TopPanelAction::ResetLayout => self.workspace.reset_layout(),
+            TopPanelAction::About => self.about = Some(AboutDialog::new(ctx)),
         }
         ctx.request_repaint();
     }
@@ -139,8 +144,18 @@ impl GridToolApp {
         }
     }
 
-    /// Shows the dialog the session is waiting on, if any, and passes on the answer.
+    /// Shows the dialog the session is waiting on, if any, and passes on the answer. It takes
+    /// the place of the About dialog, which has nothing waiting on it.
     fn show_dialog(&mut self, ctx: &egui::Context) {
+        if self.session.dialog().is_some() {
+            self.about = None;
+        }
+        if let Some(about) = &mut self.about
+            && about.show(ctx)
+        {
+            self.about = None;
+            ctx.request_repaint();
+        }
         if let Some(button) = self.session.dialog().and_then(|dialog| dialog.show(ctx)) {
             self.session.answer(ctx, button);
             ctx.request_repaint();
@@ -193,9 +208,10 @@ impl GridToolApp {
         self.handle_close_request(&ctx);
         let state = self.tool_bar_state();
         // A dialog answers Escape itself.
-        let keys = match self.session.dialog() {
-            Some(_) => ToolKeyPresses::default(),
-            None => self.tool_keys.read(&ctx),
+        let keys = if self.session.dialog().is_some() || self.about.is_some() {
+            ToolKeyPresses::default()
+        } else {
+            self.tool_keys.read(&ctx)
         };
         let previous_mode = self.active_mode();
         let mut mode = previous_mode;

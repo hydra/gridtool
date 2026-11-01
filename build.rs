@@ -6,18 +6,25 @@ use ico::{IconDir, IconDirEntry, IconImage, ResourceType};
 use image::imageops::{self, FilterType};
 use winresource::WindowsResource;
 
+#[path = "src/readme_about.rs"]
+mod readme_about;
+
 const ICON_PNG: &str = "assets/icons/gridtool.png";
+const README: &str = "README.md";
 
 /// The sizes Windows picks from for the title bar, task bar, shortcuts and Explorer.
 const ICO_SIZES: [u32; 6] = [16, 24, 32, 48, 64, 256];
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed={ICON_PNG}");
+    println!("cargo:rerun-if-changed={README}");
+
+    let out_dir = std::env::var("OUT_DIR")?;
+    let out_dir = Path::new(&out_dir);
+    write_about(Path::new(README), &out_dir.join("about.txt"))?;
 
     // Windows shows the icon in an executable's resources, which other platforms don't have.
     if std::env::var("CARGO_CFG_TARGET_OS")? == "windows" {
-        let out_dir = std::env::var("OUT_DIR")?;
-        let out_dir = Path::new(&out_dir);
         let ico_path = out_dir.join("gridtool.ico");
         write_ico(Path::new(ICON_PNG), &ico_path)?;
         WindowsResource::new()
@@ -36,6 +43,17 @@ fn profile_dir(out_dir: &Path) -> Result<&Path, Box<dyn Error>> {
         .ancestors()
         .nth(3)
         .ok_or("OUT_DIR is not inside a profile directory")?)
+}
+
+/// Writes the text of the README's About section for the About dialog to compile in. A README
+/// without one fails the build, rather than the dialog being empty.
+fn write_about(readme_path: &Path, about_path: &Path) -> Result<(), Box<dyn Error>> {
+    let about = readme_about::about_text(&fs::read_to_string(readme_path)?);
+    if about.is_empty() {
+        return Err(format!("{} has no About section", readme_path.display()).into());
+    }
+    fs::write(about_path, about)?;
+    Ok(())
 }
 
 /// Writes the PNG as an ICO file holding each of `ICO_SIZES`.

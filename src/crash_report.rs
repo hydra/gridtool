@@ -7,15 +7,14 @@ use std::path::Path;
 use human_panic::{Metadata, PanicStyle, handle_dump, print_msg};
 use rfd::{MessageButtons, MessageDialog, MessageLevel};
 
-const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
-
 /// Makes panics save a crash report and tell the user. A debug build, or one run with
 /// `RUST_BACKTRACE` set, keeps the usual panic message for whoever is developing it.
 pub fn install() {
     if PanicStyle::default() != PanicStyle::Human {
         return;
     }
-    let metadata = Metadata::new(crate::APP_NAME, env!("CARGO_PKG_VERSION")).repository(REPOSITORY);
+    let metadata =
+        Metadata::new(crate::APP_NAME, env!("CARGO_PKG_VERSION")).repository(crate::REPOSITORY);
     panic::set_hook(Box::new(move |info| {
         // First, so that the report is safe whatever goes wrong with telling the user.
         let report = handle_dump(&metadata, info);
@@ -32,7 +31,7 @@ pub fn install() {
 
 /// What the dialog says, given where the crash report was saved, if it could be.
 fn crash_message(report: Option<&Path>) -> String {
-    let name = crate::APP_NAME;
+    let (name, repository) = (crate::APP_NAME, crate::REPOSITORY);
     let closing = format!(
         "{name} had a problem and has to close. Changes that were not saved have been lost."
     );
@@ -40,7 +39,7 @@ fn crash_message(report: Option<&Path>) -> String {
         Some(report) => format!(
             "{closing}\n\n\
              A crash report was saved to:\n{}\n\n\
-             To help get this fixed, please attach it to an issue at {REPOSITORY}/issues. \
+             To help get this fixed, please attach it to an issue at {repository}/issues. \
              Nothing is sent automatically.",
             report.display()
         ),

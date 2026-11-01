@@ -31,9 +31,10 @@ pub const ROTATE_90_RIGHT: MaterialIcon = material::ICON_ROTATE_90_DEGREES_CW;
 pub const LOCKED: MaterialIcon = material::ICON_LOCK;
 pub const UNLOCKED: MaterialIcon = material::ICON_LOCK_OPEN;
 pub const PANELS: MaterialIcon = material::ICON_DASHBOARD;
+pub const ABOUT: MaterialIcon = material::ICON_INFO;
 
 #[cfg(test)]
-pub const ALL: [MaterialIcon; 21] = [
+pub const ALL: [MaterialIcon; 22] = [
     NEW,
     LOAD,
     SAVE,
@@ -55,6 +56,7 @@ pub const ALL: [MaterialIcon; 21] = [
     LOCKED,
     UNLOCKED,
     PANELS,
+    ABOUT,
 ];
 
 #[cfg(test)]

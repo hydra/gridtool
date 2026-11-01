@@ -105,6 +105,7 @@ object is chosen.
 | 17 | Redo button | redo arrow (`redo`) | "`Redo`" |
 | 18 | Horizontal spacer, 16 px | — | — |
 | 19 | Panels menu (`WORK-5`) | panels (`dashboard`) | "`Panels`" |
+| 20 | About button (`SHELL-13`), at the right-hand end of the tool bar, with the free space before it | information (`info`) | "`About`" |
 
 The buttons act on the active document (`WORK-10`). Items 14 onward up to the next spacer are the **drawing tools** group; future drawing tools
 are added to it.
@@ -179,7 +180,42 @@ more to scroll to, without the pointer having to be over it or its area, and it 
 beside the content instead of covering it. Where everything fits there is no scroll bar, so its
 presence shows whether something can be scrolled.
 
+## About
+
+**SHELL-13 — About dialog.** The About button is always enabled and opens a modal dialog, 420 px
+wide, with these centred horizontally, from top to bottom:
+1. The application icon (`SHELL-1a`), 96 × 96 px. The executable MUST NOT hold a second copy of the
+   image for this.
+2. The application's name, in a large strong font (32 px).
+3. The primary author's name: the first of the authors listed in the package's manifest. The
+   manifest lists every author in the README's Authors section, in the same order.
+4. The text of the README's About section, leaving out anything that is not text, such as the
+   screenshot, with every wrapped row centred. A build step MUST extract it from the README into a
+   generated file before compilation, and the application MUST compile in that file rather than the
+   README, so the executable holds only this section. A README with no About section MUST fail the
+   build.
+5. A link to the repository named in the package's manifest, which opens in the browser.
+6. A "`OK`" button, which closes the dialog. It has keyboard focus when the dialog opens, and
+   Escape, or clicking outside the dialog, also closes it.
+
+If another dialog needs to ask something while it is open (`FILE-11`), that dialog replaces it.
+
 ## Acceptance criteria
+
+- About dialog (`SHELL-13`):
+  - The About button is at the right-hand end of the tool bar, and opens the dialog with or without
+    a document.
+  - The icon, name, author, text, link and button are shown in that order, centred, and the name is
+    the largest. Each wrapped row of the text is centred.
+  - The text is exactly the README's About section, without its screenshot, and stops at the next
+    section. Lines wrapped in the file are joined, and paragraphs are kept. Changing the README and
+    building again changes the text.
+  - The primary author is the first in the manifest, and the manifest matches the README's Authors
+    section.
+  - Clicking the link opens the repository. OK, Enter and Escape close the dialog, and Escape leaves
+    a tool's work alone. Clicking on the dialog itself does not close it.
+  - While it is open, clicks do not reach the canvas.
+  - A question from a file command replaces it.
 
 - Scroll bars (`SHELL-12`): they do not float over the content, in the dark or the light theme.
 
@@ -190,7 +226,7 @@ presence shows whether something can be scrolled.
   after Origin and starts a new group.
 - Tool modes (`SHELL-8`, `SHELL-9`):
   - With no document, no tool is active, clicking along the tool bar changes no mode, and only
-    New, Load and the Panels menu respond. Undo and Redo are disabled (`HIST-9`).
+    New, Load, the Panels menu and About respond. Undo and Redo are disabled (`HIST-9`).
   - With a document, the chosen tool is active and every tool can be chosen.
 - Tool controls row (`SHELL-2a`):
   - The canvas starts at the same place in every tool mode, and with a drawn shape active.

@@ -809,6 +809,82 @@ fn tabs_and_tab_bars_show_the_normal_cursor_until_they_are_dragged() {
     }
 }
 
+/// In the About button, at the right-hand end of the tool bar.
+const ABOUT_BUTTON: Pos2 = Pos2::new(WINDOW.max.x - 20.0, 16.0);
+
+#[test]
+fn the_about_button_opens_the_dialog_with_or_without_a_document() {
+    let mut fixture = Fixture::new("about_opens");
+    assert!(fixture.app.about.is_none());
+
+    fixture.click(ABOUT_BUTTON);
+    assert!(fixture.app.about.is_some());
+
+    fixture.frame(vec![Event::Key {
+        key: egui::Key::Escape,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: Modifiers::NONE,
+    }]);
+    fixture.settle();
+    assert!(fixture.app.about.is_none());
+
+    fixture.new_document();
+    fixture.click(ABOUT_BUTTON);
+    assert!(fixture.app.about.is_some());
+}
+
+#[test]
+fn escape_closes_the_about_dialog_and_leaves_the_tool_alone() {
+    let mut fixture = Fixture::new("about_escape");
+    fixture.new_document();
+    fixture.open().view.mode = ToolMode::Measure;
+    let target = fixture.open().view.canvas_rect.unwrap().center();
+    fixture.click(target);
+    assert!(fixture.open().view.is_placing_new_object());
+    fixture.click(ABOUT_BUTTON);
+
+    fixture.frame(vec![Event::Key {
+        key: egui::Key::Escape,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: Modifiers::NONE,
+    }]);
+    fixture.settle();
+
+    assert!(fixture.app.about.is_none());
+    assert!(fixture.open().view.is_placing_new_object());
+}
+
+#[test]
+fn a_question_from_the_session_takes_the_place_of_the_about_dialog() {
+    let mut fixture = Fixture::new("about_replaced");
+    let id = fixture.new_document();
+    fixture.click(ABOUT_BUTTON);
+    let ctx = fixture.ctx.clone();
+
+    fixture.app.session.close(&ctx, id);
+    fixture.settle();
+
+    assert!(fixture.app.session.dialog().is_some());
+    assert!(fixture.app.about.is_none());
+}
+
+#[test]
+fn the_about_dialog_keeps_clicks_from_the_canvas() {
+    let mut fixture = Fixture::new("about_modal");
+    fixture.new_document();
+    fixture.open().view.mode = ToolMode::Origin;
+    let target = fixture.open().view.canvas_rect.unwrap().left_top() + Vec2::new(10.0, 10.0);
+    fixture.click(ABOUT_BUTTON);
+
+    fixture.click(target);
+
+    assert!(!fixture.open().editor.can_undo());
+}
+
 #[test]
 fn the_tool_bar_reports_the_open_panels() {
     let mut fixture = Fixture::new("toolbar_panels");

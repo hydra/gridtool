@@ -114,3 +114,4 @@ must satisfy them.
 | 2026-11-01 | The Windows installer program now shows the application icon (`SHELL-1a`). |
 | 2026-11-01 | A release build no longer opens a console window on Windows (`SHELL-1b`). |
 | 2026-11-01 | A panic in a release build now saves a crash report and shows a dialog saying where it is (`SHELL-1c`). |
+| 2026-11-01 | Added an About button at the right-hand end of the tool bar, and its dialog (`SHELL-5`, `SHELL-13`). |

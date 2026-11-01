@@ -6,6 +6,8 @@ mod crash_report;
 mod file_picker;
 mod open_document;
 mod open_image;
+#[cfg(test)]
+mod readme_about;
 mod session;
 mod ui;
 
@@ -14,6 +16,7 @@ use eframe::egui;
 use app::GridToolApp;
 
 const APP_NAME: &str = "GridTool";
+const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 const APP_ICON_PNG: &[u8] = include_bytes!("../assets/icons/gridtool.png");
 
 fn main() -> eframe::Result {

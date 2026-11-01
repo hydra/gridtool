@@ -20,6 +20,7 @@ pub enum TopPanelAction {
     /// Close the panel if it is open, otherwise reopen it.
     TogglePanel(Panel),
     ResetLayout,
+    About,
 }
 
 /// Which tool bar buttons should be enabled.
@@ -109,7 +110,11 @@ pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> TopP
                 );
 
                 ui.add_space(SECTION_SPACING);
-                action.or(panels_menu(ui, state))
+                let panels = panels_menu(ui, state);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    button(ui, icons::ABOUT, "About", true, TopPanelAction::About)
+                });
+                action.or(panels)
             });
             TopPanel {
                 action: row.inner,
@@ -190,14 +195,21 @@ mod tests {
     }
 
     #[test]
-    fn with_no_document_no_tool_is_active_and_only_opening_buttons_work() {
+    fn with_no_document_no_tool_is_active_and_only_opening_and_about_buttons_work() {
         let state = ToolBarState::default();
         assert_eq!(state.active_tool(ToolMode::Pan), None);
 
         let (modes, actions) = click_along_the_tool_bar(state);
 
         assert_eq!(modes, [ToolMode::Origin], "the mode cannot change");
-        assert_eq!(actions, [TopPanelAction::New, TopPanelAction::Load]);
+        assert_eq!(
+            actions,
+            [
+                TopPanelAction::New,
+                TopPanelAction::Load,
+                TopPanelAction::About
+            ]
+        );
     }
 
     #[test]
@@ -213,6 +225,37 @@ mod tests {
 
         assert!(actions.contains(&TopPanelAction::Undo), "{actions:?}");
         assert!(actions.contains(&TopPanelAction::Redo), "{actions:?}");
+    }
+
+    #[test]
+    fn the_about_button_is_at_the_right_hand_end_of_the_bar() {
+        let ctx = egui::Context::default();
+        egui_material_icons::initialize(&ctx);
+        let frame = |events: Vec<Event>| {
+            let input = RawInput {
+                screen_rect: Some(Rect::from_min_max(Pos2::ZERO, Pos2::new(WIDTH, 600.0))),
+                events,
+                ..Default::default()
+            };
+            let (mut mode, mut action) = (ToolMode::Pan, None);
+            let mut output = ctx.run_ui(input, |ui| {
+                action = show(ui, &mut mode, ToolBarState::default()).action;
+            });
+            output.textures_delta.clear();
+            action
+        };
+        let pos = Pos2::new(WIDTH - 20.0, ROW_Y);
+        let button = |pressed| Event::PointerButton {
+            pos,
+            button: PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+
+        frame(vec![Event::PointerMoved(pos)]);
+        frame(vec![button(true)]);
+
+        assert_eq!(frame(vec![button(false)]), Some(TopPanelAction::About));
     }
 
     #[test]
@@ -266,7 +309,7 @@ mod tests {
             ]
         };
 
-        // The menu button is the last thing on the bar; find it by what it opens.
+        // Find the menu button, near the end of the bar, by what it opens.
         let mut opened = false;
         'search: for x in (0..WIDTH as u32).rev().step_by(6) {
             for events in click(Pos2::new(x as f32, ROW_Y)) {
