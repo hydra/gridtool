@@ -54,6 +54,8 @@ jobs:
         env:
           # The AppImage tools are AppImages themselves, and runners have no FUSE to mount them.
           APPIMAGE_EXTRACT_AND_RUN: 1
+          # The strip in the AppImage tools is old, and can fail on libraries from newer distributions.
+          NO_STRIP: 1
 
       - uses: actions/upload-artifact@v4
         with:

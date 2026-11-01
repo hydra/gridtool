@@ -19,6 +19,8 @@ serde = { version = "1.0.229", features = ["derive"] }
 product-name = "GridTool"
 identifier = "com.github.hydra.gridtool"
 description = "Measure real-world objects from an image, and overlay real-world grids."
+category = "GraphicsAndDesign"
+icons = ["assets/icons/gridtool.png"]
 before-packaging-command = "cargo build --release --locked"
 out-dir = "target/packages"
 
