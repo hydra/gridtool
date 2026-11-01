@@ -337,7 +337,8 @@ pointer is within the range of a point or handle or inside the box, choosing bet
   of the four to it. A corner's arrow is diagonal whatever the proportions of the box, but at
   a rotation near 45° a corner's arrow may be horizontal or vertical, and an edge's diagonal.
 - A secondary-button drag shows its own cursor (`VIEW-11a`).
-- On platforms that have no separate hand cursors, the hands may look like the four-way arrow.
+- The hands look different from the four-way arrow on every platform, including those with no
+  system cursor for them, where the application supplies its own.
 
 ## Acceptance criteria
 

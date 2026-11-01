@@ -17,3 +17,6 @@ serde = { version = "1.0.229", features = ["derive"] }
 [patch.crates-io]
 # Upstream egui_ltreeview 0.9.0 requires egui 0.36; this copy is patched for egui 0.37.
 egui_ltreeview = { path = "vendor/egui_ltreeview" }
+# Upstream winit 0.30.13 shows a four-way arrow for the grab cursors on Windows; this copy
+# draws real open and closed hands.
+winit = { path = "vendor/winit" }

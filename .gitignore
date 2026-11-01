@@ -1,3 +1,4 @@
 /target
 /vendor/egui_ltreeview/target/
+/vendor/winit/target/
 /Cargo.lock
