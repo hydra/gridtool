@@ -179,6 +179,7 @@ pub enum InvalidDocument {
     FilledOpenShape(u64),
     NotPositive(f64),
     BadOpacity(f32),
+    BadFillAngle(f64),
     /// Zero, duplicated, or not below the stored next object id.
     BadObjectId(u64),
 }
@@ -202,6 +203,7 @@ impl fmt::Display for InvalidDocument {
             }
             Self::NotPositive(value) => write!(f, "{value} should be a positive number"),
             Self::BadOpacity(value) => write!(f, "opacity {value} is not between 0 and 1"),
+            Self::BadFillAngle(value) => write!(f, "fill angle {value} is not from 0 up to 180"),
             Self::BadObjectId(id) => write!(f, "object id {id} is invalid or used twice"),
         }
     }

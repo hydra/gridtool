@@ -96,22 +96,33 @@ fn rich_document() -> Document {
         },
         Action::SetOrigin(Point::new(33.5, 66.25)),
         Action::AddShape(
-            DrawnShape::open(vec![Point::new(1.0, 1.0), Point::new(30.5, 40.0)]).unwrap(),
+            DrawnShape::open(
+                vec![Point::new(1.0, 1.0), Point::new(30.5, 40.0)],
+                LengthUnit::Centimetre,
+            )
+            .unwrap(),
         ),
         Action::SetShapeLineStyle {
             index: 0,
             style: LineStyle::Dashed,
+        },
+        Action::SetShapeLineColor {
+            index: 0,
+            color: Rgb::new(10, 20, 30),
         },
         Action::SetShapeLineOpacity {
             index: 0,
             opacity: 0.75,
         },
         Action::AddShape(
-            DrawnShape::closed(vec![
-                Point::new(5.0, 5.0),
-                Point::new(50.0, 5.0),
-                Point::new(50.0, 45.0),
-            ])
+            DrawnShape::closed(
+                vec![
+                    Point::new(5.0, 5.0),
+                    Point::new(50.0, 5.0),
+                    Point::new(50.0, 45.0),
+                ],
+                LengthUnit::Metre,
+            )
             .unwrap(),
         ),
         Action::SetShapeLineStyle {
@@ -122,9 +133,21 @@ fn rich_document() -> Document {
             index: 1,
             style: FillStyle::Crosshatch,
         },
+        Action::SetShapeFillColor {
+            index: 1,
+            color: Rgb::new(40, 50, 60),
+        },
         Action::SetShapeFillSpacing {
             index: 1,
             spacing: 100.0,
+        },
+        Action::SetShapeFillUnit {
+            index: 1,
+            unit: LengthUnit::Centimetre,
+        },
+        Action::SetShapeFillAngle {
+            index: 1,
+            degrees: 22.5,
         },
         Action::SetShapeFillOpacity {
             index: 1,
@@ -287,18 +310,26 @@ const VERSION_3_SAMPLE: &str = r#"V3((
         points: [(x: 1.0, y: 2.0), (x: 30.0, y: 2.0)],
         closed: false,
         line_style: Dashed,
+        line_color: (r: 1, g: 2, b: 3),
         line_opacity: 0.75,
         fill_style: None,
-        fill_spacing: 20.0,
+        fill_color: (r: 255, g: 128, b: 0),
+        fill_spacing: 10.0,
+        fill_unit: Centimetre,
+        fill_angle: 0.0,
         fill_opacity: 0.5,
     ), (
         id: 2,
         points: [(x: 10.0, y: 10.0), (x: 50.0, y: 10.0), (x: 50.0, y: 40.0)],
         closed: true,
         line_style: Thick,
+        line_color: (r: 255, g: 128, b: 0),
         line_opacity: 1.0,
         fill_style: Crosshatch,
-        fill_spacing: 50.0,
+        fill_color: (r: 4, g: 5, b: 6),
+        fill_spacing: 2.5,
+        fill_unit: Metre,
+        fill_angle: 45.0,
         fill_opacity: 0.25,
     )],
     next_object_id: 3,
@@ -317,11 +348,15 @@ fn version_3_files_load() {
     assert!(!line.is_closed());
     assert_eq!(line.points()[1], Point::new(30.0, 2.0));
     assert_eq!(line.line_style(), LineStyle::Dashed);
+    assert_eq!(line.line_color(), Rgb::new(1, 2, 3));
     assert_eq!(line.line_opacity(), 0.75);
     assert!(closed.is_closed());
     assert_eq!(closed.line_style(), LineStyle::Thick);
     assert_eq!(closed.fill_style(), FillStyle::Crosshatch);
-    assert_eq!(closed.fill_spacing(), 50.0);
+    assert_eq!(closed.fill_color(), Rgb::new(4, 5, 6));
+    assert_eq!(closed.fill_spacing(), 2.5);
+    assert_eq!(closed.fill_unit(), LengthUnit::Metre);
+    assert_eq!(closed.fill_angle(), 45.0);
     assert_eq!(closed.fill_opacity(), 0.25);
     assert_eq!(document.next_object_id(), 3);
 }
@@ -343,7 +378,7 @@ fn invalid_shapes_are_rejected() {
         _ => unreachable!("the sample is version 3"),
     };
     type Corruption = fn(&mut DocumentV3);
-    let cases: [(Corruption, InvalidDocument); 7] = [
+    let cases: [(Corruption, InvalidDocument); 9] = [
         (
             |f| f.shapes[0].points.truncate(1),
             InvalidDocument::TooFewShapePoints(1),
@@ -367,6 +402,14 @@ fn invalid_shapes_are_rejected() {
         (
             |f| f.shapes[1].fill_spacing = 0.0,
             InvalidDocument::NotPositive(0.0),
+        ),
+        (
+            |f| f.shapes[1].fill_angle = 180.0,
+            InvalidDocument::BadFillAngle(180.0),
+        ),
+        (
+            |f| f.shapes[1].fill_angle = -1.0,
+            InvalidDocument::BadFillAngle(-1.0),
         ),
         (|f| f.shapes[1].id = 1, InvalidDocument::BadObjectId(1)),
     ];

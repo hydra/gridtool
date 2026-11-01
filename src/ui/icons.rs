@@ -27,11 +27,30 @@ pub const UNDO: MaterialIcon = material::ICON_UNDO;
 pub const REDO: MaterialIcon = material::ICON_REDO;
 pub const DELETE: MaterialIcon = material::ICON_DELETE;
 pub const DUPLICATE: MaterialIcon = material::ICON_CONTENT_COPY;
+pub const ROTATE_90_LEFT: MaterialIcon = material::ICON_ROTATE_90_DEGREES_CCW;
+pub const ROTATE_90_RIGHT: MaterialIcon = material::ICON_ROTATE_90_DEGREES_CW;
 
 #[cfg(test)]
-pub const ALL: [MaterialIcon; 17] = [
-    NEW, LOAD, SAVE, SAVE_AS, OPEN_IMAGE, PAN, ROTATE, SCALE, MEASURE, AREA, GRID, ORIGIN,
-    DRAW_LINE, UNDO, REDO, DELETE, DUPLICATE,
+pub const ALL: [MaterialIcon; 19] = [
+    NEW,
+    LOAD,
+    SAVE,
+    SAVE_AS,
+    OPEN_IMAGE,
+    PAN,
+    ROTATE,
+    SCALE,
+    MEASURE,
+    AREA,
+    GRID,
+    ORIGIN,
+    DRAW_LINE,
+    UNDO,
+    REDO,
+    DELETE,
+    DUPLICATE,
+    ROTATE_90_LEFT,
+    ROTATE_90_RIGHT,
 ];
 
 #[cfg(test)]

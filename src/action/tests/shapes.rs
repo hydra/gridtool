@@ -1,20 +1,26 @@
 use super::*;
 
 fn open_shape() -> DrawnShape {
-    DrawnShape::open(vec![
-        Point::new(1.0, 1.0),
-        Point::new(20.0, 1.0),
-        Point::new(20.0, 30.0),
-    ])
+    DrawnShape::open(
+        vec![
+            Point::new(1.0, 1.0),
+            Point::new(20.0, 1.0),
+            Point::new(20.0, 30.0),
+        ],
+        LengthUnit::Centimetre,
+    )
     .unwrap()
 }
 
 fn closed_shape() -> DrawnShape {
-    DrawnShape::closed(vec![
-        Point::new(10.0, 10.0),
-        Point::new(40.0, 10.0),
-        Point::new(40.0, 40.0),
-    ])
+    DrawnShape::closed(
+        vec![
+            Point::new(10.0, 10.0),
+            Point::new(40.0, 10.0),
+            Point::new(40.0, 40.0),
+        ],
+        LengthUnit::Centimetre,
+    )
     .unwrap()
 }
 
@@ -92,6 +98,10 @@ fn sets_every_style_of_a_closed_shape() {
             index: 1,
             style: LineStyle::Dashed,
         },
+        Action::SetShapeLineColor {
+            index: 1,
+            color: Rgb::new(1, 2, 3),
+        },
         Action::SetShapeLineOpacity {
             index: 1,
             opacity: 0.25,
@@ -100,9 +110,21 @@ fn sets_every_style_of_a_closed_shape() {
             index: 1,
             style: FillStyle::Crosshatch,
         },
+        Action::SetShapeFillColor {
+            index: 1,
+            color: Rgb::new(4, 5, 6),
+        },
         Action::SetShapeFillSpacing {
             index: 1,
             spacing: 50.0,
+        },
+        Action::SetShapeFillUnit {
+            index: 1,
+            unit: LengthUnit::Metre,
+        },
+        Action::SetShapeFillAngle {
+            index: 1,
+            degrees: 45.0,
         },
         Action::SetShapeFillOpacity {
             index: 1,
@@ -114,31 +136,41 @@ fn sets_every_style_of_a_closed_shape() {
 
     let shape = &document.shapes()[1];
     assert_eq!(shape.line_style(), LineStyle::Dashed);
+    assert_eq!(shape.line_color(), Rgb::new(1, 2, 3));
     assert_eq!(shape.line_opacity(), 0.25);
     assert_eq!(shape.fill_style(), FillStyle::Crosshatch);
+    assert_eq!(shape.fill_color(), Rgb::new(4, 5, 6));
+    // Changing the unit keeps the value.
     assert_eq!(shape.fill_spacing(), 50.0);
+    assert_eq!(shape.fill_unit(), LengthUnit::Metre);
+    assert_eq!(shape.fill_angle(), 45.0);
     assert_eq!(shape.fill_opacity(), 0.75);
     assert_eq!(*document.shapes()[0], open_shape());
 }
 
 #[test]
-fn a_line_can_change_its_line_style_and_opacity() {
+fn a_line_can_change_its_line_style_colour_and_opacity() {
     let mut document = document_with_shapes();
 
-    Action::SetShapeLineStyle {
-        index: 0,
-        style: LineStyle::Dashed,
+    for action in [
+        Action::SetShapeLineStyle {
+            index: 0,
+            style: LineStyle::Dashed,
+        },
+        Action::SetShapeLineColor {
+            index: 0,
+            color: Rgb::new(1, 2, 3),
+        },
+        Action::SetShapeLineOpacity {
+            index: 0,
+            opacity: 0.5,
+        },
+    ] {
+        action.apply(&mut document).unwrap();
     }
-    .apply(&mut document)
-    .unwrap();
-    Action::SetShapeLineOpacity {
-        index: 0,
-        opacity: 0.5,
-    }
-    .apply(&mut document)
-    .unwrap();
 
     assert_eq!(document.shapes()[0].line_style(), LineStyle::Dashed);
+    assert_eq!(document.shapes()[0].line_color(), Rgb::new(1, 2, 3));
     assert_eq!(document.shapes()[0].line_opacity(), 0.5);
 }
 
@@ -198,11 +230,53 @@ fn rejects_invalid_shape_edits() {
             not_closed.clone(),
         ),
         (
+            Action::SetShapeFillColor {
+                index: 0,
+                color: Rgb::new(1, 2, 3),
+            },
+            not_closed.clone(),
+        ),
+        (
             Action::SetShapeFillSpacing {
                 index: 0,
                 spacing: 10.0,
             },
             not_closed.clone(),
+        ),
+        (
+            Action::SetShapeFillUnit {
+                index: 0,
+                unit: LengthUnit::Metre,
+            },
+            not_closed.clone(),
+        ),
+        (
+            Action::SetShapeFillAngle {
+                index: 0,
+                degrees: 45.0,
+            },
+            not_closed.clone(),
+        ),
+        (
+            Action::SetShapeLineColor {
+                index: 2,
+                color: Rgb::new(1, 2, 3),
+            },
+            missing.clone(),
+        ),
+        (
+            Action::SetShapeFillAngle {
+                index: 1,
+                degrees: 180.0,
+            },
+            ActionError::InvalidFillAngle(180.0),
+        ),
+        (
+            Action::SetShapeFillAngle {
+                index: 1,
+                degrees: -1.0,
+            },
+            ActionError::InvalidFillAngle(-1.0),
         ),
         (
             Action::SetShapeFillOpacity {
@@ -233,7 +307,11 @@ fn rejects_invalid_shape_edits() {
     }
     assert_eq!(document, before);
 
-    let outside = DrawnShape::open(vec![Point::default(), Point::new(101.0, 0.0)]).unwrap();
+    let outside = DrawnShape::open(
+        vec![Point::default(), Point::new(101.0, 0.0)],
+        LengthUnit::Centimetre,
+    )
+    .unwrap();
     assert_eq!(
         Action::AddShape(outside).apply(&mut document),
         Err(ActionError::PointOutsideDocument(Point::new(101.0, 0.0)))
@@ -287,17 +365,33 @@ fn every_shape_action_can_be_undone_and_redone() {
             index: 0,
             style: LineStyle::Thick,
         },
+        Action::SetShapeLineColor {
+            index: 0,
+            color: Rgb::new(1, 2, 3),
+        },
         Action::SetShapeLineOpacity {
             index: 0,
             opacity: 0.5,
         },
         Action::SetShapeFillStyle {
             index: 0,
-            style: FillStyle::HorizontalLines,
+            style: FillStyle::Lines,
+        },
+        Action::SetShapeFillColor {
+            index: 0,
+            color: Rgb::new(4, 5, 6),
         },
         Action::SetShapeFillSpacing {
             index: 0,
             spacing: 5.0,
+        },
+        Action::SetShapeFillUnit {
+            index: 0,
+            unit: LengthUnit::Metre,
+        },
+        Action::SetShapeFillAngle {
+            index: 0,
+            degrees: 90.0,
         },
         Action::SetShapeFillOpacity {
             index: 0,
@@ -405,18 +499,46 @@ fn describes_shape_actions() {
             "Set shape 1 line opacity to 25%",
         ),
         (
+            Action::SetShapeLineColor {
+                index: 0,
+                color: Rgb::new(255, 128, 0),
+            },
+            "Set shape 1 line color to #FF8000",
+        ),
+        (
             Action::SetShapeFillStyle {
                 index: 1,
-                style: FillStyle::VerticalLines,
+                style: FillStyle::Lines,
             },
-            "Set shape 2 fill style to Vertical lines",
+            "Set shape 2 fill style to Lines",
+        ),
+        (
+            Action::SetShapeFillColor {
+                index: 1,
+                color: Rgb::new(255, 128, 0),
+            },
+            "Set shape 2 fill color to #FF8000",
         ),
         (
             Action::SetShapeFillSpacing {
                 index: 1,
                 spacing: 50.0,
             },
-            "Set shape 2 fill spacing to 50 px",
+            "Set shape 2 fill spacing to 50",
+        ),
+        (
+            Action::SetShapeFillUnit {
+                index: 1,
+                unit: LengthUnit::Metre,
+            },
+            "Set shape 2 fill units to m",
+        ),
+        (
+            Action::SetShapeFillAngle {
+                index: 1,
+                degrees: 22.5,
+            },
+            "Set shape 2 fill angle to 22.5°",
         ),
         (
             Action::SetShapeFillOpacity {

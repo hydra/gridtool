@@ -12,7 +12,7 @@ use crate::geometry::Point;
 use crate::grid::{CellDimension, CellShape, Grid, GridSource};
 use crate::measurement::{Endpoint, Measurement};
 use crate::object::{Identified, ObjectId};
-use crate::shape::{DrawnShape, FillStyle, LineStyle};
+use crate::shape::{DrawnShape, FillStyle, LineStyle, is_valid_fill_angle};
 use crate::units::LengthUnit;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -101,12 +101,20 @@ pub enum Action {
     ResizeShape { index: usize, points: Vec<Point> },
     /// Changes how a shape's line is drawn.
     SetShapeLineStyle { index: usize, style: LineStyle },
+    /// Changes the colour of a shape's line.
+    SetShapeLineColor { index: usize, color: Rgb },
     /// Changes the opacity of a shape's line (0 to 1).
     SetShapeLineOpacity { index: usize, opacity: f32 },
     /// Changes how a closed shape is filled.
     SetShapeFillStyle { index: usize, style: FillStyle },
-    /// Changes the distance between a closed shape's fill lines, in image pixels.
+    /// Changes the colour of a closed shape's fill.
+    SetShapeFillColor { index: usize, color: Rgb },
+    /// Changes the distance between a closed shape's fill lines, in its fill unit.
     SetShapeFillSpacing { index: usize, spacing: f64 },
+    /// Changes the unit a closed shape's fill spacing is in, keeping the spacing value.
+    SetShapeFillUnit { index: usize, unit: LengthUnit },
+    /// Changes the direction of a closed shape's fill lines, in degrees in [0, 180).
+    SetShapeFillAngle { index: usize, degrees: f64 },
     /// Changes the opacity of a closed shape's fill (0 to 1).
     SetShapeFillOpacity { index: usize, opacity: f32 },
     /// Removes a shape; later shapes move up one place.
@@ -160,6 +168,7 @@ pub enum ActionError {
         index: usize,
     },
     InvalidFillSpacing(f64),
+    InvalidFillAngle(f64),
     Calibration(CalibrationError),
 }
 
@@ -215,6 +224,9 @@ impl fmt::Display for ActionError {
             }
             Self::InvalidFillSpacing(spacing) => {
                 write!(f, "fill spacing must be a positive number, got {spacing}")
+            }
+            Self::InvalidFillAngle(degrees) => {
+                write!(f, "fill angle must be from 0 up to 180, got {degrees}")
             }
             Self::Calibration(error) => error.fmt(f),
         }
@@ -414,6 +426,9 @@ impl Action {
             Action::SetShapeLineStyle { index, style } => {
                 shape_mut(document, *index)?.set_line_style(*style);
             }
+            Action::SetShapeLineColor { index, color } => {
+                shape_mut(document, *index)?.set_line_color(*color);
+            }
             Action::SetShapeLineOpacity { index, opacity } => {
                 ensure_valid_opacity(*opacity)?;
                 shape_mut(document, *index)?.set_line_opacity(*opacity);
@@ -421,11 +436,23 @@ impl Action {
             Action::SetShapeFillStyle { index, style } => {
                 closed_shape_mut(document, *index)?.set_fill_style(*style);
             }
+            Action::SetShapeFillColor { index, color } => {
+                closed_shape_mut(document, *index)?.set_fill_color(*color);
+            }
             Action::SetShapeFillSpacing { index, spacing } => {
                 if !(spacing.is_finite() && *spacing > 0.0) {
                     return Err(ActionError::InvalidFillSpacing(*spacing));
                 }
                 closed_shape_mut(document, *index)?.set_fill_spacing(*spacing);
+            }
+            Action::SetShapeFillUnit { index, unit } => {
+                closed_shape_mut(document, *index)?.set_fill_unit(*unit);
+            }
+            Action::SetShapeFillAngle { index, degrees } => {
+                if !is_valid_fill_angle(*degrees) {
+                    return Err(ActionError::InvalidFillAngle(*degrees));
+                }
+                closed_shape_mut(document, *index)?.set_fill_angle(*degrees);
             }
             Action::SetShapeFillOpacity { index, opacity } => {
                 ensure_valid_opacity(*opacity)?;
@@ -656,6 +683,9 @@ impl fmt::Display for Action {
             Action::SetShapeLineStyle { index, style } => {
                 write!(f, "Set shape {} line style to {}", index + 1, style.name())
             }
+            Action::SetShapeLineColor { index, color } => {
+                write!(f, "Set shape {} line color to {color}", index + 1)
+            }
             Action::SetShapeLineOpacity { index, opacity } => write!(
                 f,
                 "Set shape {} line opacity to {}%",
@@ -665,8 +695,17 @@ impl fmt::Display for Action {
             Action::SetShapeFillStyle { index, style } => {
                 write!(f, "Set shape {} fill style to {}", index + 1, style.name())
             }
+            Action::SetShapeFillColor { index, color } => {
+                write!(f, "Set shape {} fill color to {color}", index + 1)
+            }
             Action::SetShapeFillSpacing { index, spacing } => {
-                write!(f, "Set shape {} fill spacing to {spacing} px", index + 1)
+                write!(f, "Set shape {} fill spacing to {spacing}", index + 1)
+            }
+            Action::SetShapeFillUnit { index, unit } => {
+                write!(f, "Set shape {} fill units to {unit}", index + 1)
+            }
+            Action::SetShapeFillAngle { index, degrees } => {
+                write!(f, "Set shape {} fill angle to {degrees}°", index + 1)
             }
             Action::SetShapeFillOpacity { index, opacity } => write!(
                 f,

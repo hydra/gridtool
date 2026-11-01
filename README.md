@@ -18,7 +18,7 @@ or measurement line. Every change can be undone, and documents can be saved and 
 - **Point-to-point measurements**: real-world distances, with editable coordinates, per-measurement units (cm or m) and colours.
 - **Area measurements**: convex or concave outlines with 3 or more points, filled and labelled with their area in cm² or m².
 - **Grids**: real-world grids with square or rectangular cells of any size, aligned to a scale or measurement line, with adjustable colour and opacity.
-- **Drawing**: draw lines through any number of points, finishing with a double-click or Enter, or click the first point to join them into an area. Choose thin, thick or dashed lines, fill areas solid or with lines or crosshatching, and set the opacity of each.
+- **Drawing**: draw lines through any number of points, finishing with a double-click or Enter, or click the first point to join them into an area. Choose thin, thick or dashed lines, fill areas solid or with lines or crosshatching at any real-world distance and angle, and set the colour and opacity of each.
 - **Editing**: select objects on the canvas or in the object tree, drag their points, stretch them with a bounding box, duplicate and delete them.
 - **View**: pan, zoom about the cursor, and rotate the view about a movable origin, without changing the document.
 - **Undo and redo**: every change is recorded in a history panel.

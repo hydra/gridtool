@@ -1,6 +1,7 @@
 use eframe::egui::{Rect, TextureHandle};
 use egui_ltreeview::TreeViewState;
 use gridtool::action::Action;
+use gridtool::units::LengthUnit;
 
 use super::area_tool::AreaTool;
 use super::grid_tool::GridTool;
@@ -65,8 +66,8 @@ impl DocumentView {
 
     /// Finishes the line being drawn, leaving it open (Enter): the action that adds it, if
     /// there is enough of a line to add.
-    pub fn finish_line(&mut self) -> Option<Action> {
-        self.line_tool.finish_open()
+    pub fn finish_line(&mut self, unit: LengthUnit) -> Option<Action> {
+        self.line_tool.finish_open(unit)
     }
 }
 
@@ -77,7 +78,6 @@ mod tests {
     use gridtool::document::Document;
     use gridtool::geometry::Point;
     use gridtool::imaging::DecodedImage;
-    use gridtool::units::LengthUnit;
 
     use crate::ui::canvas::upload_texture;
 
@@ -115,14 +115,17 @@ mod tests {
     fn finishing_a_line_needs_two_points_and_backspace_removes_them() {
         let mut view = view();
         view.line_tool.outline.click(Point::new(1.0, 1.0), None);
-        assert_eq!(view.finish_line(), None);
+        assert_eq!(view.finish_line(LengthUnit::Metre), None);
 
         view.line_tool.outline.click(Point::new(2.0, 2.0), None);
         view.remove_last_point();
         assert_eq!(view.line_tool.outline.points().len(), 1);
 
         view.line_tool.outline.click(Point::new(3.0, 3.0), None);
-        assert!(matches!(view.finish_line(), Some(Action::AddShape(_))));
+        assert!(matches!(
+            view.finish_line(LengthUnit::Metre),
+            Some(Action::AddShape(_))
+        ));
         assert!(view.line_tool.outline.points().is_empty());
     }
 }

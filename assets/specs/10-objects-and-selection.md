@@ -224,8 +224,8 @@ shapes can all be duplicated. Clicking it:
    - measurement: both endpoints, the unit and the colour
    - area: every point, the unit and the colour
    - grid: alignment source, cell shape, both cell sizes, unit, colour and opacity
-   - drawn shape: every point, the closed state, line style and opacity, and fill style,
-     spacing and opacity
+   - drawn shape: every point, the closed state, line style, colour and opacity, and fill
+     style, colour, spacing, unit, angle and opacity
 3. The copy is appended to the end of its list, so it is the last leaf of its tree folder.
 4. The copy becomes the **active object**. Because it lies exactly on top of the
    original, its selection box (if any) is in the same place.

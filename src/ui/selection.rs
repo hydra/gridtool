@@ -429,7 +429,11 @@ mod tests {
     fn document_with_drawn_line() -> (Document, ObjectId) {
         let mut document = document_with_two_measurements();
         Action::AddShape(
-            DrawnShape::open(vec![Point::new(10.0, 50.0), Point::new(30.0, 70.0)]).unwrap(),
+            DrawnShape::open(
+                vec![Point::new(10.0, 50.0), Point::new(30.0, 70.0)],
+                LengthUnit::Centimetre,
+            )
+            .unwrap(),
         )
         .apply(&mut document)
         .unwrap();

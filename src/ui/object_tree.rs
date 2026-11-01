@@ -321,8 +321,11 @@ mod tests {
     fn commands_target_the_active_shape() {
         let mut document = Document::new(100, 100);
         Action::AddShape(
-            gridtool::shape::DrawnShape::open(vec![Point::new(1.0, 1.0), Point::new(2.0, 2.0)])
-                .unwrap(),
+            gridtool::shape::DrawnShape::open(
+                vec![Point::new(1.0, 1.0), Point::new(2.0, 2.0)],
+                gridtool::units::LengthUnit::Centimetre,
+            )
+            .unwrap(),
         )
         .apply(&mut document)
         .unwrap();

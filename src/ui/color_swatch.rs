@@ -8,6 +8,8 @@ use super::color::{from_color32, to_color32};
 
 /// The size of the swatches in table rows.
 pub const ROW_SWATCH_SIZE: egui::Vec2 = egui::Vec2::new(28.0, 14.0);
+/// The size of the swatches in object properties rows.
+pub const BAR_SWATCH_SIZE: egui::Vec2 = egui::Vec2::new(36.0, 18.0);
 
 /// What happened to a swatch this frame.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]

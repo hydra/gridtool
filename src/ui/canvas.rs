@@ -208,7 +208,7 @@ pub fn show(
                 &painter,
                 transform,
                 &view.line_tool.outline,
-                shape::COLOR,
+                shape::DEFAULT_LINE_COLOR,
                 response.hover_pos(),
             );
         }
@@ -611,7 +611,12 @@ fn handle_draw_line(
     tool: &mut LineTool,
 ) -> Option<Action> {
     let (point, hit) = outline_click(ui, response, transform, document, &tool.outline)?;
-    tool.click(point, hit, response.double_clicked())
+    tool.click(
+        point,
+        hit,
+        response.double_clicked(),
+        document.calibration().unit(),
+    )
 }
 
 /// Updates the cursor for a tool placing the points of `outline`, and returns the image
@@ -1178,9 +1183,11 @@ mod tests {
         /// Adds the closed shape through the points of [`TRIANGLE`] and makes it the active
         /// object. On screen its points are at [`TRIANGLE_ON_SCREEN`].
         fn select_new_shape(&mut self) {
-            Action::AddShape(DrawnShape::closed(triangle_points()).unwrap())
-                .apply(&mut self.document)
-                .unwrap();
+            Action::AddShape(
+                DrawnShape::closed(triangle_points(), LengthUnit::Centimetre).unwrap(),
+            )
+            .apply(&mut self.document)
+            .unwrap();
             let id = self.document.shapes()[0].id();
             self.view.selection.select(Some(id));
         }
@@ -1522,7 +1529,7 @@ mod tests {
 
         harness.click(TRIANGLE_ON_SCREEN[0] + Vec2::new(4.0, -3.0));
 
-        let expected = DrawnShape::closed(triangle_points()).unwrap();
+        let expected = DrawnShape::closed(triangle_points(), LengthUnit::Centimetre).unwrap();
         assert_eq!(harness.actions, [Action::AddShape(expected)]);
         assert!(harness.view.line_tool.outline.points().is_empty());
     }
@@ -1537,7 +1544,8 @@ mod tests {
 
         harness.click(TRIANGLE_ON_SCREEN[1]);
 
-        let expected = DrawnShape::open(triangle_points()[..2].to_vec()).unwrap();
+        let expected =
+            DrawnShape::open(triangle_points()[..2].to_vec(), LengthUnit::Centimetre).unwrap();
         assert_eq!(harness.actions, [Action::AddShape(expected)]);
     }
 
@@ -1616,29 +1624,63 @@ mod tests {
 
         let mut harness = Harness::new(ToolMode::Pan);
         harness.select_new_shape();
-        for fill in FillStyle::ALL {
-            for line in LineStyle::ALL {
-                for action in [
-                    Action::SetShapeFillStyle {
-                        index: 0,
-                        style: fill,
-                    },
-                    Action::SetShapeLineStyle {
-                        index: 0,
-                        style: line,
-                    },
-                ] {
-                    action.apply(&mut harness.document).unwrap();
-                }
-                for factor in [1024.0, 1.0 / 1024.0, 1.0] {
-                    harness
-                        .view
-                        .viewport
-                        .zoom_about(SCREEN.center(), SCREEN.center(), factor);
-                    harness.frame(Vec::new());
+        let paint_at_every_zoom = |harness: &mut Harness| {
+            for fill in FillStyle::ALL {
+                for line in LineStyle::ALL {
+                    for action in [
+                        Action::SetShapeFillStyle {
+                            index: 0,
+                            style: fill,
+                        },
+                        Action::SetShapeLineStyle {
+                            index: 0,
+                            style: line,
+                        },
+                    ] {
+                        action.apply(&mut harness.document).unwrap();
+                    }
+                    for factor in [1024.0, 1.0 / 1024.0, 1.0] {
+                        harness
+                            .view
+                            .viewport
+                            .zoom_about(SCREEN.center(), SCREEN.center(), factor);
+                        harness.frame(Vec::new());
+                    }
                 }
             }
+        };
+
+        // Without a scale, the fill lines are left out.
+        paint_at_every_zoom(&mut harness);
+
+        for action in [
+            Action::SetScalePoints(
+                gridtool::calibration::ScalePoints::new(
+                    gridtool::calibration::CalibrationMethod::ThreePoint,
+                    vec![
+                        Point::new(0.0, 0.0),
+                        Point::new(20.0, 0.0),
+                        Point::new(20.0, 40.0),
+                    ],
+                )
+                .unwrap(),
+            ),
+            Action::SetDistance {
+                line: gridtool::calibration::Line::A,
+                distance: Some(20.0),
+            },
+            Action::SetDistance {
+                line: gridtool::calibration::Line::B,
+                distance: Some(40.0),
+            },
+            Action::SetShapeFillAngle {
+                index: 0,
+                degrees: 30.0,
+            },
+        ] {
+            action.apply(&mut harness.document).unwrap();
         }
+        paint_at_every_zoom(&mut harness);
     }
 
     #[test]

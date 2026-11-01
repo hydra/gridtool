@@ -16,7 +16,6 @@ use super::selection::Selection;
 use super::unit_picker;
 
 const SIZE_FIELD_WIDTH: f32 = 60.0;
-const COLOR_SWATCH_SIZE: egui::Vec2 = egui::Vec2::new(36.0, 18.0);
 
 #[derive(Default)]
 pub struct GridBar {
@@ -137,7 +136,7 @@ fn color_picker(
         ui,
         egui::Id::unique(("grid_color", id)),
         stored.color(),
-        COLOR_SWATCH_SIZE,
+        color_swatch::BAR_SWATCH_SIZE,
         "Choose the grid colour",
     );
     if let Some(color) = edit.preview {

@@ -10,7 +10,7 @@ use crate::ui::object_tree;
 use crate::ui::placeholder;
 use crate::ui::rotation_bar::RotationBar;
 use crate::ui::scale_bar::ScaleBar;
-use crate::ui::shape_bar;
+use crate::ui::shape_bar::ShapeBar;
 use crate::ui::side_panel::SidePanel;
 use crate::ui::tool_keys::{ToolKeyPresses, ToolKeys};
 use crate::ui::tool_mode::ToolMode;
@@ -22,6 +22,7 @@ pub struct GridToolApp {
     rotation_bar: RotationBar,
     scale_bar: ScaleBar,
     grid_bar: GridBar,
+    shape_bar: ShapeBar,
     side_panel: SidePanel,
     tool_keys: ToolKeys,
     /// The window title last sent to the window.
@@ -36,6 +37,7 @@ impl GridToolApp {
             rotation_bar: RotationBar::default(),
             scale_bar: ScaleBar::default(),
             grid_bar: GridBar::default(),
+            shape_bar: ShapeBar::default(),
             side_panel: SidePanel::default(),
             tool_keys: ToolKeys::default(),
             title: crate::APP_NAME.to_owned(),
@@ -102,11 +104,10 @@ impl GridToolApp {
             &mut open.view.selection,
             open.view.viewport.zoom(),
         );
-        grid.or(shape_bar::show(
-            ui,
-            open.editor.document(),
-            &mut open.view.selection,
-        ))
+        let shape = self
+            .shape_bar
+            .show(ui, open.editor.document(), &mut open.view.selection);
+        grid.or(shape)
     }
 
     /// Escape and switching tool mode both abandon what the tool was part-way through;
@@ -120,7 +121,8 @@ impl GridToolApp {
         if keys.remove_last_point {
             open.view.remove_last_point();
         }
-        keys.finish.then(|| open.view.finish_line()).flatten()
+        let unit = open.editor.document().calibration().unit();
+        keys.finish.then(|| open.view.finish_line(unit)).flatten()
     }
 
     /// Keeps the window open while the session asks about unsaved changes.

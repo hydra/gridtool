@@ -1,8 +1,9 @@
 //! Drawing the document's drawn shapes: their fill, then their line in its style.
 
 use eframe::egui::{self, Pos2, Rect, Shape, Stroke, Vec2};
+use gridtool::calibration::Scale;
 use gridtool::document::Document;
-use gridtool::shape::{self, DrawnShape, FillStyle, LineStyle};
+use gridtool::shape::{DrawnShape, FillStyle, LineStyle};
 
 use super::canvas::{DASH_GAP, DASH_LENGTH, fill_outline, paint_point_handle, to_screen};
 use super::color::{to_color32, with_opacity};
@@ -23,14 +24,16 @@ pub fn paint_shapes(
     document: &Document,
     selection: &Selection,
 ) {
+    // Fill lines are a real-world distance apart, so they need a scale.
+    let scale = document.calibration().scale().ok();
     for stored in document.shapes() {
         let drawn = selection.displayed_drawn(stored.id(), stored);
         let on_screen = to_screen(transform, drawn.points());
-        paint_fill(painter, transform, &drawn, &on_screen);
+        paint_fill(painter, transform, scale, &drawn, &on_screen);
         paint_line(painter, &drawn, &on_screen);
         if selection.active() == Some(stored.id()) {
             for &position in &on_screen {
-                paint_point_handle(painter, position, to_color32(shape::COLOR));
+                paint_point_handle(painter, position, to_color32(drawn.line_color()));
             }
         }
     }
@@ -39,21 +42,27 @@ pub fn paint_shapes(
 fn paint_fill(
     painter: &egui::Painter,
     transform: DocumentTransform,
+    scale: Option<Scale>,
     drawn: &DrawnShape,
     on_screen: &[Pos2],
 ) {
     if !drawn.is_closed() {
         return;
     }
-    let color = with_opacity(shape::COLOR, drawn.fill_opacity());
+    let color = with_opacity(drawn.fill_color(), drawn.fill_opacity());
     if drawn.fill_style() == FillStyle::Solid {
         fill_outline(painter, drawn.points(), on_screen, color);
         return;
     }
-    let spacing = visible_spacing(drawn.fill_spacing(), transform.zoom());
+    let Some(scale) = scale else {
+        return;
+    };
+    // When zoomed out, enough lines are skipped to keep them apart on screen, rather than
+    // filling the area solid.
+    let min_gap = f64::from(MIN_SCREEN_SPACING) / f64::from(transform.zoom());
     let region = transform.image_bounds_of(painter.clip_rect());
     let stroke = Stroke::new(FILL_LINE_WIDTH, color);
-    for (start, end) in drawn.fill_lines(spacing, region) {
+    for (start, end) in drawn.fill_lines(scale, min_gap, region) {
         painter.line_segment(
             [
                 transform.image_to_screen(start),
@@ -64,16 +73,8 @@ fn paint_fill(
     }
 }
 
-/// The distance to draw fill lines at, a whole multiple of `spacing` so that the lines
-/// drawn are a subset of the real ones: when zoomed out, enough lines are skipped to keep
-/// them [`MIN_SCREEN_SPACING`] apart on screen, rather than filling the area solid.
-fn visible_spacing(spacing: f64, zoom: f32) -> f64 {
-    let on_screen = spacing * f64::from(zoom);
-    spacing * (f64::from(MIN_SCREEN_SPACING) / on_screen).ceil().max(1.0)
-}
-
 fn paint_line(painter: &egui::Painter, drawn: &DrawnShape, on_screen: &[Pos2]) {
-    let color = with_opacity(shape::COLOR, drawn.line_opacity());
+    let color = with_opacity(drawn.line_color(), drawn.line_opacity());
     let closed = drawn.is_closed();
     match drawn.line_style() {
         LineStyle::Thin => paint_solid(painter, on_screen, closed, THIN_LINE_WIDTH, color),
@@ -172,21 +173,6 @@ mod tests {
     use super::*;
 
     const RECT: Rect = Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(100.0, 100.0));
-
-    #[test]
-    fn fill_lines_keep_their_spacing_when_it_is_big_enough_on_screen() {
-        assert_eq!(visible_spacing(10.0, 1.0), 10.0);
-        assert_eq!(visible_spacing(5.0, 0.6), 5.0);
-        assert_eq!(visible_spacing(20.0, 16.0), 20.0);
-    }
-
-    #[test]
-    fn fill_lines_are_skipped_when_they_would_be_too_close_on_screen() {
-        // 10 px at zoom 0.1 is 1 px on screen: every third line is 3 px apart.
-        assert_eq!(visible_spacing(10.0, 0.1), 30.0);
-        // Still a multiple of the real spacing when the division is not exact.
-        assert_eq!(visible_spacing(5.0, 0.25), 15.0);
-    }
 
     #[test]
     fn clipping_keeps_only_the_part_of_a_segment_inside() {

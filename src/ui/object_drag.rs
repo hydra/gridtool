@@ -340,11 +340,14 @@ mod tests {
     fn document_with_drawn_line() -> (Document, ObjectId) {
         let mut document = document();
         Action::AddShape(
-            DrawnShape::open(vec![
-                Point::new(10.0, 10.0),
-                Point::new(40.0, 10.0),
-                Point::new(40.0, 30.0),
-            ])
+            DrawnShape::open(
+                vec![
+                    Point::new(10.0, 10.0),
+                    Point::new(40.0, 10.0),
+                    Point::new(40.0, 30.0),
+                ],
+                LengthUnit::Centimetre,
+            )
             .unwrap(),
         )
         .apply(&mut document)

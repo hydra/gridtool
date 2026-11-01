@@ -16,7 +16,7 @@ completely, so loading it re-creates the exact document state (`DOC-1`).
   line, or a measurement by object id, which may refer to a deleted measurement), shape,
   sizes A and B (both, even for square cells), unit, colour and opacity
 - every drawn shape (`DRAW-8`), in list order, with its object id, points, closed state,
-  line style and opacity, and fill style, spacing and opacity
+  line style, colour and opacity, and fill style, colour, spacing, unit, angle and opacity
 - the object id counter (`OBJ-1`), so ids are never reused after loading
 
 **FILE-2 — Not saved.** These are **not** saved:
@@ -74,10 +74,13 @@ by giving every measurement the default colour, blue (`MEAS-1`), and adding no a
 
 **FILE-6b — Version 3 (current).** Version 3 is version 2 with this change:
 - `shapes`, after `grids`: a list of `(id, points: [(x, y), …], closed, line_style,
-  line_opacity, fill_style, fill_spacing, fill_opacity)`
+  line_color: (r, g, b), line_opacity, fill_style, fill_color: (r, g, b), fill_spacing,
+  fill_unit, fill_angle, fill_opacity)`
   - `closed` is `true` or `false`
   - `line_style` is `Thin|Thick|Dashed`
-  - `fill_style` is `None|Solid|VerticalLines|HorizontalLines|Crosshatch`
+  - `fill_style` is `None|Solid|Lines|Crosshatch`
+  - `fill_unit` is `Centimetre|Metre`
+  - `fill_angle` is in degrees, from 0 up to but not including 180
 
 Every other field is exactly as in version 2. A version 2 file is migrated to version 3 by
 adding no shapes.
@@ -94,6 +97,7 @@ document. Loading fails when:
 - the number of scale points does not match the method
 - a distance, cell size or fill spacing is not finite and > 0
 - an opacity is outside [0, 1]
+- a fill angle is not from 0 up to but not including 180
 - an object id is 0, used twice, or not below `next_object_id`
 
 **FILE-8 — Loading the image.** After the description is valid, the referenced image is
@@ -220,7 +224,8 @@ and shows the dialogs.
 - Each `FILE-7` failure is rejected with its reason. This includes an area with 2 points, an area point outside
   the document, an area reusing a measurement's id, an open shape with 1 point, a closed
   shape with 2 points, a shape point outside the document, an open shape with a fill, a
-  shape opacity of 1.5, a fill spacing of 0, and a shape reusing another shape's id.
+  shape opacity of 1.5, a fill spacing of 0, a fill angle of 180 or -1, and a shape reusing
+  another shape's id.
 - Image references:
   - `a.png` beside the document is stored as `a.png`
   - an image in `images/` below it is stored as `images/b.png`

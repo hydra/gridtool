@@ -17,7 +17,7 @@ use crate::object::{Identified, ObjectId};
 use crate::shape::{self, DrawnShape, FillStyle, LineStyle};
 
 use super::InvalidDocument;
-use super::v1::{CalibrationV1, GridV1, PointV1, ScalePointsV1};
+use super::v1::{CalibrationV1, ColorV1, GridV1, PointV1, ScalePointsV1, UnitV1};
 use super::v2::{AreaV2, DocumentV2, MeasurementV2};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -44,10 +44,16 @@ pub struct ShapeV3 {
     pub points: Vec<PointV1>,
     pub closed: bool,
     pub line_style: LineStyleV3,
+    pub line_color: ColorV1,
     pub line_opacity: f32,
     /// `None` unless closed.
     pub fill_style: FillStyleV3,
+    pub fill_color: ColorV1,
+    /// The real-world distance between fill lines, in `fill_unit`.
     pub fill_spacing: f64,
+    pub fill_unit: UnitV1,
+    /// Degrees clockwise from the image's x axis, in [0, 180).
+    pub fill_angle: f64,
     pub fill_opacity: f32,
 }
 
@@ -62,8 +68,7 @@ pub enum LineStyleV3 {
 pub enum FillStyleV3 {
     None,
     Solid,
-    VerticalLines,
-    HorizontalLines,
+    Lines,
     Crosshatch,
 }
 
@@ -92,8 +97,7 @@ impl From<FillStyle> for FillStyleV3 {
         match style {
             FillStyle::None => Self::None,
             FillStyle::Solid => Self::Solid,
-            FillStyle::VerticalLines => Self::VerticalLines,
-            FillStyle::HorizontalLines => Self::HorizontalLines,
+            FillStyle::Lines => Self::Lines,
             FillStyle::Crosshatch => Self::Crosshatch,
         }
     }
@@ -104,8 +108,7 @@ impl From<FillStyleV3> for FillStyle {
         match style {
             FillStyleV3::None => Self::None,
             FillStyleV3::Solid => Self::Solid,
-            FillStyleV3::VerticalLines => Self::VerticalLines,
-            FillStyleV3::HorizontalLines => Self::HorizontalLines,
+            FillStyleV3::Lines => Self::Lines,
             FillStyleV3::Crosshatch => Self::Crosshatch,
         }
     }
@@ -190,9 +193,13 @@ impl DocumentV3 {
                     points: shape.points().iter().map(|&p| p.into()).collect(),
                     closed: shape.is_closed(),
                     line_style: shape.line_style().into(),
+                    line_color: shape.line_color().into(),
                     line_opacity: shape.line_opacity(),
                     fill_style: shape.fill_style().into(),
+                    fill_color: shape.fill_color().into(),
                     fill_spacing: shape.fill_spacing(),
+                    fill_unit: shape.fill_unit().into(),
+                    fill_angle: shape.fill_angle(),
                     fill_opacity: shape.fill_opacity(),
                 })
                 .collect(),
@@ -293,9 +300,9 @@ impl DocumentV3 {
                 .map(|&point| inside(point))
                 .collect::<Result<Vec<_>, _>>()?;
             let shape = if stored.closed {
-                DrawnShape::closed(points)
+                DrawnShape::closed(points, stored.fill_unit.into())
             } else {
-                DrawnShape::open(points)
+                DrawnShape::open(points, stored.fill_unit.into())
             };
             let mut shape = shape
                 .map_err(|shape::TooFewPoints(count)| InvalidDocument::TooFewShapePoints(count))?;
@@ -305,10 +312,16 @@ impl DocumentV3 {
             ensure_opacity(stored.line_opacity)?;
             ensure_opacity(stored.fill_opacity)?;
             ensure_positive(stored.fill_spacing)?;
+            if !shape::is_valid_fill_angle(stored.fill_angle) {
+                return Err(InvalidDocument::BadFillAngle(stored.fill_angle));
+            }
             shape.set_line_style(stored.line_style.into());
+            shape.set_line_color(stored.line_color.into());
             shape.set_line_opacity(stored.line_opacity);
             shape.set_fill_style(stored.fill_style.into());
+            shape.set_fill_color(stored.fill_color.into());
             shape.set_fill_spacing(stored.fill_spacing);
+            shape.set_fill_angle(stored.fill_angle);
             shape.set_fill_opacity(stored.fill_opacity);
             shapes.push(Identified::new(claim(stored.id)?, shape));
         }
