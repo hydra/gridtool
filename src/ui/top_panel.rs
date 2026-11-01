@@ -1,8 +1,9 @@
 use eframe::egui;
 
-use super::icon_button::{icon_button, selectable_icon_button};
+use super::icon_button::{icon_button, icon_text, selectable_icon_button};
 use super::icons;
 use super::tool_mode::ToolMode;
+use super::workspace::Panel;
 
 /// Gap between groups of tool bar buttons.
 const SECTION_SPACING: f32 = 16.0;
@@ -14,20 +15,24 @@ pub enum TopPanelAction {
     Load,
     Save,
     SaveAs,
-    OpenImage,
     Undo,
     Redo,
+    /// Close the panel if it is open, otherwise reopen it.
+    TogglePanel(Panel),
+    ResetLayout,
 }
 
 /// Which tool bar buttons should be enabled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ToolBarState {
-    /// A document is open.
+    /// A document is active.
     pub has_document: bool,
-    /// The open document has unsaved changes.
+    /// The active document has unsaved changes.
     pub has_unsaved_changes: bool,
     pub can_undo: bool,
     pub can_redo: bool,
+    /// Which panels are open, by [`Panel::index`].
+    pub open_panels: [bool; Panel::ALL.len()],
 }
 
 impl ToolBarState {
@@ -58,7 +63,7 @@ pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> TopP
                         action = Some(clicked);
                     }
                 };
-                button(ui, icons::NEW, "New", true, TopPanelAction::New);
+                button(ui, icons::NEW, "New…", true, TopPanelAction::New);
                 button(ui, icons::LOAD, "Load…", true, TopPanelAction::Load);
                 button(
                     ui,
@@ -73,15 +78,6 @@ pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> TopP
                     "Save as…",
                     state.has_document,
                     TopPanelAction::SaveAs,
-                );
-
-                ui.add_space(SECTION_SPACING);
-                button(
-                    ui,
-                    icons::OPEN_IMAGE,
-                    "Open image…",
-                    true,
-                    TopPanelAction::OpenImage,
                 );
 
                 ui.add_space(SECTION_SPACING);
@@ -111,7 +107,9 @@ pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> TopP
                     state.can_redo,
                     TopPanelAction::Redo,
                 );
-                action
+
+                ui.add_space(SECTION_SPACING);
+                action.or(panels_menu(ui, state))
             });
             TopPanel {
                 action: row.inner,
@@ -119,6 +117,26 @@ pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> TopP
             }
         })
         .inner
+}
+
+/// The menu that closes and reopens panels, and puts them back where they started.
+fn panels_menu(ui: &mut egui::Ui, state: ToolBarState) -> Option<TopPanelAction> {
+    let menu = ui.menu_button(icon_text(icons::PANELS), |ui| {
+        let mut action = None;
+        for panel in Panel::ALL {
+            let mut open = state.open_panels[panel.index()];
+            if ui.checkbox(&mut open, panel.title()).clicked() {
+                action = Some(TopPanelAction::TogglePanel(panel));
+            }
+        }
+        ui.separator();
+        if ui.button("Reset layout").clicked() {
+            action = Some(TopPanelAction::ResetLayout);
+        }
+        action
+    });
+    menu.response.on_hover_text("Panels");
+    menu.inner.flatten()
 }
 
 #[cfg(test)]
@@ -179,14 +197,7 @@ mod tests {
         let (modes, actions) = click_along_the_tool_bar(state);
 
         assert_eq!(modes, [ToolMode::Origin], "the mode cannot change");
-        assert_eq!(
-            actions,
-            [
-                TopPanelAction::New,
-                TopPanelAction::Load,
-                TopPanelAction::OpenImage
-            ]
-        );
+        assert_eq!(actions, [TopPanelAction::New, TopPanelAction::Load]);
     }
 
     #[test]
@@ -202,6 +213,97 @@ mod tests {
 
         assert!(actions.contains(&TopPanelAction::Undo), "{actions:?}");
         assert!(actions.contains(&TopPanelAction::Redo), "{actions:?}");
+    }
+
+    #[test]
+    fn the_panels_menu_toggles_panels_and_resets_the_layout() {
+        let ctx = egui::Context::default();
+        egui_material_icons::initialize(&ctx);
+        let state = ToolBarState {
+            open_panels: [true, false, true, true],
+            ..Default::default()
+        };
+        let mut chosen = None;
+        let mut frame = |events: Vec<Event>| {
+            let input = RawInput {
+                screen_rect: Some(Rect::from_min_max(Pos2::ZERO, Pos2::new(WIDTH, 600.0))),
+                events,
+                ..Default::default()
+            };
+            let mut mode = ToolMode::Pan;
+            let mut output = ctx.run_ui(input, |ui| {
+                if let Some(action) = show(ui, &mut mode, state).action {
+                    chosen = Some(action);
+                }
+            });
+            output.textures_delta.clear();
+            output
+                .shapes
+                .iter()
+                .filter_map(|clipped| match &clipped.shape {
+                    egui::Shape::Text(text) => {
+                        Some((text.galley.job.text.clone(), text.visual_bounding_rect()))
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        let click = |pos| {
+            [
+                vec![Event::PointerMoved(pos)],
+                vec![Event::PointerButton {
+                    pos,
+                    button: PointerButton::Primary,
+                    pressed: true,
+                    modifiers: Modifiers::NONE,
+                }],
+                vec![Event::PointerButton {
+                    pos,
+                    button: PointerButton::Primary,
+                    pressed: false,
+                    modifiers: Modifiers::NONE,
+                }],
+            ]
+        };
+
+        // The menu button is the last thing on the bar; find it by what it opens.
+        let mut opened = false;
+        'search: for x in (0..WIDTH as u32).rev().step_by(6) {
+            for events in click(Pos2::new(x as f32, ROW_Y)) {
+                frame(events);
+            }
+            for _ in 0..2 {
+                if frame(Vec::new())
+                    .iter()
+                    .any(|(text, _)| text == "Reset layout")
+                {
+                    opened = true;
+                    break 'search;
+                }
+            }
+        }
+        assert!(opened, "the menu opens");
+        let shown = frame(Vec::new());
+        let position_of = |wanted: &str| {
+            shown
+                .iter()
+                .find(|(text, _)| text == wanted)
+                .unwrap_or_else(|| panic!("{wanted} in {shown:?}"))
+                .1
+                .center()
+        };
+        for title in Panel::ALL.map(Panel::title) {
+            position_of(title);
+        }
+        let point_to_point = position_of(Panel::PointToPoint.title());
+
+        for events in click(point_to_point) {
+            frame(events);
+        }
+        assert_eq!(
+            chosen,
+            Some(TopPanelAction::TogglePanel(Panel::PointToPoint))
+        );
     }
 
     #[test]

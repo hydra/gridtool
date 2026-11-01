@@ -122,9 +122,9 @@ formatted by `FMT-7`, or "`Area <n>`" when the area is unavailable.
 
 ## Areas table
 
-**AREA-12 — Location and table.** The table is in the middle section of the right-hand
-side panel (`SHELL-11`). The section has the heading "`Areas`" followed by a separator.
-- With no document open, the section shows "`No document open`" in weak text.
+**AREA-12 — Location and table.** The table is the Areas panel (`WORK-1`), showing the active
+document.
+- With no document open, the panel shows "`No document open`" in weak text.
 - With a document that has no areas, it shows
   "`No areas yet. Use the Measure area tool to add one.`" in weak text.
 

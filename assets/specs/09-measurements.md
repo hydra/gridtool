@@ -85,9 +85,9 @@ can be dragged (`OBJ-15`).
 
 ## Measurements table
 
-**MEAS-10 — Location.** The table is in the top section of the right-hand side panel
-(`SHELL-11`). The section has the heading "`Point-to-point`" followed by a separator.
-- With no document open, the section shows "`No document open`" in weak text.
+**MEAS-10 — Location.** The table is the Point-to-point panel (`WORK-1`), showing the active
+document.
+- With no document open, the panel shows "`No document open`" in weak text.
 - With a document that has no measurements, it shows
   "`No measurements yet. Use the Measure distance tool to add one.`" in weak text.
 

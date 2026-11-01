@@ -144,18 +144,21 @@ this order, followed by a 16 px spacer:
 
 | Button | Icon meaning (current Material Symbols icon) | Tooltip | Enabled |
 |---|---|---|---|
-| New | new document (`note_add`) | "`New`" | always |
+| New | new document (`note_add`) | "`New…`" | always |
 | Load | open folder (`folder_open`) | "`Load…`" | always |
 | Save | save (`save`) | "`Save`" | only when a document is open **and** it has unsaved changes (`FILE-9`) |
 | Save as | save as (`save_as`) | "`Save as…`" | when a document is open |
 
+Save and Save as act on the active document (`WORK-10`).
+
 ## Commands
 
-**FILE-11 — Unsaved changes dialog.** New, Load and Open image replace the open document,
-and closing the window (`FILE-17`) closes it. If it has unsaved changes, each of these
-first shows a modal dialog:
+**FILE-11 — Unsaved changes dialog.** Closing a document (`FILE-12`) and closing the window
+(`FILE-17`) lose what is open. If a document has unsaved changes, each of these first brings it
+forward and shows a modal dialog:
 - **Title:** "`Unsaved changes`"
-- **Question:** "`Do you want to save now?`"
+- **Question:** "`Do you want to save <name> now?`", where `<name>` is the document's name
+  as on its tab, without the "`*`" (`WORK-7`).
 - **Buttons:** "`Yes`", "`No`", "`Cancel`", left to right.
 - **Default:** **Cancel** has keyboard focus when the dialog opens, so Enter picks it.
   Escape, or clicking outside the dialog, also means Cancel.
@@ -168,27 +171,33 @@ The answers:
 - **Cancel:** close the dialog. Nothing else changes, including the document, its history
   and its file.
 
-With no unsaved changes, or no document open, the command is carried out straight away.
+With no unsaved changes, the command is carried out straight away.
 
-**FILE-12 — New.** Closes the document and forgets its file name. The application returns
-to its start-up state with no document open (`SHELL-3`).
+**FILE-12 — New and closing.** **New** starts a new document from an image the user chooses, as
+`IMG-2` to `IMG-7` say; nothing already open is affected, so it asks nothing. A document is closed
+by the close button on its tab (`WORK-7`), which first asks about unsaved changes (`FILE-11`).
+What is then shown is up to the workspace (`WORK-10`, `WORK-13`).
 
 **FILE-13 — Load.** Shows the native open dialog, titled "`Load document`", with one
 filter, "`GridTool document`" (`*.ron`).
 - **Cancelled:** nothing changes.
-- **Success:** the loaded document replaces the open one, with an empty history and the
-  default view. Its file becomes the document's file, and it has no unsaved changes.
+- **Success:** the loaded document opens and becomes active (`WORK-10`), with an empty history
+  and the default view, and the open documents are kept. Its file becomes the document's file,
+  and it has no unsaved changes.
+- **Already open:** if the chosen file is the file of an open document, nothing is loaded and
+  that document becomes active.
 - **Failure** (`FILE-7`, `FILE-8`, or an unreadable file): an error dialog titled
   "`Could not load document`" shows "`<path>: <reason>`" with one "`OK`" button. The open
-  document, if any, is kept.
+  documents are kept.
 
 **FILE-17 — Closing the window.** When the user closes the application window (the
 window's close button, or the system's close shortcut):
-- With unsaved changes, the window stays open and the Unsaved changes dialog
-  (`FILE-11`) is shown, the same dialog with the same title, question, buttons and
-  default. **Yes** saves and then closes the window; **No** closes it without saving;
-  **Cancel**, or a cancelled or failed save, keeps the window and the document open.
-- With no unsaved changes, or no document open, the window closes straight away.
+- The window stays open while the Unsaved changes dialog (`FILE-11`) is shown for each document
+  with unsaved changes in turn, in the order they were opened. **Yes** saves that document and
+  **No** leaves it unsaved, and either moves on to the next. **Cancel**, or a cancelled or failed
+  save, ends it there: the window and every document stay open, those already saved stay saved, and
+  a later attempt asks about all that remain unsaved. After the last, the window closes.
+- With no unsaved changes anywhere, or no document open, the window closes straight away.
 - While any dialog is already open, closing the window does nothing.
 
 **FILE-14 — Save.** If the document has a file (it was loaded or saved before), write to
@@ -265,13 +274,22 @@ and shows the dialogs.
 - Saving over an existing file replaces it and leaves no temporary file behind.
 - Loading reports read, parse, missing-image and image-size-mismatch errors.
 - Session flows, with scripted file dialogs and real files:
-  - **New with nothing open:** asks nothing.
+  - **Cancelling the image dialog:** opens nothing and asks nothing.
   - **Freshly opened image:** has unsaved changes.
-  - **New, then Cancel:** keeps the document and its history. The dialog's title,
+  - **Closing a document, then Cancel:** keeps the document and its history. The dialog's title,
     question, buttons and default are as `FILE-11` says.
-  - **New, then No:** resets without showing any file dialog.
-  - **New, then Yes:** saves, then resets. A following document asks for a new file name.
-  - **New, then Yes, then cancelling the save dialog:** keeps the document.
+  - **Closing a document, then No:** closes it without showing any file dialog.
+  - **Closing a document, then Yes:** saves, then closes it.
+  - **Closing a document, then Yes, then cancelling the save dialog:** keeps the document.
+  - **Closing one document:** leaves the others, and asks by the name of the one closing.
+  - **Closing a saved document that is not active:** asks nothing and keeps the active one.
+  - **Opening:** adds a document, keeps the others and asks nothing. The same image can be opened
+    twice.
+  - **Failed image open:** shows the error dialog and keeps the open documents.
+  - **Load of a file already open:** switches to its document.
+  - **Save:** acts on the active document only.
+  - **Closing the window:** asks about each unsaved document in turn. Cancel keeps them all, and
+    the next attempt starts over.
   - **Save:**
     - It asks once, adding `.ron`.
     - A later Save writes to the same file without asking.
@@ -279,7 +297,6 @@ and shows the dialogs.
   - **Undo back to the saved state:** no unsaved changes. One more undo brings them back.
   - **Load:** restores the saved document, with no history, no unsaved changes, and the
     loaded file as its file.
-  - **Load and Open image:** also ask about unsaved changes.
   - **Failed load:** shows the error dialog and keeps the open document.
   - **Save as to a name whose `.ron` file exists:**
     - It asks about replacing.

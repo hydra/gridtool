@@ -10,7 +10,6 @@ pub const NEW: MaterialIcon = material::ICON_NOTE_ADD;
 pub const LOAD: MaterialIcon = material::ICON_FOLDER_OPEN;
 pub const SAVE: MaterialIcon = material::ICON_SAVE;
 pub const SAVE_AS: MaterialIcon = material::ICON_SAVE_AS;
-pub const OPEN_IMAGE: MaterialIcon = material::ICON_IMAGE;
 pub const PAN: MaterialIcon = material::ICON_PAN_TOOL;
 pub const ROTATE: MaterialIcon = material::ICON_ROTATE_RIGHT;
 /// A ruler.
@@ -31,6 +30,7 @@ pub const ROTATE_90_LEFT: MaterialIcon = material::ICON_ROTATE_90_DEGREES_CCW;
 pub const ROTATE_90_RIGHT: MaterialIcon = material::ICON_ROTATE_90_DEGREES_CW;
 pub const LOCKED: MaterialIcon = material::ICON_LOCK;
 pub const UNLOCKED: MaterialIcon = material::ICON_LOCK_OPEN;
+pub const PANELS: MaterialIcon = material::ICON_DASHBOARD;
 
 #[cfg(test)]
 pub const ALL: [MaterialIcon; 21] = [
@@ -38,7 +38,6 @@ pub const ALL: [MaterialIcon; 21] = [
     LOAD,
     SAVE,
     SAVE_AS,
-    OPEN_IMAGE,
     PAN,
     ROTATE,
     SCALE,
@@ -55,6 +54,7 @@ pub const ALL: [MaterialIcon; 21] = [
     ROTATE_90_RIGHT,
     LOCKED,
     UNLOCKED,
+    PANELS,
 ];
 
 #[cfg(test)]

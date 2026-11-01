@@ -5,9 +5,10 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-eframe = "0.37.0"
+eframe = { version = "0.37.0", features = ["persistence"] }
 egui = "0.37.0"
 egui_ltreeview = "0.9.0"
+egui_tiles = "0.18.0"
 egui_material_icons = "0.9.0"
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "bmp"] }
 rfd = "0.17.2"
@@ -32,6 +33,8 @@ out-dir = "target/packages"
 [patch.crates-io]
 # Upstream egui_ltreeview 0.9.0 requires egui 0.36; this copy is patched for egui 0.37.
 egui_ltreeview = { path = "vendor/egui_ltreeview" }
+# Upstream egui_tiles 0.18.0 cannot refuse a drop; this copy lets the application say which it allows.
+egui_tiles = { path = "vendor/egui_tiles" }
 # Upstream winit 0.30.13 shows a four-way arrow for the grab cursors on Windows; this copy
 # draws real open and closed hands.
 winit = { path = "vendor/winit" }

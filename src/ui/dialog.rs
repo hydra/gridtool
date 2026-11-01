@@ -37,11 +37,12 @@ pub struct Dialog {
 }
 
 impl Dialog {
-    /// "Unsaved changes" with Yes / No / Cancel; Cancel is the default.
-    pub fn unsaved_changes() -> Self {
+    /// "Unsaved changes" about the document called `name`, with Yes / No / Cancel; Cancel is
+    /// the default.
+    pub fn unsaved_changes(name: &str) -> Self {
         Self {
             title: "Unsaved changes".to_owned(),
-            message: "Do you want to save now?".to_owned(),
+            message: format!("Do you want to save {name} now?"),
             buttons: &[DialogButton::Yes, DialogButton::No, DialogButton::Cancel],
             default: DialogButton::Cancel,
         }
@@ -146,7 +147,7 @@ mod tests {
     #[test]
     fn enter_picks_the_default_button() {
         let ctx = egui::Context::default();
-        let dialog = Dialog::unsaved_changes();
+        let dialog = Dialog::unsaved_changes("plan.ron");
 
         assert_eq!(frame(&ctx, &dialog, Vec::new()), None);
         let answer = frame(

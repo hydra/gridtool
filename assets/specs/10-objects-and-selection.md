@@ -25,9 +25,8 @@ containing all of its points.
 
 ## Object tree
 
-**OBJ-3 — Panel.** A panel docked on the **left** of the window (`SHELL-2`):
-- It can be resized horizontally and has a default width of 220 px.
-- It has the heading "`Objects`", then the **object tool bar** (`OBJ-12`, `OBJ-13`),
+**OBJ-3 — Panel.** The Objects panel (`WORK-1`), showing the active document:
+- It has the **object tool bar** (`OBJ-12`, `OBJ-13`),
   then a separator, then a tree view.
 - With no document open it shows "`No document open`" in weak text below the separator,
   and both tool bar buttons are disabled.
@@ -113,7 +112,7 @@ leaf as selected:
 
 **OBJ-6a — Table rows reflect the active object.** A row of the Point-to-point (`MEAS-11`) or Areas
 (`AREA-12`) table is **selected** exactly while its object is the active object, so at most one
-row is selected in the whole side panel, and none while the active object has no row or there is
+row is selected across the two tables, and none while the active object has no row or there is
 no active object. A selected row has the selection colour as its background. The current position
 in the History section (`HIST`) is not a selection and is not affected.
 - **Clicking a row**, anywhere between the left and right of the table, including on a field, drop-down or

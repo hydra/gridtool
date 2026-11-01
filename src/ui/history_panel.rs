@@ -3,20 +3,13 @@ use gridtool::editor::Editor;
 
 /// Lists every recorded action. The row for the current position in the undo/redo
 /// stack is highlighted; undone actions are dimmed.
-pub fn show(ui: &mut egui::Ui, editor: Option<&Editor>) {
-    ui.heading("History");
-    ui.separator();
+pub fn show(ui: &mut egui::Ui, editor: &Editor) {
     egui::ScrollArea::both()
         .id_salt("history_scroll")
         .auto_shrink(false)
         .show(ui, |ui| {
             ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
-            match editor {
-                Some(editor) => history_rows(ui, editor),
-                None => {
-                    ui.weak("No document open");
-                }
-            }
+            history_rows(ui, editor);
         });
 }
 

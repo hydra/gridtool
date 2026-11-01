@@ -98,45 +98,87 @@ pub fn upload_texture(ctx: &egui::Context, name: &str, image: &DecodedImage) -> 
     ctx.load_texture(name, color_image, egui::TextureOptions::default())
 }
 
-/// Shows the canvas, returning the document action the user completed this frame, if any.
+/// What the user did on a canvas this frame.
+#[derive(Debug, Default)]
+pub struct CanvasOutput {
+    /// The document action the user completed, if any.
+    pub action: Option<Action>,
+    /// The user clicked or began dragging on a document that is not active.
+    pub activate: bool,
+}
+
+/// Shows the canvas. Only an `active` document's canvas responds to its tool. The primary button
+/// on any other only makes it active; the view can still be zoomed and panned.
 pub fn show(
     ui: &mut egui::Ui,
     mode: ToolMode,
     view: &mut DocumentView,
     document: &Document,
-) -> Option<Action> {
+    active: bool,
+) -> CanvasOutput {
     let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
     let view_center = response.rect.center();
     let document_size = Vec2::new(document.width() as f32, document.height() as f32);
     view.set_canvas_rect(response.rect, document_size);
 
     handle_zoom(ui, &response, view_center, &mut view.viewport);
+    let activate =
+        !active && (response.clicked() || response.drag_started_by(PointerButton::Primary));
+    if response.drag_started_by(PointerButton::Primary) && activate {
+        view.ignore_primary_until_release = true;
+    }
+    if view.ignore_primary_until_release && !ui.input(|input| input.pointer.primary_down()) {
+        view.ignore_primary_until_release = false;
+    }
     let transform = view.viewport.transform(view_center, document_size);
+    let action = if active && !view.ignore_primary_until_release {
+        handle_tool(ui, &response, mode, transform, view, document)
+    } else {
+        None
+    };
+    // In every mode the secondary button pans. Done after the tool so its cursor wins.
+    drag_pan(ui, &response, &mut view.viewport, PointerButton::Secondary);
+
+    let transform = view.viewport.transform(view_center, document_size);
+    paint(&painter, &response, mode, transform, view, document);
+    CanvasOutput { action, activate }
+}
+
+/// Lets the selection and then the tool respond to the pointer, returning the document action
+/// the user completed, if any.
+fn handle_tool(
+    ui: &mut egui::Ui,
+    response: &Response,
+    mode: ToolMode,
+    transform: DocumentTransform,
+    view: &mut DocumentView,
+    document: &Document,
+) -> Option<Action> {
     // Dragging the active object, its points or its resize handles takes priority over
     // every tool.
-    let selection_input = handle_selection(ui, &response, transform, document, &mut view.selection);
+    let selection_input = handle_selection(ui, response, transform, document, &mut view.selection);
     let action = match selection_input {
         SelectionInput::Handled(action) => action,
         SelectionInput::NotHandled => match mode {
             ToolMode::Pan => {
-                handle_pan(ui, &response, &mut view.viewport);
+                handle_pan(ui, response, &mut view.viewport);
                 None
             }
             ToolMode::Rotate => {
-                handle_rotate(ui, &response, transform, document, view);
+                handle_rotate(ui, response, transform, document, view);
                 None
             }
             ToolMode::Scale => {
-                handle_scale(ui, &response, transform, document, &mut view.scale_tool)
+                handle_scale(ui, response, transform, document, &mut view.scale_tool)
             }
             ToolMode::Measure => {
-                handle_measure(ui, &response, transform, document, &mut view.measure_tool)
+                handle_measure(ui, response, transform, document, &mut view.measure_tool)
             }
-            ToolMode::Area => handle_area(ui, &response, transform, document, &mut view.area_tool),
-            ToolMode::Grid => handle_grid(ui, &response, transform, document, view),
-            ToolMode::Origin => handle_origin(ui, &response, transform, document),
+            ToolMode::Area => handle_area(ui, response, transform, document, &mut view.area_tool),
+            ToolMode::Grid => handle_grid(ui, response, transform, document, view),
+            ToolMode::Origin => handle_origin(ui, response, transform, document),
             ToolMode::DrawLine => {
-                handle_draw_line(ui, &response, transform, document, &mut view.line_tool)
+                handle_draw_line(ui, response, transform, document, &mut view.line_tool)
             }
         },
     };
@@ -155,25 +197,32 @@ pub fn show(
     {
         ui.set_cursor_icon(grip_cursor(grip, false, transform.image_axes()));
     }
-    // In every mode the secondary button pans. Done after the tool so its cursor wins.
-    drag_pan(ui, &response, &mut view.viewport, PointerButton::Secondary);
+    action
+}
 
-    // Drawing order: image, grids, drawn shapes, areas, then the lines grids align to, then
-    // tool overlays.
-    let transform = view.viewport.transform(view_center, document_size);
-    paint_document(&painter, transform, &view.texture);
-    paint_grids(&painter, transform, document, &view.selection);
-    paint_shapes(&painter, transform, document, &view.selection);
-    paint_areas(&painter, transform, document, &view.selection);
-    paint_measurements(&painter, transform, document, &view.selection);
+/// Draws the document and what is on it: the image, grids, drawn shapes, areas, then the lines
+/// grids align to, then tool overlays.
+fn paint(
+    painter: &egui::Painter,
+    response: &Response,
+    mode: ToolMode,
+    transform: DocumentTransform,
+    view: &DocumentView,
+    document: &Document,
+) {
+    paint_document(painter, transform, &view.texture);
+    paint_grids(painter, transform, document, &view.selection);
+    paint_shapes(painter, transform, document, &view.selection);
+    paint_areas(painter, transform, document, &view.selection);
+    paint_measurements(painter, transform, document, &view.selection);
     match mode {
         ToolMode::Scale => {
             let points = view.scale_tool.points(document.calibration());
-            paint_scale_markers(&painter, transform, &points, view.scale_tool.method());
+            paint_scale_markers(painter, transform, &points, view.scale_tool.method());
         }
         ToolMode::Grid => {
             if let Some(points) = document.calibration().points() {
-                paint_scale_markers(&painter, transform, points.points(), points.method());
+                paint_scale_markers(painter, transform, points.points(), points.method());
             }
         }
         ToolMode::Pan
@@ -183,23 +232,23 @@ pub fn show(
         | ToolMode::Origin
         | ToolMode::DrawLine => {}
     }
-    paint_active_grid_source(&painter, transform, document, &view.selection);
+    paint_active_grid_source(painter, transform, document, &view.selection);
     let scale = document.calibration().scale().ok();
     let calibration_unit = document.calibration().unit();
     match mode {
         ToolMode::Rotate => {
             paint_rotate_handle(
-                &painter,
+                painter,
                 transform.image_to_screen(document.origin()),
                 view.viewport.rotation_radians(),
             );
         }
-        ToolMode::Origin => paint_origin(&painter, transform, document.origin()),
+        ToolMode::Origin => paint_origin(painter, transform, document.origin()),
         ToolMode::Measure => {
             if let Some(start) = view.measure_tool.pending_start() {
                 let style = view.measure_tool.settings.style(calibration_unit);
                 paint_pending_measurement(
-                    &painter,
+                    painter,
                     transform,
                     start,
                     style.line.color,
@@ -209,7 +258,7 @@ pub fn show(
         }
         ToolMode::Area => {
             paint_pending_outline(
-                &painter,
+                painter,
                 transform,
                 scale,
                 &view.area_tool.outline,
@@ -219,7 +268,7 @@ pub fn show(
         }
         ToolMode::DrawLine => {
             paint_pending_outline(
-                &painter,
+                painter,
                 transform,
                 scale,
                 &view.line_tool.outline,
@@ -229,15 +278,14 @@ pub fn show(
         }
         ToolMode::Grid => {
             if let Some(source) = view.grid_tool.hovered() {
-                paint_highlighted_source(&painter, transform, document, &view.selection, source);
+                paint_highlighted_source(painter, transform, document, &view.selection, source);
             }
         }
         ToolMode::Pan | ToolMode::Scale => {}
     }
     if let Some(bounds) = view.selection.active_bounds(document) {
-        paint_selection(&painter, transform, bounds);
+        paint_selection(painter, transform, bounds);
     }
-    action
 }
 
 /// Highlights the alignable line under the pointer; a click on it adds a grid.
@@ -1173,7 +1221,7 @@ mod tests {
             let ctx = self.ctx.clone();
             let mut output = ctx.run_ui(input, |ui| {
                 self.actions
-                    .extend(show(ui, self.mode, &mut self.view, &self.document));
+                    .extend(show(ui, self.mode, &mut self.view, &self.document, true).action);
             });
             // There is no renderer to upload textures to.
             output.textures_delta.clear();

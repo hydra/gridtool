@@ -3,7 +3,7 @@
 ## Window
 
 **SHELL-1.** The application opens one native window with an initial inner size of
-1280 × 800. Its title follows the usual Windows form "`<document> - GridTool`":
+1280 × 800. Its title follows the usual Windows form "`<document> - GridTool`", naming the active document (`WORK-10`):
 - With no document open, the title is "`GridTool`".
 - With a document that has a file (`FILE-14`), `<document>` is the file's name with its
   extension and without its folder, for example "`plan.ron - GridTool`".
@@ -24,11 +24,8 @@ file, and the release packages. All of them come from the same image.
 1. **Main tool bar.** One horizontal row, always visible.
 2. **Tool controls row.** A second row directly below the tool bar, always visible
    (`SHELL-2a`).
-3. Below the rows, side by side, from left to right:
-   - **Object panel.** Docked on the left-hand side (see `OBJ-3`).
-   - **Canvas.** Fills the remaining space and shows the document (see `VIEW`, `SCALE`,
-     `MEAS`, `OBJ`).
-   - **Side panel.** Docked on the right-hand side (see `SHELL-11`).
+3. **Workspace.** The rest of the window: the Documents area, with the panels docked around
+   it (`WORK`).
 
 **SHELL-2a — Tool controls row.** The row under the tool bar is always shown, with or
 without a document, whatever it contains, so the canvas does not move when a tool or an
@@ -61,11 +58,11 @@ object is chosen.
   With no document open, it is the help text "`Open an image to get started`", whichever
   tool was active. Help text is in weak text, and wraps like controls.
 
-**SHELL-3.** When no document is open, the canvas area shows the centred message
+**SHELL-3.** When no document is open, the Documents area shows the centred message
 "`Open an image to get started.`"
 
-**SHELL-4.** When the last attempt to open an image failed, the canvas area shows the
-error message centred, in the toolkit's error colour (see `IMG-6`).
+**SHELL-4.** **Withdrawn.** A failed attempt to open an image is now reported in a dialog
+(`IMG-6`).
 
 ## Main tool bar
 
@@ -73,27 +70,27 @@ error message centred, in the toolkit's error colour (see `IMG-6`).
 
 | # | Item | Icon meaning (current Material Symbols icon) | Tooltip |
 |---|---|---|---|
-| 1 | New button (`FILE-10`) | new document (`note_add`) | "`New`" |
+| 1 | New button (`FILE-10`) | new document (`note_add`) | "`New…`" |
 | 2 | Load button | open folder (`folder_open`) | "`Load…`" |
 | 3 | Save button | save (`save`) | "`Save`" |
 | 4 | Save as button | save as (`save_as`) | "`Save as…`" |
 | 5 | Horizontal spacer, 16 px | — | — |
-| 6 | Open image button | image (`image`) | "`Open image…`" |
-| 7 | Horizontal spacer, 16 px | — | — |
-| 8 | Pan & zoom mode button | hand (`pan_tool`) | "`Pan & zoom`" |
-| 9 | Rotate view mode button | rotate (`rotate_right`) | "`Rotate view`" |
-| 10 | Scale mode button | ruler (`straighten`) | "`Scale`" |
-| 11 | Measure distance mode button | tape measure (`measuring_tape`) | "`Measure distance`" |
-| 12 | Measure area mode button (`AREA-1`) | polygon (`pentagon`) | "`Measure area`" |
-| 13 | Grid mode button | grid (`grid_on`) | "`Grid`" |
-| 14 | Origin mode button | crosshair (`my_location`) | "`Origin`" (`ORIGIN-2`) |
+| 6 | Pan & zoom mode button | hand (`pan_tool`) | "`Pan & zoom`" |
+| 7 | Rotate view mode button | rotate (`rotate_right`) | "`Rotate view`" |
+| 8 | Scale mode button | ruler (`straighten`) | "`Scale`" |
+| 9 | Measure distance mode button | tape measure (`measuring_tape`) | "`Measure distance`" |
+| 10 | Measure area mode button (`AREA-1`) | polygon (`pentagon`) | "`Measure area`" |
+| 11 | Grid mode button | grid (`grid_on`) | "`Grid`" |
+| 12 | Origin mode button | crosshair (`my_location`) | "`Origin`" (`ORIGIN-2`) |
+| 13 | Horizontal spacer, 16 px | — | — |
+| 14 | Draw line mode button (`DRAW-1`) | line segments joined at points (`polyline`) | "`Draw line`" |
 | 15 | Horizontal spacer, 16 px | — | — |
-| 16 | Draw line mode button (`DRAW-1`) | line segments joined at points (`polyline`) | "`Draw line`" |
-| 17 | Horizontal spacer, 16 px | — | — |
-| 18 | Undo button | undo arrow (`undo`) | "`Undo`" |
-| 19 | Redo button | redo arrow (`redo`) | "`Redo`" |
+| 16 | Undo button | undo arrow (`undo`) | "`Undo`" |
+| 17 | Redo button | redo arrow (`redo`) | "`Redo`" |
+| 18 | Horizontal spacer, 16 px | — | — |
+| 19 | Panels menu (`WORK-5`) | panels (`dashboard`) | "`Panels`" |
 
-Items 16 onward up to the next spacer are the **drawing tools** group; future drawing tools
+The buttons act on the active document (`WORK-10`). Items 14 onward up to the next spacer are the **drawing tools** group; future drawing tools
 are added to it.
 
 **SHELL-6 — Icon font.** Every icon in the UI is a **Google Material Symbols** icon
@@ -117,17 +114,14 @@ one place.
 
 ## Tool modes
 
-**SHELL-8.** While a document is open there is exactly one active tool mode. With no document
-open there is none, as every tool works on a document's image. The modes are **Pan &
+**SHELL-8.** Each open document has exactly one active tool mode of its own (`WORK-11`), and the
+tool bar shows the active document's. With no document open there is none, as every tool works on a document's image. The modes are **Pan &
 zoom**, **Rotate view**, **Scale**, **Measure distance**, **Measure area**, **Grid**,
-**Origin** and **Draw line**. **Pan & zoom is the default**: it becomes active when a document
-opens with none open before.
+**Origin** and **Draw line**. **Pan & zoom is the default**: every document starts with it.
 
 **SHELL-9.** The mode buttons work like a radio group. The active mode's button is shown
-as selected, and clicking a mode button makes that mode active. The active mode is
-application state and stays the same when a different image is opened in place of an open
-document. With no document open, every mode button is disabled and none is shown as selected,
-and the mode chosen before is forgotten.
+as selected, and clicking a mode button makes that mode active for the active document. With no document open,
+every mode button is disabled and none is shown as selected.
 
 **SHELL-10.** New modes will be added later. The list of modes, and which of them start a
 new group of buttons (`SHELL-5`), MUST be defined in one place, so that adding a mode needs
@@ -160,28 +154,9 @@ edits the text).
 leaving it open (`DRAW-5`). Like Escape, it does nothing while a dialog is open or while a
 widget such as a text field has keyboard focus.
 
-## Side panel
+## Panels
 
-**SHELL-11.** The side panel is docked on the right of the window:
-- It can be resized horizontally and has a default width of 460 px.
-- It is split vertically into three sections, from top to bottom:
-
-  | Section | Contents | Initial share of the height |
-  |---|---|---|
-  | Point-to-point | the distance measurements table (`MEAS-10`) | 33 % |
-  | Areas | the area measurements table (`AREA-12`) | 34 % |
-  | History | the history list (`HIST-10`) | 33 % |
-
-- **Shares.** Each section's share is tracked as a fraction of the height available to
-  the sections (the panel's height less the dividers). When the window is resized, each
-  section keeps its share.
-- **Dividers.** Between neighbouring sections is a divider, 6 px high, drawn as a
-  horizontal line. Hovering over or dragging it shows a vertical-resize cursor.
-  Dragging it up or down moves height between the section above and the section below
-  only: one grows by exactly what the other loses, and the third keeps its share.
-- **Minimum.** A divider cannot make a section smaller than 40 px.
-- Each section scrolls independently. With no document open, the two tables show their
-  heading and "`No document open`" in weak text.
+**SHELL-11.** **Withdrawn.** The side panel is replaced by the panels of the workspace (`WORK`).
 
 **SHELL-12 — Scroll bars.** Throughout the application, a scroll bar is drawn whenever there is
 more to scroll to, without the pointer having to be over it or its area, and it takes up space
@@ -199,7 +174,7 @@ presence shows whether something can be scrolled.
   after Origin and starts a new group.
 - Tool modes (`SHELL-8`, `SHELL-9`):
   - With no document, no tool is active, clicking along the tool bar changes no mode, and only
-    New, Load and Open image respond. Undo and Redo are disabled (`HIST-9`).
+    New, Load and the Panels menu respond. Undo and Redo are disabled (`HIST-9`).
   - With a document, the chosen tool is active and every tool can be chosen.
 - Tool controls row (`SHELL-2a`):
   - The canvas starts at the same place in every tool mode, and with a drawn shape active.
@@ -223,13 +198,3 @@ presence shows whether something can be scrolled.
     focused text field is not. Enter with nothing focused is read as "finish"; Enter in a
     focused text field is not.
   - Cancelling stops a rotate-handle drag.
-- Side panel (`SHELL-11`):
-  - The initial shares are 33 %, 34 % and 33 %; shares given in any proportion are
-    scaled to add up to 1.
-  - Moving the lower divider down by 10 % of the height gives 33 %, 44 % and 23 %;
-    then moving the upper divider up by 13 % gives 20 %, 57 % and 23 %.
-  - Dragging a divider far past a section stops at the minimum, and the other sections
-    are unchanged.
-  - With 412 px for 3 sections at 25 %, 25 % and 50 %, the sections are 100, 100 and
-    200 px high, separated by two 6 px dividers.
-  - The panel shows every section, with and without a document open.

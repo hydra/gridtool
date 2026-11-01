@@ -76,7 +76,7 @@ document returns to its exact state before that entry. Otherwise undo does nothi
 becomes its exact state after the entry at the position, and the position moves forward
 by one. Otherwise redo does nothing.
 
-**HIST-8 — Scope.** The history belongs to one open document. Opening a new image starts
+**HIST-8 — Scope.** Each open document has its own history. Opening an image starts
 an empty history (`IMG-7`), and so does loading a document (`FILE-13`). The history is
 never saved (`FILE-2`). Saving is not an action and does not change the history.
 
@@ -89,8 +89,8 @@ never saved (`FILE-2`). Saving is not an action and does not change the history.
 - Every user-facing action MUST be undoable and redoable through these buttons.
 
 **HIST-10 — History panel.**
-- The history list is the bottom section of the side panel (`SHELL-11`).
-- It has the heading "`History`", then a separator, then a list that scrolls **both
+- The history list is the History panel (`WORK-1`), showing the active document.
+- It is a list that scrolls **both
   vertically and horizontally**. Rows do not wrap, so long labels scroll horizontally.
 - With no document open, the list shows "`No document open`" in weak text.
 - With a document open, the list shows:

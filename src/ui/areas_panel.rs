@@ -16,8 +16,6 @@ use super::selection::Selection;
 use super::table_rows::{TableOutput, TableRows, row_color};
 use super::unit_picker;
 
-/// The panel's title.
-pub const HEADING: &str = "Areas";
 const COLUMN_HEADERS: [&str; 5] = ["#", "Color", "Area", "Units", ""];
 
 /// Draws the table into `ui`, returning what the user did. The row of the active object is
@@ -28,8 +26,6 @@ pub fn show(
     selection: &Selection,
     reveal: bool,
 ) -> TableOutput {
-    ui.heading(HEADING);
-    ui.separator();
     if document.areas().is_empty() {
         ui.weak("No areas yet. Use the Measure area tool to add one.");
         return TableOutput::default();

@@ -18,6 +18,8 @@ fn main() -> eframe::Result {
             .with_title(APP_NAME)
             .with_inner_size([1280.0, 800.0])
             .with_icon(app_icon()),
+        // Only the layout of the panels is restored; see `GridToolApp::save`.
+        persist_window: false,
         ..Default::default()
     };
 
@@ -27,7 +29,8 @@ fn main() -> eframe::Result {
         Box::new(|cc| {
             egui_material_icons::initialize(&cc.egui_ctx);
             ui::app_style::apply(&cc.egui_ctx);
-            Ok(Box::<GridToolApp>::default())
+            let layout = cc.storage.and_then(app::saved_layout);
+            Ok(Box::new(GridToolApp::with_saved_layout(layout.as_deref())))
         }),
     )
 }

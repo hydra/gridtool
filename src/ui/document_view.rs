@@ -19,6 +19,10 @@ use super::viewport::Viewport;
 /// active object, and in-progress tool interactions. Nothing here is part of the document.
 pub struct DocumentView {
     pub texture: TextureHandle,
+    /// The active tool, which each document keeps for itself.
+    pub mode: ToolMode,
+    /// The press that made this document active is still held, so it is not for the tool.
+    pub ignore_primary_until_release: bool,
     pub viewport: Viewport,
     pub selection: Selection,
     pub scale_tool: ScaleTool,
@@ -40,6 +44,8 @@ impl DocumentView {
     pub fn new(texture: TextureHandle) -> Self {
         Self {
             texture,
+            mode: ToolMode::default(),
+            ignore_primary_until_release: false,
             viewport: Viewport::default(),
             selection: Selection::default(),
             scale_tool: ScaleTool::default(),

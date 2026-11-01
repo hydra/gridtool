@@ -15,6 +15,14 @@ use crate::ui::document_view::DocumentView;
 use crate::ui::object_tree::TreePick;
 use crate::ui::reveal;
 
+/// The last part of `path`, for showing to the user.
+pub fn file_name(path: &Path) -> String {
+    path.file_name()
+        .unwrap_or(path.as_os_str())
+        .to_string_lossy()
+        .into_owned()
+}
+
 pub struct OpenDocument {
     pub editor: Editor,
     pub view: DocumentView,
@@ -64,6 +72,11 @@ impl OpenDocument {
             file,
             saved,
         }
+    }
+
+    /// What to call the document: the name of its file or, if it has none yet, of its image.
+    pub fn name(&self) -> String {
+        file_name(self.file.as_deref().unwrap_or(&self.image_path))
     }
 
     /// Whether the document differs from the file it was loaded from or saved to. A

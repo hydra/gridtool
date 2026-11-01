@@ -3,70 +3,107 @@ use gridtool::action::Action;
 
 use crate::file_picker::{RfdDocumentPicker, RfdImagePicker};
 use crate::open_document::OpenDocument;
-use crate::session::{Content, Replacement, Session};
-use crate::ui::canvas;
-use crate::ui::object_tree::{self, TreePick};
-use crate::ui::placeholder;
-use crate::ui::side_panel::SidePanel;
+use crate::session::{DocumentId, Session};
+use crate::ui::object_tree::TreePick;
 use crate::ui::tool_controls::ToolControls;
 use crate::ui::tool_keys::{ToolKeyPresses, ToolKeys};
 use crate::ui::tool_mode::ToolMode;
 use crate::ui::top_panel::{self, ToolBarState, TopPanelAction};
+use crate::ui::workspace::{Panel, Workspace, WorkspaceOutput};
+
+/// Where the panels' arrangement is kept between runs.
+const LAYOUT_KEY: &str = "workspace_layout";
+
+/// The panels' arrangement saved by the last run, if any.
+pub fn saved_layout(storage: &dyn eframe::Storage) -> Option<String> {
+    storage.get_string(LAYOUT_KEY)
+}
 
 pub struct GridToolApp {
     session: Session,
-    mode: ToolMode,
+    workspace: Workspace,
+    /// Holds only what is being edited in the row, so it is reset when the document changes.
     tool_controls: ToolControls,
-    side_panel: SidePanel,
     tool_keys: ToolKeys,
     /// The window title last sent to the window.
     title: String,
+    /// The active document in the previous frame.
+    shown_document: Option<DocumentId>,
+    /// The document the user clicked. It becomes active after one more frame, in which a field
+    /// the click took the focus from finishes its edit on the document it belongs to.
+    activating: Option<DocumentId>,
 }
 
 impl GridToolApp {
-    pub fn new(session: Session) -> Self {
+    pub fn new(session: Session, workspace: Workspace) -> Self {
         Self {
             session,
-            mode: ToolMode::default(),
+            workspace,
             tool_controls: ToolControls::default(),
-            side_panel: SidePanel::default(),
             tool_keys: ToolKeys::default(),
             title: crate::APP_NAME.to_owned(),
+            shown_document: None,
+            activating: None,
         }
     }
 
+    /// The application as it runs, with the panels arranged by a layout from [`saved_layout`].
+    pub fn with_saved_layout(layout: Option<&str>) -> Self {
+        Self::new(
+            Session::new(Box::new(RfdImagePicker), Box::new(RfdDocumentPicker)),
+            Workspace::from_saved_layout(layout),
+        )
+    }
+
     fn tool_bar_state(&self) -> ToolBarState {
-        self.session
+        let state = self
+            .session
             .document()
             .map(|open| ToolBarState {
                 has_document: true,
                 has_unsaved_changes: open.has_unsaved_changes(),
                 can_undo: open.editor.can_undo(),
                 can_redo: open.editor.can_redo(),
+                ..Default::default()
             })
-            .unwrap_or_default()
+            .unwrap_or_default();
+        ToolBarState {
+            open_panels: Panel::ALL.map(|panel| self.workspace.is_open(panel)),
+            ..state
+        }
     }
 
     fn handle(&mut self, ctx: &egui::Context, action: TopPanelAction) {
         let session = &mut self.session;
         match action {
-            TopPanelAction::New => session.replace(ctx, Replacement::New),
-            TopPanelAction::Load => session.replace(ctx, Replacement::Load),
-            TopPanelAction::OpenImage => session.replace(ctx, Replacement::OpenImage),
+            TopPanelAction::New => session.open_image(ctx),
+            TopPanelAction::Load => session.load(ctx),
             TopPanelAction::Save => session.save(ctx),
             TopPanelAction::SaveAs => session.save_as(ctx),
             TopPanelAction::Undo => session.document_mut().map_or((), OpenDocument::undo),
             TopPanelAction::Redo => session.document_mut().map_or((), OpenDocument::redo),
+            TopPanelAction::TogglePanel(panel) => self.workspace.toggle(panel),
+            TopPanelAction::ResetLayout => self.workspace.reset_layout(),
         }
+        ctx.request_repaint();
     }
 
     /// Shows the row under the tool bar, returning any document action from it.
     fn show_tool_controls(&mut self, ui: &mut egui::Ui, min_height: f32) -> Option<Action> {
+        let mode = self.active_mode();
         let open = self
             .session
             .document_mut()
             .map(|open| (&mut open.view, open.editor.document()));
-        self.tool_controls.show(ui, self.mode, min_height, open)
+        self.tool_controls.show(ui, mode, min_height, open)
+    }
+
+    /// The active document's tool. Without one there is no active tool, and this is what the
+    /// tool bar is told while it shows none.
+    fn active_mode(&self) -> ToolMode {
+        self.session
+            .document()
+            .map_or_else(ToolMode::default, |open| open.view.mode)
     }
 
     /// Escape abandons what the tool was part-way through, and switching tool mode leaves it
@@ -106,16 +143,53 @@ impl GridToolApp {
     fn show_dialog(&mut self, ctx: &egui::Context) {
         if let Some(button) = self.session.dialog().and_then(|dialog| dialog.show(ctx)) {
             self.session.answer(ctx, button);
+            ctx.request_repaint();
+        }
+    }
+
+    /// What is being edited in the tool controls and tables belongs to the document it was
+    /// started on, so none of it carries over to another.
+    fn forget_edits_if_the_document_changed(&mut self, ctx: &egui::Context) {
+        let active = self.session.active_id();
+        if active != self.shown_document {
+            self.shown_document = active;
+            self.tool_controls = ToolControls::default();
+            self.workspace.forget_table_state();
+            ctx.memory_mut(egui::Memory::stop_text_input);
+        }
+    }
+
+    /// Applies what the user did in the workspace, to the active document unless it says
+    /// otherwise.
+    fn apply(&mut self, ctx: &egui::Context, actions: Vec<Action>, output: WorkspaceOutput) {
+        if let Some(open) = self.session.document_mut() {
+            for action in actions.into_iter().chain(output.actions) {
+                open.perform(action);
+            }
+            let pick = output.tree_pick.or(output.table_pick.map(TreePick::Object));
+            if let Some(pick) = pick {
+                open.pick(pick);
+            }
+        }
+        if let Some(id) = self.activating.take() {
+            self.session.activate(id);
+            ctx.request_repaint();
+        }
+        if output.activate.is_some() {
+            self.activating = output.activate;
+            ctx.request_repaint();
+        }
+        if let Some(id) = output.close {
+            self.session.close(ctx, id);
+            ctx.request_repaint();
         }
     }
 
     /// Shows one frame of the whole application.
     fn show(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
-        // With no document there is no active tool, so the next document starts afresh.
-        if self.session.document().is_none() {
-            self.mode = ToolMode::default();
-        }
+        self.workspace.sync(&mut self.session);
+        self.forget_edits_if_the_document_changed(&ctx);
         self.handle_close_request(&ctx);
         let state = self.tool_bar_state();
         // A dialog answers Escape itself.
@@ -123,72 +197,28 @@ impl GridToolApp {
             Some(_) => ToolKeyPresses::default(),
             None => self.tool_keys.read(&ctx),
         };
-        let previous_mode = self.mode;
-        let tool_bar = top_panel::show(ui, &mut self.mode, state);
+        let previous_mode = self.active_mode();
+        let mut mode = previous_mode;
+        let tool_bar = top_panel::show(ui, &mut mode, state);
+        if let Some(open) = self.session.document_mut() {
+            open.view.mode = mode;
+        }
+        let mut actions: Vec<Action> = self
+            .apply_tool_keys(keys, mode != previous_mode)
+            .into_iter()
+            .collect();
         if let Some(action) = tool_bar.action {
             self.handle(&ctx, action);
         }
-        let mut actions: Vec<Action> = self
-            .apply_tool_keys(keys, self.mode != previous_mode)
-            .into_iter()
-            .collect();
         actions.extend(self.show_tool_controls(ui, tool_bar.content_height));
 
-        let tree = self.session.document_mut().map(|open| {
-            let view = &mut open.view;
-            (
-                open.editor.document(),
-                &mut view.tree_state,
-                &view.selection,
-            )
-        });
-        let objects = object_tree::show(ui, tree);
-        actions.extend(objects.action);
-        if let Some(pick) = objects.pick
-            && let Some(open) = self.session.document_mut()
-        {
-            open.pick(pick);
-        }
-
-        let open = self
-            .session
-            .document()
-            .map(|open| (&open.editor, &open.view.selection));
-        let tables = self.side_panel.show(ui, open);
-        actions.extend(tables.action);
-        if let Some(id) = tables.pick
-            && let Some(open) = self.session.document_mut()
-        {
-            open.pick(TreePick::Object(id));
-        }
-
-        let mode = self.mode;
-        egui::CentralPanel::default().show(ui, |ui| match self.session.content_mut() {
-            Content::Empty => placeholder::show(ui, "Open an image to get started."),
-            Content::Error(message) => {
-                let color = ui.visuals().error_fg_color;
-                placeholder::show(ui, egui::RichText::new(message.as_str()).color(color));
-            }
-            Content::Document(open) => {
-                actions.extend(canvas::show(
-                    ui,
-                    mode,
-                    &mut open.view,
-                    open.editor.document(),
-                ));
-            }
-        });
-
-        if let Some(open) = self.session.document_mut() {
-            for action in actions {
-                open.perform(action);
-            }
-        }
+        let output = self.workspace.show(ui, &mut self.session);
+        self.apply(&ctx, actions, output);
         // A different active object brings its tool, whose controls show from the next frame.
         if let Some(open) = self.session.document_mut()
             && let Some(mode) = open.view.tool_of_new_active_object(open.editor.document())
         {
-            self.mode = mode;
+            open.view.mode = mode;
             ctx.request_repaint();
         }
 
@@ -198,188 +228,22 @@ impl GridToolApp {
     }
 }
 
-impl Default for GridToolApp {
-    fn default() -> Self {
-        Self::new(Session::new(
-            Box::new(RfdImagePicker),
-            Box::new(RfdDocumentPicker),
-        ))
-    }
-}
-
 impl eframe::App for GridToolApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.show(ui);
     }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        if let Some(layout) = self.workspace.save_layout() {
+            storage.set_string(LAYOUT_KEY, layout);
+        }
+    }
+
+    /// Only the layout of the panels is restored.
+    fn persist_egui_memory(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use std::fs;
-    use std::path::{Path, PathBuf};
-
-    use super::*;
-    use crate::file_picker::{DocumentFilePicker, ImageFilePicker};
-
-    const WINDOW: egui::Rect =
-        egui::Rect::from_min_max(egui::Pos2::ZERO, egui::Pos2::new(1280.0, 800.0));
-    const IMAGE_WIDTH: u32 = 2000;
-    const IMAGE_HEIGHT: u32 = 1500;
-
-    /// Always picks the same files, so that the file dialogs need no user.
-    #[derive(Clone)]
-    struct Picks {
-        image: PathBuf,
-        document: PathBuf,
-    }
-
-    impl ImageFilePicker for Picks {
-        fn pick_image(&self) -> Option<PathBuf> {
-            Some(self.image.clone())
-        }
-    }
-
-    impl DocumentFilePicker for Picks {
-        fn pick_document(&self) -> Option<PathBuf> {
-            Some(self.document.clone())
-        }
-
-        fn pick_save_path(&self, _suggestion: &Path) -> Option<PathBuf> {
-            None
-        }
-    }
-
-    /// The whole application, with a temporary image bigger than its window to open.
-    struct Fixture {
-        folder: PathBuf,
-        ctx: egui::Context,
-        app: GridToolApp,
-        picks: Picks,
-    }
-
-    impl Fixture {
-        fn new(name: &str) -> Self {
-            let folder =
-                std::env::temp_dir().join(format!("gridtool_app_{name}_{}", std::process::id()));
-            fs::create_dir_all(&folder).unwrap();
-            let picks = Picks {
-                image: folder.join("plan.png"),
-                document: folder.join("plan.ron"),
-            };
-            image::RgbaImage::new(IMAGE_WIDTH, IMAGE_HEIGHT)
-                .save(&picks.image)
-                .unwrap();
-            let session = Session::new(Box::new(picks.clone()), Box::new(picks.clone()));
-            Self {
-                folder,
-                ctx: egui::Context::default(),
-                app: GridToolApp::new(session),
-                picks,
-            }
-        }
-
-        fn frame(&mut self) {
-            let input = egui::RawInput {
-                screen_rect: Some(WINDOW),
-                ..Default::default()
-            };
-            let ctx = self.ctx.clone();
-            let mut output = ctx.run_ui(input, |ui| self.app.show(ui));
-            // There is no renderer to upload textures to.
-            output.textures_delta.clear();
-        }
-
-        fn replace(&mut self, replacement: Replacement) {
-            let ctx = self.ctx.clone();
-            self.app.session.replace(&ctx, replacement);
-        }
-
-        fn open(&mut self) -> &mut OpenDocument {
-            self.app.session.document_mut().expect("a document is open")
-        }
-
-        /// Shows frames as the running application would, then checks that the whole document
-        /// is inside the canvas area.
-        fn assert_document_fits_the_canvas(&mut self) {
-            for _ in 0..4 {
-                self.frame();
-            }
-            let view = &self.open().view;
-            let canvas = view.canvas_rect.expect("the canvas was drawn");
-            let size = egui::Vec2::new(IMAGE_WIDTH as f32, IMAGE_HEIGHT as f32);
-            let corners = view.viewport.transform(canvas.center(), size).corners();
-            assert!(
-                corners.iter().all(|corner| canvas.contains(*corner)),
-                "{corners:?} outside {canvas:?}"
-            );
-            assert!(view.viewport.zoom() < 1.0);
-            assert!(
-                canvas.width() < WINDOW.width(),
-                "the panels take their share of the window"
-            );
-        }
-    }
-
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.folder);
-        }
-    }
-
-    #[test]
-    fn an_image_opened_in_a_new_document_fits_the_canvas() {
-        let mut fixture = Fixture::new("open_image");
-        fixture.frame();
-
-        fixture.replace(Replacement::OpenImage);
-
-        fixture.assert_document_fits_the_canvas();
-    }
-
-    #[test]
-    fn a_loaded_document_fits_the_canvas() {
-        let mut fixture = Fixture::new("load");
-        fixture.replace(Replacement::OpenImage);
-        let path = fixture.picks.document.clone();
-        fixture.open().save_to(&path).unwrap();
-        // Zoomed in, so that the fit below can only come from loading.
-        fixture.frame();
-        fixture.frame();
-        let center = fixture.open().view.canvas_rect.unwrap().center();
-        fixture
-            .open()
-            .view
-            .viewport
-            .zoom_about(center, center, 100.0);
-
-        fixture.replace(Replacement::Load);
-
-        fixture.assert_document_fits_the_canvas();
-    }
-
-    #[test]
-    fn zooming_after_opening_is_kept() {
-        let mut fixture = Fixture::new("zoom_kept");
-        fixture.replace(Replacement::OpenImage);
-        fixture.assert_document_fits_the_canvas();
-        let center = fixture.open().view.canvas_rect.unwrap().center();
-        let fitted = fixture.open().view.viewport.zoom();
-        fixture.open().view.viewport.zoom_about(center, center, 2.0);
-
-        fixture.frame();
-
-        assert_eq!(fixture.open().view.viewport.zoom(), fitted * 2.0);
-    }
-
-    #[test]
-    fn fitting_leaves_the_document_and_its_history_alone() {
-        let mut fixture = Fixture::new("document_unchanged");
-        fixture.replace(Replacement::OpenImage);
-        let before = fixture.open().editor.document().clone();
-
-        fixture.assert_document_fits_the_canvas();
-
-        assert_eq!(fixture.open().editor.document(), &before);
-        assert!(!fixture.open().editor.can_undo());
-    }
-}
+mod tests;

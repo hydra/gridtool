@@ -12,7 +12,7 @@ must satisfy them.
 | File | Area | ID prefix |
 |---|---|---|
 | [01-architecture.md](01-architecture.md) | Separation of document logic from presentation; testability | `ARCH` |
-| [02-application-shell.md](02-application-shell.md) | Window, layout, tool bar, tool modes, side panel | `SHELL` |
+| [02-application-shell.md](02-application-shell.md) | Window, layout, tool bar, tool modes | `SHELL` |
 | [03-image-loading.md](03-image-loading.md) | Choosing and decoding image files | `IMG` |
 | [04-document-model.md](04-document-model.md) | The document and its coordinate system | `DOC` |
 | [05-view-navigation.md](05-view-navigation.md) | Pan, zoom and view rotation (view state, not document state) | `VIEW` |
@@ -23,9 +23,10 @@ must satisfy them.
 | [10-objects-and-selection.md](10-objects-and-selection.md) | Object ids, object tree, active object, selection box and resizing | `OBJ` |
 | [11-grids.md](11-grids.md) | Grid tool, grid geometry, grid properties row | `GRID` |
 | [12-origin.md](12-origin.md) | Document origin (rotation centre), Origin mode and marker | `ORIGIN` |
-| [13-files.md](13-files.md) | New, Load, Save, Save as; unsaved changes; closing the window; closing the window; the `.ron` file format | `FILE` |
+| [13-files.md](13-files.md) | New, Load, Save, Save as; unsaved changes; closing documents and the window; the `.ron` file format | `FILE` |
 | [14-areas.md](14-areas.md) | Measure area tool, area measurements, Areas table | `AREA` |
 | [15-shapes.md](15-shapes.md) | Draw line tool, drawn shapes and their styles, shape properties row | `DRAW` |
+| [16-workspace.md](16-workspace.md) | Dockable panels, the Documents area, multiple documents, the active document | `WORK` |
 
 ## Conventions
 
@@ -47,11 +48,12 @@ must satisfy them.
 |---|---|
 | **Document** | The thing being edited: an image-sized rectangle plus its calibration data, measurements, areas, grids, drawn shapes and origin. |
 | **Document file** | A `.ron` file describing a document in a versioned format, referring to its image by path (`FILE`). |
-| **Unsaved changes** | The open document differs from the document as last loaded or saved, or it has never been saved. |
+| **Unsaved changes** | An open document differs from the document as last loaded or saved, or it has never been saved. |
 | **Image coordinates** | Pixel coordinates on the un-rotated image. The origin is at the top-left corner, x increases to the right and y increases downwards. Values may be fractional. |
 | **Screen coordinates** | Positions in the application window, in logical screen units. |
 | **View** | How the document is displayed: pan, zoom and rotation. View state is never part of the document. |
 | **Action** | A single change to the document. It can be undone and redone. |
+| **Active document** | The open document that the tool bar, panels and commands are showing and acting on (`WORK-10`). |
 | **Tool mode** | The active tool. It decides what mouse input on the canvas does. |
 | **Calibration points** | Points placed on the image that define two reference lines, A and B. |
 | **Scale** | The real-world length of one image pixel along the image's X axis and along its Y axis. |
@@ -104,3 +106,5 @@ must satisfy them.
 | 2026-11-01 | With no document open there is now no active tool: every mode button is disabled and none is selected, and Pan & zoom becomes active when a document next opens (`SHELL-8`, `SHELL-9`). The tool controls row then says "`Open an image to get started`" (`SHELL-2a`). |
 | 2026-11-01 | The application has one icon, used for the window, task bar or dock, executable file and release packages (`SHELL-1a`). |
 | 2026-11-01 | A newly opened or loaded document now fits in the canvas area, zoomed out if needed, instead of always starting at 100 % (`VIEW-2`, `VIEW-2a`). |
+| 2026-11-01 | Several documents can be open at once, each with its own tab, view, tool, active object and history, and the panels are now dockable (`16`). The Documents area can be split and its tabs regrouped; panels can be docked around it, grouped, closed and reopened from a new Panels menu, and their arrangement is restored at start-up. This withdraws the side panel (`SHELL-11`) and the error shown in the canvas area (`SHELL-4`), since a failed image open now shows a dialog (`IMG-6`). New now opens an image and adds a document (`FILE-12`, `IMG-2`), replacing the Open image button (`SHELL-5`). Nothing replaces an open document any more, so only closing a document or the window asks about unsaved changes, naming the document (`FILE-11`, `FILE-17`). Load of a file already open switches to it (`FILE-13`). The tool mode is per document (`SHELL-8`, `SHELL-9`). Panels have no headings, their titles being on their tabs (`OBJ-3`, `MEAS-10`, `AREA-12`, `HIST-10`). |
+| 2026-11-01 | Tabs and tab bars no longer show the grab cursor on hover, only the grabbing hand while being dragged (`WORK-14`). |

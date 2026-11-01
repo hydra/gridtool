@@ -17,8 +17,6 @@ use super::icons::{DELETE as DELETE_ICON, DUPLICATE as DUPLICATE_ICON};
 use super::selection::Selection;
 use super::tool_controls::shape_label;
 
-const DEFAULT_WIDTH: f32 = 220.0;
-
 /// A node in the object tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TreeNode {
@@ -91,7 +89,7 @@ fn command_button(
     command.filter(|_| clicked)
 }
 
-/// Shows the panel. `open` is the open document with its tree state and selection.
+/// Shows the panel's content. `open` is the active document with its tree state and selection.
 pub fn show(
     ui: &mut egui::Ui,
     open: Option<(
@@ -100,27 +98,18 @@ pub fn show(
         &Selection,
     )>,
 ) -> ObjectPanelOutput {
-    egui::Panel::left("object_panel")
-        .resizable(true)
-        .default_size(DEFAULT_WIDTH)
-        .show(ui, |ui| {
-            ui.heading("Objects");
-            let commands = match &open {
-                Some((document, _, selection)) => {
-                    ObjectCommands::for_active(document, selection.active())
-                }
-                None => ObjectCommands::default(),
-            };
-            let action = commands.show(ui);
-            ui.separator();
-            let Some((document, state, selection)) = open else {
-                ui.weak("No document open");
-                return ObjectPanelOutput::default();
-            };
-            let pick = show_tree(ui, document, state, selection).inner;
-            ObjectPanelOutput { pick, action }
-        })
-        .inner
+    let commands = match &open {
+        Some((document, _, selection)) => ObjectCommands::for_active(document, selection.active()),
+        None => ObjectCommands::default(),
+    };
+    let action = commands.show(ui);
+    ui.separator();
+    let Some((document, state, selection)) = open else {
+        ui.weak("No document open");
+        return ObjectPanelOutput::default();
+    };
+    let pick = show_tree(ui, document, state, selection).inner;
+    ObjectPanelOutput { pick, action }
 }
 
 fn show_tree(

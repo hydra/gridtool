@@ -8,15 +8,14 @@
 as `.png`, is not supported. The list of extensions MUST be defined once and used both
 for the dialog filter and for validation.
 
-**IMG-2 — Choosing a file.** Clicking the Open image button (`SHELL-5`) first deals with
-any unsaved changes (`FILE-11`). It then shows the platform's native file-open dialog:
+**IMG-2 — Choosing a file.** Clicking the New button (`SHELL-5`) shows the platform's native
+file-open dialog:
 - the title is "`Open image`"
 - there is one filter, named "`Images`", that limits the listing to the supported
   extensions
 - the user can select one file
 
-**IMG-3 — Cancel.** If the user cancels the dialog, nothing changes. The current document,
-its history and its view are all kept.
+**IMG-3 — Cancel.** If the user cancels the dialog, nothing changes.
 
 **IMG-4 — Re-validation.** The dialog filter can be bypassed, for example by typing a
 file name. So after a file is chosen, its extension MUST be checked again before the
@@ -25,16 +24,15 @@ file is read. An unsupported extension produces an error and the file is not rea
 **IMG-5 — Decoding.** The file is read and decoded into 8-bit-per-channel RGBA pixels at
 the image's native width and height. Transparency is kept.
 
-**IMG-6 — Errors.** If opening fails, the current document is closed and the error is
-shown in the canvas area (`SHELL-4`). The message has one of these forms:
+**IMG-6 — Errors.** If opening fails, the open documents are kept and an error dialog titled
+"`Could not open image`", with one "`OK`" button, shows a message in one of these forms:
 - "`unsupported image format: <path>`"
 - "`could not read file: <system error>`"
 - "`could not decode image: <decoder error>`"
 
-**IMG-7 — Success.** On success, the previous document (if any) is discarded together
-with its history and view state. A new document is created from the image (`DOC-2`) with
-an empty history (`HIST`), and the view returns to its defaults (`VIEW-2`). The new
-document has no file and has unsaved changes until it is saved (`FILE-9`).
+**IMG-7 — Success.** On success, a new document is created from the image (`DOC-2`) with an empty
+history (`HIST`) and the default view (`VIEW-2`), and it becomes active (`WORK-10`). The open
+documents are kept. The new document has no file and has unsaved changes until it is saved (`FILE-9`).
 
 **IMG-8 — Display.** The decoded image is drawn as the document's content on the canvas
 and fills the document rectangle exactly (`VIEW-6`).

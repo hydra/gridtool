@@ -102,7 +102,7 @@ impl Fixture {
 
     fn open_image(&mut self) {
         self.script.image(Some(self.path("photo.png")));
-        self.session.replace(&self.ctx, Replacement::OpenImage);
+        self.session.open_image(&self.ctx);
     }
 
     fn edit(&mut self, x: f64) {
@@ -127,7 +127,13 @@ impl Fixture {
     }
 
     fn is_empty(&self) -> bool {
-        matches!(self.session.content, Content::Empty)
+        self.session.document_ids().next().is_none()
+    }
+
+    /// Asks to close the active document, as the close button of its tab does.
+    fn close_active(&mut self) {
+        let id = self.session.active_id().expect("a document is active");
+        self.session.close(&self.ctx, id);
     }
 
     /// Saves to `name` via Save, answering the save dialog.
@@ -144,10 +150,11 @@ impl Drop for Fixture {
 }
 
 #[test]
-fn new_with_nothing_open_asks_nothing() {
+fn cancelling_the_image_dialog_opens_nothing() {
     let mut fixture = Fixture::new("new_empty");
 
-    fixture.session.replace(&fixture.ctx, Replacement::New);
+    fixture.script.image(None);
+    fixture.session.open_image(&fixture.ctx);
 
     assert!(fixture.is_empty());
     assert_eq!(fixture.session.dialog(), None);
@@ -162,16 +169,16 @@ fn a_never_saved_document_has_unsaved_changes() {
 }
 
 #[test]
-fn new_with_unsaved_changes_asks_and_cancel_keeps_everything() {
+fn closing_a_document_with_unsaved_changes_asks_and_cancel_keeps_everything() {
     let mut fixture = Fixture::new("new_cancel");
     fixture.open_image();
     fixture.edit(3.0);
 
-    fixture.session.replace(&fixture.ctx, Replacement::New);
+    fixture.close_active();
     let dialog = fixture.session.dialog().unwrap();
-    assert_eq!(dialog, Dialog::unsaved_changes());
+    assert_eq!(dialog, Dialog::unsaved_changes("photo.png"));
     assert_eq!(dialog.title, "Unsaved changes");
-    assert_eq!(dialog.message, "Do you want to save now?");
+    assert_eq!(dialog.message, "Do you want to save photo.png now?");
     assert_eq!(
         dialog.buttons,
         [DialogButton::Yes, DialogButton::No, DialogButton::Cancel]
@@ -186,11 +193,11 @@ fn new_with_unsaved_changes_asks_and_cancel_keeps_everything() {
 }
 
 #[test]
-fn new_then_no_discards_without_saving() {
+fn closing_a_document_then_no_discards_without_saving() {
     let mut fixture = Fixture::new("new_no");
     fixture.open_image();
 
-    fixture.session.replace(&fixture.ctx, Replacement::New);
+    fixture.close_active();
     fixture.answer(DialogButton::No);
 
     assert!(fixture.is_empty());
@@ -198,32 +205,27 @@ fn new_then_no_discards_without_saving() {
 }
 
 #[test]
-fn new_then_yes_saves_then_resets_and_forgets_the_file() {
+fn closing_a_document_then_yes_saves_it_first() {
     let mut fixture = Fixture::new("new_yes");
     fixture.open_image();
     fixture.edit(3.0);
     fixture.script.save(Some(fixture.path("plan.ron")));
 
-    fixture.session.replace(&fixture.ctx, Replacement::New);
+    fixture.close_active();
     fixture.answer(DialogButton::Yes);
 
     assert!(fixture.is_empty());
     let saved = document_file::load(&fixture.path("plan.ron")).unwrap();
     assert_eq!(saved.document.origin(), Point::new(3.0, 1.0));
-
-    // The file is forgotten: the next document asks where to save again.
-    fixture.open_image();
-    fixture.save_as_new("other.ron");
-    assert!(fixture.path("other.ron").exists());
 }
 
 #[test]
-fn new_then_yes_but_cancelling_the_save_dialog_keeps_the_document() {
+fn closing_a_document_then_yes_but_cancelling_the_save_dialog_keeps_it() {
     let mut fixture = Fixture::new("new_yes_cancel");
     fixture.open_image();
     fixture.script.save(None);
 
-    fixture.session.replace(&fixture.ctx, Replacement::New);
+    fixture.close_active();
     fixture.answer(DialogButton::Yes);
 
     assert!(!fixture.is_empty());
@@ -288,30 +290,16 @@ fn loading_restores_the_document_without_history_or_unsaved_changes() {
     fixture.edit(6.0);
     fixture.save_as_new("plan.ron");
     let saved = fixture.open().editor.document().clone();
-    fixture.session.replace(&fixture.ctx, Replacement::New);
+    fixture.close_active();
 
     fixture.script.document(Some(fixture.path("plan.ron")));
-    fixture.session.replace(&fixture.ctx, Replacement::Load);
+    fixture.session.load(&fixture.ctx);
 
     let open = fixture.open();
     assert_eq!(open.editor.document(), &saved);
     assert!(!open.has_unsaved_changes());
     assert!(!open.editor.can_undo());
     assert_eq!(fixture.file(), Some(fixture.path("plan.ron")));
-}
-
-#[test]
-fn load_and_open_image_also_ask_about_unsaved_changes() {
-    for replacement in [Replacement::Load, Replacement::OpenImage] {
-        let mut fixture = Fixture::new("other_replacements");
-        fixture.open_image();
-
-        fixture.session.replace(&fixture.ctx, replacement);
-
-        assert_eq!(fixture.session.dialog(), Some(Dialog::unsaved_changes()));
-        fixture.answer(DialogButton::Cancel);
-        assert!(!fixture.is_empty());
-    }
 }
 
 #[test]
@@ -322,7 +310,7 @@ fn a_failed_load_reports_the_error_and_keeps_the_open_document() {
     fs::write(fixture.path("broken.ron"), "nonsense").unwrap();
 
     fixture.script.document(Some(fixture.path("broken.ron")));
-    fixture.session.replace(&fixture.ctx, Replacement::Load);
+    fixture.session.load(&fixture.ctx);
 
     let dialog = fixture.session.dialog().unwrap();
     assert_eq!(dialog.title, "Could not load document");
@@ -402,7 +390,10 @@ fn closing_with_unsaved_changes_asks_and_cancel_keeps_the_window_open() {
     fixture.open_image();
 
     assert!(!fixture.session.request_close(&fixture.ctx));
-    assert_eq!(fixture.session.dialog(), Some(Dialog::unsaved_changes()));
+    assert_eq!(
+        fixture.session.dialog(),
+        Some(Dialog::unsaved_changes("photo.png"))
+    );
     // Asking again while the dialog is open keeps the one dialog.
     assert!(!fixture.session.request_close(&fixture.ctx));
     fixture.answer(DialogButton::Cancel);
@@ -468,6 +459,179 @@ fn the_window_title_names_the_document_file() {
     fixture.save_as_new("plan");
     assert_eq!(fixture.session.window_title(), "plan.ron - GridTool");
 
-    fixture.session.replace(&fixture.ctx, Replacement::New);
+    fixture.close_active();
     assert_eq!(fixture.session.window_title(), "GridTool");
+}
+
+#[test]
+fn opening_adds_a_document_keeps_the_others_and_makes_it_active() {
+    let mut fixture = Fixture::new("adds");
+    fixture.open_image();
+    let first = fixture.session.active_id().unwrap();
+    fixture.edit(3.0);
+
+    fixture.open_image();
+
+    let second = fixture.session.active_id().unwrap();
+    assert_ne!(first, second);
+    assert_eq!(
+        fixture.session.document_ids().collect::<Vec<_>>(),
+        [first, second]
+    );
+    assert_eq!(
+        fixture.session.dialog(),
+        None,
+        "nothing is replaced, so nothing asks"
+    );
+    let kept = fixture.session.document_by_id(first).unwrap();
+    assert_eq!(kept.editor.document().origin(), Point::new(3.0, 1.0));
+}
+
+#[test]
+fn the_same_image_can_be_opened_as_two_documents() {
+    let mut fixture = Fixture::new("same_image");
+
+    fixture.open_image();
+    fixture.open_image();
+
+    assert_eq!(fixture.session.document_ids().count(), 2);
+}
+
+#[test]
+fn a_failed_image_open_reports_the_error_and_keeps_the_documents() {
+    let mut fixture = Fixture::new("image_error");
+    fixture.open_image();
+    let open = fixture.session.active_id();
+    fs::write(fixture.path("broken.png"), "nonsense").unwrap();
+
+    fixture.script.image(Some(fixture.path("broken.png")));
+    fixture.session.open_image(&fixture.ctx);
+
+    let dialog = fixture.session.dialog().unwrap();
+    assert_eq!(dialog.title, "Could not open image");
+    fixture.answer(DialogButton::Ok);
+    assert_eq!(fixture.session.document_ids().count(), 1);
+    assert_eq!(fixture.session.active_id(), open);
+}
+
+#[test]
+fn loading_a_file_that_is_already_open_switches_to_its_document() {
+    let mut fixture = Fixture::new("already_open");
+    fixture.open_image();
+    fixture.save_as_new("plan.ron");
+    let saved = fixture.session.active_id();
+    fixture.open_image();
+
+    fixture.script.document(Some(fixture.path("plan.ron")));
+    fixture.session.load(&fixture.ctx);
+
+    assert_eq!(fixture.session.active_id(), saved);
+    assert_eq!(fixture.session.document_ids().count(), 2);
+}
+
+#[test]
+fn commands_act_on_the_active_document() {
+    let mut fixture = Fixture::new("active");
+    fixture.open_image();
+    let first = fixture.session.active_id().unwrap();
+    fixture.save_as_new("first.ron");
+    fixture.open_image();
+    fixture.save_as_new("second.ron");
+    let untouched = fixture.origin();
+
+    fixture.session.activate(first);
+    fixture.edit(7.0);
+    fixture.session.save(&fixture.ctx);
+
+    let saved = document_file::load(&fixture.path("first.ron")).unwrap();
+    assert_eq!(saved.document.origin(), Point::new(7.0, 1.0));
+    let other = document_file::load(&fixture.path("second.ron")).unwrap();
+    assert_eq!(other.document.origin(), untouched);
+    assert_eq!(fixture.session.window_title(), "first.ron - GridTool");
+}
+
+#[test]
+fn closing_one_document_leaves_the_others_and_asks_by_name() {
+    let mut fixture = Fixture::new("close_one");
+    fixture.open_image();
+    let first = fixture.session.active_id().unwrap();
+    fixture.save_as_new("first.ron");
+    fixture.open_image();
+    let second = fixture.session.active_id().unwrap();
+
+    // Closing a document that is not active brings it forward while it asks.
+    fixture.session.activate(first);
+    fixture.session.close(&fixture.ctx, second);
+    assert_eq!(fixture.session.active_id(), Some(second));
+    assert_eq!(
+        fixture.session.dialog(),
+        Some(Dialog::unsaved_changes("photo.png"))
+    );
+
+    fixture.answer(DialogButton::No);
+
+    assert_eq!(fixture.session.document_ids().collect::<Vec<_>>(), [first]);
+    assert_eq!(
+        fixture.session.active_id(),
+        None,
+        "the document area chooses"
+    );
+}
+
+#[test]
+fn closing_a_saved_document_that_is_not_active_keeps_the_active_one() {
+    let mut fixture = Fixture::new("close_inactive");
+    fixture.open_image();
+    let first = fixture.session.active_id().unwrap();
+    fixture.save_as_new("first.ron");
+    fixture.open_image();
+    let second = fixture.session.active_id();
+
+    fixture.session.close(&fixture.ctx, first);
+
+    assert_eq!(fixture.session.dialog(), None);
+    assert_eq!(fixture.session.active_id(), second);
+}
+
+#[test]
+fn closing_the_window_asks_about_each_unsaved_document_in_turn() {
+    let mut fixture = Fixture::new("window_each");
+    fixture.open_image();
+    let first = fixture.session.active_id();
+    fixture.open_image();
+    let second = fixture.session.active_id();
+    fixture.open_image();
+    fixture.save_as_new("saved.ron");
+    fixture.script.save(Some(fixture.path("second.ron")));
+
+    assert!(!fixture.session.request_close(&fixture.ctx));
+    assert_eq!(fixture.session.active_id(), first, "shown while it asks");
+    fixture.answer(DialogButton::No);
+    assert!(!fixture.session.exiting);
+    assert_eq!(fixture.session.active_id(), second);
+    fixture.answer(DialogButton::Yes);
+
+    assert_eq!(fixture.session.dialog(), None);
+    assert!(fixture.session.exiting);
+    assert!(fixture.path("second.ron").exists());
+    fixture.script.assert_all_dialogs_used();
+}
+
+#[test]
+fn cancelling_while_closing_the_window_keeps_every_document_and_starts_over_next_time() {
+    let mut fixture = Fixture::new("window_cancel");
+    fixture.open_image();
+    fixture.open_image();
+
+    assert!(!fixture.session.request_close(&fixture.ctx));
+    fixture.answer(DialogButton::No);
+    fixture.answer(DialogButton::Cancel);
+
+    assert!(!fixture.session.exiting);
+    assert_eq!(fixture.session.document_ids().count(), 2);
+
+    // The No was for that attempt only.
+    assert!(!fixture.session.request_close(&fixture.ctx));
+    fixture.answer(DialogButton::No);
+    assert!(fixture.session.dialog().is_some());
 }

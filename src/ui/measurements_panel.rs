@@ -52,9 +52,6 @@ impl Axis {
     }
 }
 
-/// The panel's title.
-pub const HEADING: &str = "Point-to-point";
-
 /// Spare (or missing) table width smaller than this, in points, is left alone, so that
 /// pixel rounding cannot keep the fields changing width.
 const WIDTH_TOLERANCE: f32 = 2.0;
@@ -86,8 +83,6 @@ impl MeasurementsPanel {
         selection: &Selection,
         reveal: bool,
     ) -> TableOutput {
-        ui.heading(HEADING);
-        ui.separator();
         if document.measurements().is_empty() {
             ui.weak("No measurements yet. Use the Measure distance tool to add one.");
             return TableOutput::default();
