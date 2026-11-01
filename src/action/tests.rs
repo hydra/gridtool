@@ -1162,3 +1162,130 @@ fn rejects_new_objects_with_invalid_styles() {
         Err(ActionError::InvalidFillSpacing(-1.0))
     );
 }
+
+#[test]
+fn moving_replaces_every_point_and_keeps_everything_else() {
+    let mut document = document_with_measurements(1);
+    Action::AddArea(triangle(0.0)).apply(&mut document).unwrap();
+    let area_points: Vec<Point> = document.areas()[0]
+        .points()
+        .iter()
+        .map(|point| Point::new(point.x + 1.0, point.y + 2.0))
+        .collect();
+    let (measurement_before, area_before) = (
+        document.measurements()[0].clone(),
+        document.areas()[0].clone(),
+    );
+
+    Action::MoveMeasurement {
+        index: 0,
+        start: Point::new(1.0, 2.0),
+        end: Point::new(11.0, 12.0),
+    }
+    .apply(&mut document)
+    .unwrap();
+    Action::MoveArea {
+        index: 0,
+        points: area_points.clone(),
+    }
+    .apply(&mut document)
+    .unwrap();
+
+    let measurement = &document.measurements()[0];
+    assert_eq!(measurement.start(), Point::new(1.0, 2.0));
+    assert_eq!(measurement.end(), Point::new(11.0, 12.0));
+    assert_eq!(measurement.id(), measurement_before.id());
+    assert_eq!(measurement.unit(), measurement_before.unit());
+    let area = &document.areas()[0];
+    assert_eq!(area.points(), area_points);
+    assert_eq!(area.id(), area_before.id());
+    assert_eq!(area.unit(), area_before.unit());
+}
+
+#[test]
+fn moves_outside_the_document_or_of_missing_objects_are_rejected() {
+    let mut document = document_with_measurements(1);
+    Action::AddArea(triangle(0.0)).apply(&mut document).unwrap();
+    let before = document.clone();
+    let inside = Point::new(1.0, 1.0);
+    let outside = Point::new(500.0, 1.0);
+    let cases = [
+        (
+            Action::MoveMeasurement {
+                index: 0,
+                start: inside,
+                end: outside,
+            },
+            ActionError::PointOutsideDocument(outside),
+        ),
+        (
+            Action::MoveMeasurement {
+                index: 1,
+                start: inside,
+                end: inside,
+            },
+            ActionError::MeasurementIndexOutOfRange { index: 1, count: 1 },
+        ),
+        (
+            Action::MoveArea {
+                index: 0,
+                points: vec![outside; 3],
+            },
+            ActionError::PointOutsideDocument(outside),
+        ),
+        (
+            Action::MoveArea {
+                index: 0,
+                points: vec![inside],
+            },
+            ActionError::AreaPointCountChanged {
+                expected: 3,
+                actual: 1,
+            },
+        ),
+        (
+            Action::MoveArea {
+                index: 1,
+                points: vec![inside; 3],
+            },
+            ActionError::AreaIndexOutOfRange { index: 1, count: 1 },
+        ),
+    ];
+
+    for (action, error) in cases {
+        assert_eq!(action.apply(&mut document), Err(error), "{action:?}");
+    }
+    assert_eq!(document, before);
+}
+
+#[test]
+fn move_labels_name_the_object() {
+    let point = Point::new(1.0, 2.0);
+    let cases = [
+        (
+            Action::MoveMeasurement {
+                index: 0,
+                start: point,
+                end: Point::new(3.0, 4.0),
+            },
+            "Move measurement 1 to (1.0, 2.0) - (3.0, 4.0)",
+        ),
+        (
+            Action::MoveArea {
+                index: 1,
+                points: vec![point],
+            },
+            "Move area 2",
+        ),
+        (
+            Action::MoveShape {
+                index: 2,
+                points: vec![point],
+            },
+            "Move shape 3",
+        ),
+    ];
+    for (action, label) in cases {
+        assert_eq!(action.to_string(), label);
+    }
+}

@@ -555,3 +555,44 @@ fn describes_shape_actions() {
         assert_eq!(action.to_string(), label);
     }
 }
+
+#[test]
+fn moving_a_shape_replaces_its_points_and_can_be_undone() {
+    let document = document_with_shapes();
+    let shape_count = document.shapes().len();
+    let before = document.shapes()[0].clone();
+    let points: Vec<Point> = before
+        .points()
+        .iter()
+        .map(|point| Point::new(point.x + 1.0, point.y + 1.0))
+        .collect();
+    let mut editor = Editor::new(document);
+
+    editor
+        .perform(Action::MoveShape {
+            index: 0,
+            points: points.clone(),
+        })
+        .unwrap();
+    let moved = &editor.document().shapes()[0];
+    assert_eq!(moved.points(), points);
+    assert_eq!(moved.id(), before.id());
+    assert_eq!(moved.line(), before.line());
+    assert_eq!(editor.document().shapes().len(), shape_count);
+
+    assert!(editor.undo());
+    assert_eq!(editor.document().shapes()[0], before);
+
+    let mut document = editor.document().clone();
+    assert_eq!(
+        Action::MoveShape {
+            index: 0,
+            points: vec![Point::new(1.0, 1.0)],
+        }
+        .apply(&mut document),
+        Err(ActionError::ShapePointCountChanged {
+            expected: points.len(),
+            actual: 1,
+        })
+    );
+}

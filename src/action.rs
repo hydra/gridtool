@@ -60,6 +60,12 @@ pub enum Action {
         start: Point,
         end: Point,
     },
+    /// Replaces both ends of a measurement at once, after moving it as a whole.
+    MoveMeasurement {
+        index: usize,
+        start: Point,
+        end: Point,
+    },
     /// Changes the unit a measurement's distance is reported in.
     SetMeasurementUnit { index: usize, unit: LengthUnit },
     /// Removes a measurement; later measurements move up one place.
@@ -77,6 +83,9 @@ pub enum Action {
     /// Replaces every point of an area at once (e.g. after resizing its bounding box). The
     /// number of points must stay the same.
     ResizeArea { index: usize, points: Vec<Point> },
+    /// Replaces every point of an area at once, after moving it as a whole. The number of
+    /// points must stay the same.
+    MoveArea { index: usize, points: Vec<Point> },
     /// Changes the unit an area is reported in.
     SetAreaUnit { index: usize, unit: LengthUnit },
     /// Removes an area; later areas move up one place.
@@ -114,6 +123,9 @@ pub enum Action {
     /// Replaces every point of a shape at once (e.g. after resizing its bounding box). The
     /// number of points must stay the same.
     ResizeShape { index: usize, points: Vec<Point> },
+    /// Replaces every point of a shape at once, after moving it as a whole. The number of
+    /// points must stay the same.
+    MoveShape { index: usize, points: Vec<Point> },
     /// Changes how a measurement, area or drawn shape is drawn.
     SetStyle {
         target: StyleTarget,
@@ -292,7 +304,8 @@ impl Action {
                     .measurements_mut()
                     .push(Identified::new(id, measurement.clone()));
             }
-            Action::ResizeMeasurement { index, start, end } => {
+            Action::ResizeMeasurement { index, start, end }
+            | Action::MoveMeasurement { index, start, end } => {
                 ensure_inside(document, *start)?;
                 ensure_inside(document, *end)?;
                 measurement_mut(document, *index)?.set_points(*start, *end);
@@ -338,7 +351,7 @@ impl Action {
                 }
                 *area = area.with_point(*point, *to);
             }
-            Action::ResizeArea { index, points } => {
+            Action::ResizeArea { index, points } | Action::MoveArea { index, points } => {
                 for &point in points {
                     ensure_inside(document, point)?;
                 }
@@ -420,7 +433,7 @@ impl Action {
                 }
                 *shape = shape.with_point(*point, *to);
             }
-            Action::ResizeShape { index, points } => {
+            Action::ResizeShape { index, points } | Action::MoveShape { index, points } => {
                 for &point in points {
                     ensure_inside(document, point)?;
                 }
@@ -614,6 +627,9 @@ impl fmt::Display for Action {
             Action::ResizeMeasurement { index, start, end } => {
                 write!(f, "Resize measurement {} to {start} - {end}", index + 1)
             }
+            Action::MoveMeasurement { index, start, end } => {
+                write!(f, "Move measurement {} to {start} - {end}", index + 1)
+            }
             Action::SetMeasurementUnit { index, unit } => {
                 write!(f, "Set measurement {} units to {unit}", index + 1)
             }
@@ -625,6 +641,7 @@ impl fmt::Display for Action {
                 write!(f, "Move area {} point {} to {to}", index + 1, point + 1)
             }
             Action::ResizeArea { index, .. } => write!(f, "Resize area {}", index + 1),
+            Action::MoveArea { index, .. } => write!(f, "Move area {}", index + 1),
             Action::SetAreaUnit { index, unit } => {
                 write!(f, "Set area {} units to {unit}", index + 1)
             }
@@ -669,6 +686,7 @@ impl fmt::Display for Action {
                 write!(f, "Move shape {} point {} to {to}", index + 1, point + 1)
             }
             Action::ResizeShape { index, .. } => write!(f, "Resize shape {}", index + 1),
+            Action::MoveShape { index, .. } => write!(f, "Move shape {}", index + 1),
             Action::SetStyle { target, edit } => write!(f, "Set {target} {edit}"),
             Action::DeleteShape { index } => write!(f, "Delete shape {}", index + 1),
             Action::DuplicateShape { index } => write!(f, "Duplicate shape {}", index + 1),

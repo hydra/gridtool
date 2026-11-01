@@ -1,4 +1,4 @@
-//! Dragging the active object's points or bounding-box handles: the live preview while
+//! Dragging the active object, its points or its bounding-box handles: the live preview while
 //! the pointer moves, and the document [`Action`] committed when it is released.
 
 use gridtool::action::Action;
@@ -16,6 +16,8 @@ pub enum Grip {
     Bounds(BoundsHandle),
     /// One of the object's own points (for a measurement, 0 is the start and 1 the end).
     Point(usize),
+    /// The object as a whole: every point moves together.
+    Whole,
 }
 
 /// The shape of an object that can be dragged.
@@ -61,11 +63,20 @@ impl Shape {
     }
 
     /// The shape after `grip` is moved by `(dx, dy)` image pixels, with every point kept
-    /// inside `document`.
+    /// inside `document`. Moving the whole shape stops at the document's edge, so that it
+    /// keeps its form.
     fn dragged(&self, document: &Document, grip: Grip, dx: f64, dy: f64) -> Shape {
         let clamp = |point: Point| document.clamp(point);
         let moved = |point: Point| Point::new(point.x + dx, point.y + dy);
+        let (whole_dx, whole_dy) = self.bounds().limit_move(document.bounds(), dx, dy);
+        // Clamped too, as rounding could otherwise take a point just past the edge.
+        let whole = |point: Point| clamp(Point::new(point.x + whole_dx, point.y + whole_dy));
         match (self, grip) {
+            (Shape::Measurement(measurement), Grip::Whole) => {
+                Shape::Measurement(measurement.map_points(whole))
+            }
+            (Shape::Area(area), Grip::Whole) => Shape::Area(area.map_points(whole)),
+            (Shape::Drawn(drawn), Grip::Whole) => Shape::Drawn(drawn.map_points(whole)),
             (Shape::Measurement(measurement), Grip::Bounds(handle)) => {
                 Shape::Measurement(measurement.resized(handle, dx, dy).map_points(clamp))
             }
@@ -98,6 +109,19 @@ impl Shape {
             return None;
         }
         Some(match (edited, grip) {
+            (Shape::Measurement(measurement), Grip::Whole) => Action::MoveMeasurement {
+                index,
+                start: measurement.start(),
+                end: measurement.end(),
+            },
+            (Shape::Area(area), Grip::Whole) => Action::MoveArea {
+                index,
+                points: area.points().to_vec(),
+            },
+            (Shape::Drawn(drawn), Grip::Whole) => Action::MoveShape {
+                index,
+                points: drawn.points().to_vec(),
+            },
             (Shape::Measurement(measurement), Grip::Bounds(_)) => Action::ResizeMeasurement {
                 index,
                 start: measurement.start(),
@@ -156,6 +180,7 @@ fn endpoint(index: usize) -> Endpoint {
 pub struct ObjectDrag {
     grip: Grip,
     press: Point,
+    pointer: Point,
     original: Shape,
     preview: Shape,
 }
@@ -166,6 +191,7 @@ impl ObjectDrag {
         Self {
             grip,
             press,
+            pointer: press,
             preview: shape.clone(),
             original: shape,
         }
@@ -176,9 +202,23 @@ impl ObjectDrag {
         &self.preview
     }
 
+    /// The grip as it is now: a resize handle dragged past the opposite edge of the box has
+    /// become the handle on that side.
+    pub fn grip(&self) -> Grip {
+        match self.grip {
+            Grip::Bounds(handle) => Grip::Bounds(self.original.bounds().handle_after_drag(
+                handle,
+                self.pointer.x - self.press.x,
+                self.pointer.y - self.press.y,
+            )),
+            grip => grip,
+        }
+    }
+
     /// Updates the preview for the pointer at image point `pointer`: the grip moves by
     /// the pointer's movement since the press.
     pub fn drag_to(&mut self, document: &Document, pointer: Point) {
+        self.pointer = pointer;
         self.preview = self.original.dragged(
             document,
             self.grip,
@@ -430,6 +470,104 @@ mod tests {
             drag.preview().bounds(),
             Bounds::around(Point::new(55.0, 45.0), Point::new(90.0, 90.0))
         );
+    }
+
+    #[test]
+    fn dragging_the_whole_of_each_kind_moves_every_point_by_the_pointer_movement() {
+        let (document, shape_id) = document_with_drawn_line();
+        let press = Point::new(30.0, 20.0);
+        let to = Point::new(35.0, 28.0);
+
+        assert_eq!(
+            drag(
+                &document,
+                document.measurements()[0].id(),
+                Grip::Whole,
+                press,
+                to
+            ),
+            Some(Action::MoveMeasurement {
+                index: 0,
+                start: Point::new(15.0, 18.0),
+                end: Point::new(45.0, 38.0),
+            })
+        );
+        assert_eq!(
+            drag(&document, document.areas()[0].id(), Grip::Whole, press, to),
+            Some(Action::MoveArea {
+                index: 0,
+                points: vec![
+                    Point::new(55.0, 58.0),
+                    Point::new(95.0, 58.0),
+                    Point::new(75.0, 98.0),
+                ],
+            })
+        );
+        assert_eq!(
+            drag(&document, shape_id, Grip::Whole, press, to),
+            Some(Action::MoveShape {
+                index: 0,
+                points: vec![
+                    Point::new(15.0, 18.0),
+                    Point::new(45.0, 18.0),
+                    Point::new(45.0, 38.0),
+                ],
+            })
+        );
+    }
+
+    #[test]
+    fn a_whole_object_stops_at_the_document_edge_and_keeps_its_form() {
+        let document = document();
+        let id = document.areas()[0].id();
+
+        // The triangle (50, 50), (90, 50), (70, 90) can go 10 right and 10 down, and 50 up.
+        let action = drag(
+            &document,
+            id,
+            Grip::Whole,
+            Point::new(60.0, 60.0),
+            Point::new(160.0, -40.0),
+        );
+
+        assert_eq!(
+            action,
+            Some(Action::MoveArea {
+                index: 0,
+                points: vec![
+                    Point::new(60.0, 0.0),
+                    Point::new(100.0, 0.0),
+                    Point::new(80.0, 40.0),
+                ],
+            })
+        );
+    }
+
+    #[test]
+    fn a_move_that_ends_where_it_started_produces_no_action() {
+        let document = document();
+        let id = document.areas()[0].id();
+        let press = Point::new(60.0, 60.0);
+
+        assert_eq!(drag(&document, id, Grip::Whole, press, press), None);
+    }
+
+    #[test]
+    fn the_grip_of_a_resize_follows_the_pointer_across_the_box() {
+        let document = document();
+        let id = document.areas()[0].id();
+        let handle = Grip::Bounds(BoundsHandle::BottomRight);
+        let press = Point::new(90.0, 90.0);
+        let mut drag = ObjectDrag::new(Shape::of(&document, id).unwrap(), handle, press);
+        assert_eq!(drag.grip(), handle);
+
+        // Past the left edge, at x = 50.
+        drag.drag_to(&document, Point::new(40.0, 90.0));
+        assert_eq!(drag.grip(), Grip::Bounds(BoundsHandle::BottomLeft));
+
+        // And back.
+        drag.drag_to(&document, Point::new(60.0, 90.0));
+        assert_eq!(drag.grip(), handle);
     }
 
     #[test]

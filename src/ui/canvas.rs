@@ -21,6 +21,7 @@ use super::document_view::DocumentView;
 use super::format::format_length;
 use super::grid_display::paint_grids;
 use super::grid_tool::add_grid;
+use super::grip_cursor::grip_cursor;
 use super::hit_test::nearest_within;
 use super::line_hit::segment_at;
 use super::line_tool::LineTool;
@@ -111,7 +112,8 @@ pub fn show(
 
     handle_zoom(ui, &response, view_center, &mut view.viewport);
     let transform = view.viewport.transform(view_center, document_size);
-    // The active object's points and resize handles take priority over every tool.
+    // Dragging the active object, its points or its resize handles takes priority over
+    // every tool.
     let selection_input = handle_selection(ui, &response, transform, document, &mut view.selection);
     let action = match selection_input {
         SelectionInput::Handled(action) => action,
@@ -146,12 +148,12 @@ pub fn show(
         view.grid_tool.set_hovered(None);
     }
     if !view.selection.is_dragging()
-        && response
+        && !response.dragged()
+        && let Some(grip) = response
             .hover_pos()
-            .and_then(|pointer| grip_at(transform, document, &view.selection, pointer))
-            .is_some()
+            .and_then(|pointer| drag_grip_at(transform, document, &view.selection, pointer))
     {
-        ui.set_cursor_icon(CursorIcon::Grab);
+        ui.set_cursor_icon(grip_cursor(grip, false, transform.image_axes()));
     }
     // In every mode the secondary button pans. Done after the tool so its cursor wins.
     drag_pan(ui, &response, &mut view.viewport, PointerButton::Secondary);
@@ -281,13 +283,13 @@ fn handle_grid(
 
 /// Whether the active object's grips are handling the primary button.
 enum SelectionInput {
-    /// A drag of a point or resize handle is in progress (or just ended, with its
-    /// action), or one was clicked; tools must ignore input.
+    /// A drag of the object, a point or a resize handle is in progress (or just ended, with
+    /// its action), or a point or resize handle was clicked; tools must ignore input.
     Handled(Option<Action>),
     NotHandled,
 }
 
-/// Dragging the active object's points or resize handles, and clearing the selection
+/// Dragging the active object, its points or its resize handles, and clearing the selection
 /// when the user clicks outside its bounding box. Runs in every tool mode.
 fn handle_selection(
     ui: &egui::Ui,
@@ -310,7 +312,7 @@ fn handle_selection(
 
     if response.drag_started_by(PointerButton::Primary)
         && let Some(origin) = press_origin(ui)
-        && let Some(grip) = grip_at(transform, document, selection, origin)
+        && let Some(grip) = drag_grip_at(transform, document, selection, origin)
     {
         selection.begin_drag(document, grip, transform.screen_to_image(origin));
     }
@@ -321,7 +323,9 @@ fn handle_selection(
         {
             selection.drag_to(document, transform.screen_to_image(pointer));
         }
-        ui.set_cursor_icon(CursorIcon::Grabbing);
+        if let Some(grip) = selection.dragged_grip() {
+            ui.set_cursor_icon(grip_cursor(grip, true, transform.image_axes()));
+        }
         let action = response
             .drag_stopped_by(PointerButton::Primary)
             .then(|| selection.end_drag(document))
@@ -336,18 +340,36 @@ fn handle_selection(
         if grip_at(transform, document, selection, position).is_some() {
             return SelectionInput::Handled(None);
         }
-        let margin = transform.screen_to_image_length(SELECTION_PADDING + RESIZE_HANDLE_SIZE / 2.0);
-        if !bounds
-            .expanded(margin)
-            .contains(transform.screen_to_image(position))
-        {
+        let margin = SELECTION_PADDING + RESIZE_HANDLE_SIZE / 2.0;
+        if !box_contains(transform, bounds, margin, position) {
             selection.select(None);
         }
     }
     SelectionInput::NotHandled
 }
 
-/// The grip of the active object under screen `position`: the nearer of its nearest
+/// Whether screen `position` is inside `bounds` grown by `margin` screen points.
+fn box_contains(transform: DocumentTransform, bounds: Bounds, margin: f32, position: Pos2) -> bool {
+    bounds
+        .expanded(transform.screen_to_image_length(margin))
+        .contains(transform.screen_to_image(position))
+}
+
+/// What a drag from screen `position` would hold: a point or resize handle of the active
+/// object if there is one, otherwise the whole object if inside its selection box.
+fn drag_grip_at(
+    transform: DocumentTransform,
+    document: &Document,
+    selection: &Selection,
+    position: Pos2,
+) -> Option<Grip> {
+    let bounds = selection.active_bounds(document)?;
+    grip_at(transform, document, selection, position).or_else(|| {
+        box_contains(transform, bounds, SELECTION_PADDING, position).then_some(Grip::Whole)
+    })
+}
+
+/// The point or resize handle of the active object under screen `position`: the nearer of its nearest
 /// point (within [`POINT_GRAB_RADIUS`]) and its nearest resize handle (within
 /// [`RESIZE_HANDLE_GRAB_RADIUS`]).
 fn grip_at(
@@ -1086,6 +1108,8 @@ mod tests {
     /// document, is drawn at the default view. Its end (150, 50) is at (450, 300).
     const MEASUREMENT_START_ON_SCREEN: Pos2 = Pos2::new(350.0, 300.0);
     const MEASUREMENT_MIDDLE_ON_SCREEN: Pos2 = Pos2::new(400.0, 300.0);
+    /// On the test measurement, inside its selection box and clear of its points and handles.
+    const INSIDE_MEASUREMENT_BOX: Pos2 = Pos2::new(370.0, 300.0);
     /// The selection box's right-edge handle: the end, pushed out by the padding.
     const RIGHT_RESIZE_HANDLE: Pos2 = Pos2::new(450.0 + SELECTION_PADDING, 300.0);
     const EMPTY_SPOT: Pos2 = Pos2::new(600.0, 500.0);
@@ -1105,6 +1129,8 @@ mod tests {
         view: DocumentView,
         document: Document,
         actions: Vec<Action>,
+        /// The cursor asked for by the last frame.
+        cursor: CursorIcon,
     }
 
     impl Harness {
@@ -1130,6 +1156,7 @@ mod tests {
                 view: DocumentView::new(texture),
                 document,
                 actions: Vec::new(),
+                cursor: CursorIcon::Default,
             };
             harness.frame(Vec::new()); // Lay out once so the canvas rect is known.
             harness
@@ -1148,6 +1175,24 @@ mod tests {
             });
             // There is no renderer to upload textures to.
             output.textures_delta.clear();
+            self.cursor = output.platform_output.cursor_icon;
+        }
+
+        /// Presses the primary button at `from` and drags on to `to`, without releasing it.
+        fn press_and_drag(&mut self, from: Pos2, to: Pos2) {
+            self.frame(vec![Event::PointerMoved(from)]);
+            self.frame(vec![Event::PointerButton {
+                pos: from,
+                button: PointerButton::Primary,
+                pressed: true,
+                modifiers: Modifiers::NONE,
+            }]);
+            self.frame(vec![Event::PointerMoved(to)]);
+        }
+
+        fn cursor_over(&mut self, position: Pos2) -> CursorIcon {
+            self.frame(vec![Event::PointerMoved(position)]);
+            self.cursor
         }
 
         fn drag(&mut self, button: PointerButton, from: Pos2, by: Vec2) {
@@ -1355,6 +1400,145 @@ mod tests {
                 "{mode:?}"
             );
             assert_eq!(harness.pan(), Vec2::ZERO, "{mode:?} should not pan");
+        }
+    }
+
+    #[test]
+    fn dragging_inside_the_box_moves_the_active_object_in_every_mode() {
+        for mode in ToolMode::ALL {
+            let mut harness = Harness::new(mode);
+            harness.select_measurement();
+            let id = harness.view.selection.active();
+
+            harness.drag(PointerButton::Primary, INSIDE_MEASUREMENT_BOX, DRAG_BY);
+
+            assert_eq!(
+                harness.actions,
+                [Action::MoveMeasurement {
+                    index: 0,
+                    start: Point::new(90.0, 75.0),
+                    end: Point::new(190.0, 75.0),
+                }],
+                "{mode:?}"
+            );
+            assert_eq!(harness.pan(), Vec2::ZERO, "{mode:?} should not pan");
+            assert_eq!(harness.view.selection.active(), id, "{mode:?}");
+        }
+    }
+
+    #[test]
+    fn dragging_inside_the_box_moves_active_areas_and_shapes() {
+        // The middle of the box around the triangle, clear of its points and handles.
+        let inside = Pos2::new(340.0, 290.0);
+        let moved = vec![
+            Point::new(60.0, 45.0),
+            Point::new(100.0, 45.0),
+            Point::new(80.0, 85.0),
+        ];
+
+        let mut harness = Harness::new(ToolMode::Area);
+        harness.select_new_area();
+        harness.drag(PointerButton::Primary, inside, DRAG_BY);
+        assert_eq!(
+            harness.actions,
+            [Action::MoveArea {
+                index: 0,
+                points: moved.clone(),
+            }]
+        );
+
+        let mut harness = Harness::new(ToolMode::DrawLine);
+        harness.select_new_shape();
+        harness.drag(PointerButton::Primary, inside, DRAG_BY);
+        assert_eq!(
+            harness.actions,
+            [Action::MoveShape {
+                index: 0,
+                points: moved,
+            }]
+        );
+    }
+
+    #[test]
+    fn a_drag_from_outside_the_box_does_not_move_the_active_object() {
+        let mut harness = Harness::new(ToolMode::Pan);
+        harness.select_measurement();
+
+        // Just beyond the padding, and clear of the handles.
+        let outside = MEASUREMENT_MIDDLE_ON_SCREEN + Vec2::new(30.0, SELECTION_PADDING + 1.0);
+        harness.drag(PointerButton::Primary, outside, DRAG_BY);
+
+        assert!(harness.actions.is_empty());
+        assert_eq!(harness.pan(), DRAG_BY);
+    }
+
+    #[test]
+    fn the_cursor_shows_what_a_drag_would_do() {
+        let mut harness = Harness::new(ToolMode::Measure);
+        harness.select_measurement();
+        let [left, right, top, bottom] = [
+            MEASUREMENT_START_ON_SCREEN.x - SELECTION_PADDING,
+            MEASUREMENT_MIDDLE_ON_SCREEN.x * 2.0 - MEASUREMENT_START_ON_SCREEN.x
+                + SELECTION_PADDING,
+            MEASUREMENT_MIDDLE_ON_SCREEN.y - SELECTION_PADDING,
+            MEASUREMENT_MIDDLE_ON_SCREEN.y + SELECTION_PADDING,
+        ];
+        let middle = MEASUREMENT_MIDDLE_ON_SCREEN;
+
+        for (position, cursor) in [
+            (Pos2::new(left, top), CursorIcon::ResizeNwSe),
+            (Pos2::new(right, bottom), CursorIcon::ResizeNwSe),
+            (Pos2::new(right, top), CursorIcon::ResizeNeSw),
+            (Pos2::new(left, bottom), CursorIcon::ResizeNeSw),
+            (Pos2::new(middle.x, top), CursorIcon::ResizeVertical),
+            (Pos2::new(middle.x, bottom), CursorIcon::ResizeVertical),
+            (Pos2::new(left, middle.y), CursorIcon::ResizeHorizontal),
+            (Pos2::new(right, middle.y), CursorIcon::ResizeHorizontal),
+            (INSIDE_MEASUREMENT_BOX, CursorIcon::Move),
+            (MEASUREMENT_START_ON_SCREEN, CursorIcon::Grab),
+            (EMPTY_SPOT, CursorIcon::Crosshair),
+        ] {
+            assert_eq!(harness.cursor_over(position), cursor, "{position:?}");
+        }
+    }
+
+    #[test]
+    fn the_cursor_stays_on_the_grip_during_a_drag() {
+        let mut harness = Harness::new(ToolMode::Measure);
+        harness.select_measurement();
+        harness.press_and_drag(INSIDE_MEASUREMENT_BOX, INSIDE_MEASUREMENT_BOX + DRAG_BY);
+        assert_eq!(harness.cursor, CursorIcon::Move);
+
+        let mut harness = Harness::new(ToolMode::Measure);
+        harness.select_measurement();
+        harness.press_and_drag(
+            MEASUREMENT_START_ON_SCREEN,
+            MEASUREMENT_START_ON_SCREEN + DRAG_BY,
+        );
+        assert_eq!(harness.cursor, CursorIcon::Grabbing);
+    }
+
+    #[test]
+    fn a_resize_cursor_follows_the_corner_across_the_box() {
+        let mut harness = Harness::new(ToolMode::Area);
+        harness.select_new_area();
+        // The bottom-right handle of the 40 × 40 box around the triangle.
+        let corner = TRIANGLE_ON_SCREEN[1] + Vec2::new(SELECTION_PADDING, 40.0 + SELECTION_PADDING);
+        harness.press_and_drag(corner, corner + Vec2::new(10.0, 10.0));
+        assert_eq!(harness.cursor, CursorIcon::ResizeNwSe);
+
+        for (by, cursor, name) in [
+            (Vec2::new(-60.0, 0.0), CursorIcon::ResizeNeSw, "bottom-left"),
+            (Vec2::new(-60.0, -60.0), CursorIcon::ResizeNwSe, "top-left"),
+            (Vec2::new(0.0, -60.0), CursorIcon::ResizeNeSw, "top-right"),
+            (
+                Vec2::new(10.0, 10.0),
+                CursorIcon::ResizeNwSe,
+                "bottom-right",
+            ),
+        ] {
+            harness.frame(vec![Event::PointerMoved(corner + by)]);
+            assert_eq!(harness.cursor, cursor, "{name}");
         }
     }
 

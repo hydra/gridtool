@@ -105,11 +105,11 @@ arrow itself keeps its fixed length.
   button pans the view by the pointer's movement, exactly as in `VIEW-11`.
 - The cursor is a grabbing hand while right-dragging.
 - A right-drag never triggers a tool action, even when it starts on a calibration point,
-  a point or resize handle of the active object, or the rotate arrow. It is never
+  a point, resize handle or selection box of the active object, or the rotate arrow. It is never
   recorded in the history.
 - All tool gestures use the **primary** button only: placing points, dragging points or
-  handles, and dragging the rotate arrow (`SCALE-5`, `SCALE-7`, `MEAS-6`, `AREA-2`,
-  `OBJ-9`, `OBJ-15`, `VIEW-14`).
+  handles, moving the active object, and dragging the rotate arrow (`SCALE-5`, `SCALE-7`,
+  `MEAS-6`, `AREA-2`, `OBJ-9`, `OBJ-15`, `OBJ-16`, `VIEW-14`).
 - Together with wheel zoom (`VIEW-8`), this means the view can always be navigated
   without changing tool.
 - The active object's resize handles take priority over every tool's primary-button

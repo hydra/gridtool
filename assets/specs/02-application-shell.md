@@ -128,8 +128,8 @@ or changing the document:
 - the pending scale points while placing (`SCALE-4`), and any scale point drag
 - the pending start point of a measurement (`MEAS-5`)
 - the points placed so far for a new area (`AREA-2`) or drawn shape (`DRAW-2`)
-- a drag of the active object's points or resize handles in progress (`OBJ-9`,
-  `OBJ-15`); the object keeps its shape and stays active
+- a drag moving the active object, or of its points or resize handles, in progress (`OBJ-9`,
+  `OBJ-15`, `OBJ-16`); the object keeps its shape and place and stays active
 - a rotate-handle drag in progress (`VIEW-13`); the view keeps the rotation it reached
 
 Escape and switching mode cancel exactly the same things. Escape changes neither the tool

@@ -1,4 +1,4 @@
-//! The active object, and dragging its points or bounding-box handles.
+//! The active object, and dragging it, its points or its bounding-box handles.
 //!
 //! Selection is presentation state: it is not part of the document and is not undoable.
 //! A drag produces a document [`Action`] when it ends.
@@ -170,6 +170,11 @@ impl Selection {
 
     pub fn is_dragging(&self) -> bool {
         self.drag.is_some()
+    }
+
+    /// The grip being dragged, as it is now (see [`ObjectDrag::grip`]).
+    pub fn dragged_grip(&self) -> Option<Grip> {
+        self.drag.as_ref().map(ObjectDrag::grip)
     }
 
     /// Updates the preview for the pointer at image point `pointer`. Points stay inside
@@ -367,6 +372,38 @@ mod tests {
         );
 
         assert_eq!(selection.end_drag(&document), None);
+    }
+
+    #[test]
+    fn moving_previews_every_point_and_ends_with_one_action() {
+        let document = document_with_two_measurements();
+        let mut selection = Selection::default();
+        let id = id_of(&document, 0);
+        selection.select(Some(id));
+
+        assert!(selection.begin_drag(&document, Grip::Whole, Point::new(20.0, 20.0)));
+        selection.drag_to(&document, Point::new(25.0, 28.0));
+
+        assert_eq!(selection.dragged_grip(), Some(Grip::Whole));
+        let preview = selection.displayed(id, &document.measurements()[0]);
+        assert_eq!(preview.start(), Point::new(15.0, 18.0));
+        assert_eq!(preview.end(), Point::new(45.0, 38.0));
+        assert_eq!(
+            selection.active_bounds(&document),
+            Some(Bounds::around(
+                Point::new(15.0, 18.0),
+                Point::new(45.0, 38.0)
+            ))
+        );
+        assert_eq!(
+            selection.end_drag(&document),
+            Some(Action::MoveMeasurement {
+                index: 0,
+                start: Point::new(15.0, 18.0),
+                end: Point::new(45.0, 38.0),
+            })
+        );
+        assert_eq!(selection.dragged_grip(), None);
     }
 
     #[test]

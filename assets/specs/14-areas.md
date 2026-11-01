@@ -21,7 +21,7 @@ places the next point of a new outline:
 - Clicks outside the document are ignored, unless they land on a placed point
   (`AREA-3`, `AREA-4`).
 - A primary drag does nothing, unless it starts on one of the active object's points or
-  resize handles (`OBJ-9`, `OBJ-15`). In particular, it does not pan.
+  resize handles, or inside its selection box (`OBJ-9`, `OBJ-15`, `OBJ-16`). In particular, it does not pan.
 - The points are discarded when the user presses Escape or leaves Measure area mode
   (`SHELL-10a`).
 
@@ -47,7 +47,7 @@ Further rules:
 - a pointing hand over the last point, or over the first point once the outline can be
   finished
 - a crosshair elsewhere
-- as `OBJ-9` and `OBJ-15` say over the active object's points and resize handles
+- as `OBJ-17` says over the active object's selection box, points and resize handles
 
 ## Data
 
@@ -160,7 +160,7 @@ that row.
   screen, pans the view to its centre and zooms out if it does not fit (`OBJ-5`,
   `OBJ-5a`, `AREA-8`)
 - while active, it shows a selection box whose handles stretch every point (`OBJ-8`,
-  `OBJ-9`, `OBJ-9b`), and each of its points can be dragged (`OBJ-15`)
+  `OBJ-9`, `OBJ-9b`), each of its points can be dragged (`OBJ-15`), and dragging inside its box moves it (`OBJ-16`)
 - it can be duplicated and deleted with the object tool bar (`OBJ-12`, `OBJ-13`)
 - it is saved and loaded with the document (`FILE-1`, `FILE-6a`)
 

@@ -80,6 +80,36 @@ impl Bounds {
         )
     }
 
+    /// The movement nearest to `(dx, dy)`, axis by axis, that keeps these bounds inside
+    /// `limits`.
+    pub fn limit_move(&self, limits: Bounds, dx: f64, dy: f64) -> (f64, f64) {
+        (
+            dx.min(limits.max.x - self.max.x)
+                .max(limits.min.x - self.min.x),
+            dy.min(limits.max.y - self.max.y)
+                .max(limits.min.y - self.min.y),
+        )
+    }
+
+    /// The handle of the resized box that `handle` has become after being dragged by
+    /// `(dx, dy)`: dragging an edge past its opposite edge makes it the opposite edge.
+    pub fn handle_after_drag(&self, handle: BoundsHandle, dx: f64, dy: f64) -> BoundsHandle {
+        let crossed = |moved, delta: f64, size: f64| match moved {
+            Some(Edge::Min) => delta > size,
+            Some(Edge::Max) => -delta > size,
+            None => false,
+        };
+        let (x_edge, y_edge) = handle.edges();
+        let mut result = handle;
+        if crossed(x_edge, dx, self.max.x - self.min.x) {
+            result = result.mirrored_horizontally();
+        }
+        if crossed(y_edge, dy, self.max.y - self.min.y) {
+            result = result.mirrored_vertically();
+        }
+        result
+    }
+
     /// Image position of a resize handle.
     pub fn handle_point(&self, handle: BoundsHandle) -> Point {
         let center = self.center();
@@ -167,6 +197,34 @@ impl BoundsHandle {
             Left | Right => None,
         };
         (x, y)
+    }
+
+    /// The handle on the other side of the box from left to right.
+    fn mirrored_horizontally(self) -> BoundsHandle {
+        use BoundsHandle::*;
+        match self {
+            TopLeft => TopRight,
+            TopRight => TopLeft,
+            Left => Right,
+            Right => Left,
+            BottomLeft => BottomRight,
+            BottomRight => BottomLeft,
+            Top | Bottom => self,
+        }
+    }
+
+    /// The handle on the other side of the box from top to bottom.
+    fn mirrored_vertically(self) -> BoundsHandle {
+        use BoundsHandle::*;
+        match self {
+            TopLeft => BottomLeft,
+            BottomLeft => TopLeft,
+            Top => Bottom,
+            Bottom => Top,
+            TopRight => BottomRight,
+            BottomRight => TopRight,
+            Left | Right => self,
+        }
     }
 }
 
@@ -265,6 +323,36 @@ mod tests {
             flat.stretch(BoundsHandle::Bottom, 0.0, 3.0, Point::new(4.0, 5.0)),
             Point::new(4.0, 8.0)
         );
+    }
+
+    #[test]
+    fn a_move_is_limited_to_keep_the_bounds_inside() {
+        let limits = Bounds::around(Point::new(0.0, 0.0), Point::new(100.0, 50.0));
+        let bounds = Bounds::around(Point::new(10.0, 10.0), Point::new(30.0, 20.0));
+
+        assert_eq!(bounds.limit_move(limits, 5.0, -5.0), (5.0, -5.0));
+        assert_eq!(bounds.limit_move(limits, 500.0, 500.0), (70.0, 30.0));
+        assert_eq!(bounds.limit_move(limits, -500.0, -500.0), (-10.0, -10.0));
+    }
+
+    #[test]
+    fn a_handle_becomes_the_opposite_one_only_past_the_opposite_edge() {
+        use BoundsHandle::*;
+        let bounds = Bounds::around(Point::new(10.0, 10.0), Point::new(30.0, 20.0));
+        let after = |handle, dx, dy| bounds.handle_after_drag(handle, dx, dy);
+
+        assert_eq!(after(BottomRight, 5.0, 5.0), BottomRight);
+        // Reaching the opposite edge is not yet past it.
+        assert_eq!(after(BottomRight, -20.0, -10.0), BottomRight);
+        assert_eq!(after(BottomRight, -21.0, 0.0), BottomLeft);
+        assert_eq!(after(BottomRight, 0.0, -11.0), TopRight);
+        assert_eq!(after(BottomRight, -21.0, -11.0), TopLeft);
+        assert_eq!(after(TopLeft, 21.0, 11.0), BottomRight);
+        assert_eq!(after(TopLeft, 21.0, 0.0), TopRight);
+        assert_eq!(after(Left, 21.0, 99.0), Right);
+        assert_eq!(after(Right, -21.0, 99.0), Left);
+        assert_eq!(after(Top, 99.0, 11.0), Bottom);
+        assert_eq!(after(Bottom, 99.0, -11.0), Top);
     }
 
     #[test]

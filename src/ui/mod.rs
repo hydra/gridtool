@@ -15,6 +15,7 @@ mod format;
 pub mod grid_bar;
 mod grid_display;
 mod grid_tool;
+mod grip_cursor;
 mod history_panel;
 mod hit_test;
 mod icon_button;

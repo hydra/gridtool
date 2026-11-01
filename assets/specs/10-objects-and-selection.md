@@ -131,8 +131,8 @@ in the History section (`HIST`) is not a selection and is not affected.
 - It is presentation state: not part of the document, not an action, and not affected by
   undo/redo except as below.
 - After **any** document change (an action, undo or redo), if the active object no
-  longer exists, the active object is cleared. Any drag of its points or resize handles
-  in progress is abandoned.
+  longer exists, the active object is cleared. Any drag of it, its points or its resize
+  handles in progress is abandoned.
 - Because selection uses ids, deleting an *earlier* measurement leaves the same
   measurement active, even though its list position changes.
 
@@ -161,8 +161,8 @@ top of everything else, in every tool mode:
 - **Rotation.** The box rotates with the view, like the document.
 - **Resize handles.** Eight filled purple squares, each **10 × 10 px** and axis-aligned
   on screen, centred on the box's four corners and the midpoints of its four edges.
-- **Live updates.** During a resize or a point drag (`OBJ-15`), the box, the object and
-  its table row all show the live preview.
+- **Live updates.** During a resize, a point drag (`OBJ-15`) or a move (`OBJ-16`), the box,
+  the object and its table row all show the live preview.
 
 ## Resizing
 
@@ -175,8 +175,7 @@ handles, and its points (`OBJ-15`), take priority over the tool:
 - **No tool input.** While resizing, the tool receives no primary-button input: Pan &
   zoom mode does not pan, and the scale and measure tools do not react.
 - **Panning.** A secondary-button drag on a handle pans as usual (`VIEW-11a`).
-- **Cursor.** An open hand while hovering over a handle or a point, and a grabbing hand
-  while dragging.
+- **Cursor.** As `OBJ-17` says.
 - **Committing.** When the drag ends, one **Resize measurement** action (`HIST-2`) is
   committed with both new endpoints, or for an area or a drawn shape one **Resize area** or
   **Resize shape** action with all of its new points (`OBJ-9b`). If nothing changed, no
@@ -237,6 +236,8 @@ active object, and no selection box, handles or points to drag.
   `OBJ-9` and `OBJ-15`) places nothing and keeps it active, since those are for dragging.
 - Grids have no such points: any click clears an active grid (`OBJ-10`), and a click on an
   alignment line adds the new grid, which then becomes active (`GRID-12`).
+- A **drag** that starts inside the selection box moves the object (`OBJ-16`) and starts
+  nothing, even though a click at the same place would.
 
 **OBJ-11 — Withdrawn.** Measurement endpoints could not be dragged directly in any mode.
 This is replaced by dragging the active object's points (`OBJ-15`); the endpoints of a
@@ -296,6 +297,47 @@ or drawn shape.
   committed.
 - Only the active object's points can be dragged. The points of other objects cannot be
   grabbed.
+
+**OBJ-16 — Moving the active object.** In **every** tool mode, the active object can be moved
+by dragging it. Measurements, areas and drawn shapes can be moved; grids have no selection box
+(`GRID-12`).
+- **Starting.** A primary-button drag that *starts* inside the selection box (`OBJ-8`, its
+  bounding box grown by the 8 px padding, edges included), and not on a point (`OBJ-15`) or
+  resize handle (`OBJ-9`), moves the object. The ranges of `OBJ-9` and `OBJ-15` come first,
+  so a small object's box may be entirely points and handles until the view is zoomed in.
+- **Moving.** Every point moves by the pointer's movement since the press (in image pixels),
+  so the object does not jump when grabbed.
+- **Staying inside.** The object stops at the edges of the document (`DOC-5`), keeping its
+  form: along each axis the movement is limited so that its bounding box stays inside the
+  document, and the object can still slide along the other axis.
+- **No tool input.** As for resizing, the tool receives no primary-button input while the
+  object is moved, and a secondary-button drag pans as usual.
+- **Committing.** When the drag ends, one **Move measurement**, **Move area** or **Move shape**
+  action (`HIST-2`) is committed. If nothing changed, no action is committed.
+- **Clicks.** A click inside the box is not a drag: `OBJ-10` and `OBJ-10a` apply.
+
+**OBJ-17 — Cursor over the selection box.** While the pointer is over the canvas, the cursor
+shows what a primary-button drag starting there would do, in every tool mode and in place of the
+tool's cursor. It does this while there is an active object with a selection box and the
+pointer is within the range of a point or handle or inside the box, choosing between them as
+`OBJ-9` and `OBJ-16` do:
+- **Inside the box** (`OBJ-16`): a four-way arrow, also while moving.
+- **Over a point** (`OBJ-15`): an open hand, and a grabbing hand while dragging.
+- **Over a resize handle** (`OBJ-9`): a two-way arrow, also while resizing, along the direction
+  the handle lies in from the centre of the box:
+  - top-left and bottom-right: diagonal, up-left and down-right
+  - top-right and bottom-left: diagonal, up-right and down-left
+  - left and right: horizontal
+  - top and bottom: vertical
+- **Which handle, during a resize.** The arrow is that of the handle where the pointer is
+  now. Once the dragged edge passes its opposite edge, it counts as the handle on that side
+  of the box, so dragging the bottom-right handle past the left edge gives the bottom-left
+  handle's arrow. No other state is kept.
+- **Rotated views.** The direction is the one on screen (`OBJ-8`), so the arrow is the nearest
+  of the four to it. A corner's arrow is diagonal whatever the proportions of the box, but at
+  a rotation near 45° a corner's arrow may be horizontal or vertical, and an edge's diagonal.
+- A secondary-button drag shows its own cursor (`VIEW-11a`).
+- On platforms that have no separate hand cursors, the hands may look like the four-way arrow.
 
 ## Acceptance criteria
 
@@ -387,6 +429,25 @@ or drawn shape.
     (50, 50), (90, 50), (70, 70)
   - a drag that ends where it started commits nothing
   - an active area's bounding box and points follow the drag preview
+- Moves (`OBJ-16`):
+  - dragging inside the box of an active measurement, area or drawn shape by (40, 25) commits one
+    move action with every point moved by (40, 25), in every mode, with no pan, and it stays active
+  - moving the triangle (50, 50), (90, 50), (70, 90) by (100, −100) in a 100 × 100 document gives
+    (60, 0), (100, 0), (80, 40)
+  - a drag from just outside the box does not move the object; in Pan & zoom mode it pans
+  - a move that ends where it started commits nothing
+  - **Move measurement**, **Move area** and **Move shape** are rejected, changing nothing, for a
+    point outside the document or a missing index, and for an area or shape a changed number of
+    points, and they can be undone. Labels: "`Move measurement 1 to (1.0, 2.0) - (3.0, 4.0)`",
+    "`Move area 2`", "`Move shape 3`".
+- Cursors (`OBJ-17`):
+  - with a level measurement active in Measure mode: the eight handles show the arrows
+    listed, inside the box a four-way arrow, a point an open hand, and elsewhere a crosshair
+  - the cursor stays a four-way arrow while moving, and a grabbing hand while dragging a point
+  - dragging an area's bottom-right handle round the box gives, in turn, the arrows of the
+    bottom-left, top-left, top-right and bottom-right handles
+  - rotated by 90°, the right handle has the vertical arrow and the bottom-right handle the
+    up-right and down-left one; rotated by 45°, the right handle has a diagonal arrow
 - Canvas, simulated with pointer events:
   - Dragging the right handle by (40, 25) in **every** mode commits exactly one resize,
     moving the end's x by 40 (y unchanged), with no pan.

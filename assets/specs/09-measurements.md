@@ -54,11 +54,11 @@ Additional rules:
   pending.
 - Clicks outside the document are ignored.
 - The cursor is a crosshair while hovering over the canvas, except over the active
-  object's points and resize handles (`OBJ-9`, `OBJ-15`).
+  object's selection box, points and resize handles (`OBJ-17`).
 - The pending start is discarded when the user presses Escape or leaves Measure mode
   (`SHELL-10a`).
 - A primary drag in Measure mode does nothing, unless it starts on one of the active
-  object's points or resize handles (`OBJ-9`, `OBJ-15`). In particular, it does not pan.
+  object's points or resize handles, or inside its selection box (`OBJ-9`, `OBJ-15`, `OBJ-16`). In particular, it does not pan.
 
 **MEAS-7 — Withdrawn.** Measurement endpoints used to be draggable directly in Measure
 mode. Overlapping endpoints made it hard to grab the right one, so this was replaced by
