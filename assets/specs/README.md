@@ -112,3 +112,4 @@ must satisfy them.
 | 2026-11-01 | Fill angles now range from 0 up to 360 instead of 180 (`DRAW-8`), so rotating adds to or subtracts from the current angle without folding back at 180, wrapping around a full turn (`DRAW-14`). A typed angle must be from 0 to 360, where 360 wraps to 0, and negative or larger numbers are now rejected instead of converted. Saved files are now version 6 (`FILE-6e`), and earlier versions keep their own limit. |
 | 2026-11-01 | A typed fill angle below 0, or of 360 or more, now wraps around a full turn instead of being rejected, so `-45` gives 315 and `361` gives 1 (`DRAW-14`). |
 | 2026-11-01 | The Windows installer program now shows the application icon (`SHELL-1a`). |
+| 2026-11-01 | A release build no longer opens a console window on Windows (`SHELL-1b`). |

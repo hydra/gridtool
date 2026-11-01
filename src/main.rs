@@ -1,3 +1,6 @@
+// A release build opens no console window on Windows. A debug build keeps one, for panics and logs.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod app;
 mod file_picker;
 mod open_document;

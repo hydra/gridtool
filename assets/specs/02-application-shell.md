@@ -18,6 +18,9 @@ file, the release packages, and the installer program of a package that has one.
 from the same image.
 - A test MUST check that the bundled icon can be loaded and is square.
 
+**SHELL-1b — No console window.** On Windows, a release build opens only the application window,
+with no console window beside it. A development build MAY keep one for diagnostics.
+
 ## Layout
 
 **SHELL-2.** The window is divided into these regions, from top to bottom:
