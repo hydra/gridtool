@@ -11,9 +11,24 @@ it (`ARCH-4`).
 - **zoom**: a scale factor, in screen units per image pixel
 - **rotation**: an angle in degrees
 
-**VIEW-2 — Defaults.** Pan is `(0,0)`, zoom is `1.0` (100 %) and rotation is `0°`. Every
-newly opened document starts with these defaults. A failed open leaves no document, so
-there is no view to keep.
+**VIEW-2 — Defaults.** Pan is `(0,0)`, rotation is `0°` and zoom is given by `VIEW-2a`.
+Every newly opened document starts with these defaults, whether it was made from an image
+or loaded from a file. A failed open leaves no document, so there is no view to keep.
+
+**VIEW-2a — Fit on opening.** The whole of a newly opened document fits in the canvas area,
+centred, with a margin of 16 screen units on every side:
+
+```
+zoom = min(1, (canvasWidth − 32) / documentWidth, (canvasHeight − 32) / documentHeight)
+```
+
+- A document that already fits stays at 100 %: it is never enlarged.
+- A canvas too small for the margin is used in full, with no margin.
+- The zoom limits still apply (`VIEW-10`), so a document too big to fit at the lowest zoom
+  does not fit.
+- The canvas area is its size once the panels around it have taken their room. After that
+  the view is the user's: resizing the window does not fit the document again.
+- Fitting changes only the view. It adds nothing to the history (`ARCH-4`).
 
 **VIEW-3 — Transform.** Let `c` be the centre of the canvas area and `p` an image point.
 The point's screen position is:

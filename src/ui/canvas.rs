@@ -106,9 +106,9 @@ pub fn show(
     document: &Document,
 ) -> Option<Action> {
     let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
-    view.canvas_rect = Some(response.rect);
     let view_center = response.rect.center();
     let document_size = Vec2::new(document.width() as f32, document.height() as f32);
+    view.set_canvas_rect(response.rect, document_size);
 
     handle_zoom(ui, &response, view_center, &mut view.viewport);
     let transform = view.viewport.transform(view_center, document_size);
@@ -1158,7 +1158,9 @@ mod tests {
                 actions: Vec::new(),
                 cursor: CursorIcon::Default,
             };
-            harness.frame(Vec::new()); // Lay out once so the canvas rect is known.
+            // Lay out until the canvas rect is known and has settled.
+            harness.frame(Vec::new());
+            harness.frame(Vec::new());
             harness
         }
 

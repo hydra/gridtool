@@ -10,6 +10,17 @@ use super::angle::normalize_degrees;
 const MIN_ZOOM: f32 = 0.02;
 const MAX_ZOOM: f32 = 1024.0;
 
+/// The space kept clear between something fitted to the canvas and the canvas's edge, in
+/// screen points.
+pub const FIT_MARGIN: f32 = 16.0;
+
+/// The part of canvas `view` to fit things in: inside the margin, or all of it if it is too
+/// small to have one.
+pub fn fit_room(view: Rect) -> Rect {
+    let room = view.shrink(FIT_MARGIN);
+    if room.is_positive() { room } else { view }
+}
+
 /// User-controlled camera over the document. The document's center is drawn at
 /// `view_center + pan`, scaled by `zoom` and rotated clockwise by the view rotation.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -30,6 +41,19 @@ impl Default for Viewport {
 }
 
 impl Viewport {
+    /// The view of a newly opened document in canvas `view`: unrotated and centred, zoomed
+    /// out if it would not otherwise fit. A document that fits stays at actual size.
+    pub fn fitting(document_size: Vec2, view: Rect) -> Self {
+        let room = fit_room(view).size();
+        let zoom = (room.x / document_size.x)
+            .min(room.y / document_size.y)
+            .min(1.0);
+        Self {
+            zoom: zoom.max(MIN_ZOOM),
+            ..Self::default()
+        }
+    }
+
     /// Clockwise view rotation, in degrees within `[0, 360)`.
     pub fn rotation_degrees(&self) -> f32 {
         self.rotation_degrees
@@ -210,6 +234,53 @@ mod tests {
 
     fn transform(viewport: &Viewport) -> DocumentTransform {
         viewport.transform(VIEW_CENTER, DOCUMENT_SIZE)
+    }
+
+    const VIEW: Rect = Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(800.0, 600.0));
+
+    #[test]
+    fn fitting_zooms_out_for_whichever_side_is_tightest() {
+        for (size, expected_zoom) in [
+            (
+                Vec2::new(4000.0, 1000.0),
+                (800.0 - 2.0 * FIT_MARGIN) / 4000.0,
+            ),
+            (
+                Vec2::new(1000.0, 4000.0),
+                (600.0 - 2.0 * FIT_MARGIN) / 4000.0,
+            ),
+        ] {
+            let viewport = Viewport::fitting(size, VIEW);
+
+            assert!((viewport.zoom() - expected_zoom).abs() < 1e-6, "{size:?}");
+            let room = VIEW.shrink(FIT_MARGIN - 0.01);
+            let corners = viewport.transform(VIEW.center(), size).corners();
+            assert!(corners.iter().all(|corner| room.contains(*corner)));
+            assert_eq!(viewport.pan, Vec2::ZERO);
+        }
+    }
+
+    #[test]
+    fn fitting_leaves_a_document_that_fits_at_actual_size() {
+        let viewport = Viewport::fitting(Vec2::new(100.0, 50.0), VIEW);
+
+        assert_eq!(viewport, Viewport::default());
+    }
+
+    #[test]
+    fn fitting_uses_the_whole_view_when_it_is_too_small_for_the_margin() {
+        let view = Rect::from_min_size(Pos2::ZERO, Vec2::splat(20.0));
+
+        let viewport = Viewport::fitting(Vec2::splat(100.0), view);
+
+        assert!((viewport.zoom() - 0.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn fitting_stops_at_the_lowest_zoom() {
+        let viewport = Viewport::fitting(Vec2::splat(1_000_000.0), VIEW);
+
+        assert_eq!(viewport.zoom(), MIN_ZOOM);
     }
 
     #[test]

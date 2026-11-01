@@ -103,3 +103,4 @@ must satisfy them.
 | 2026-11-01 | The tool controls row shows help text for the tools with no controls, Pan & zoom and Origin (`SHELL-2a`). |
 | 2026-11-01 | With no document open there is now no active tool: every mode button is disabled and none is selected, and Pan & zoom becomes active when a document next opens (`SHELL-8`, `SHELL-9`). The tool controls row then says "`Open an image to get started`" (`SHELL-2a`). |
 | 2026-11-01 | The application has one icon, used for the window, task bar or dock, executable file and release packages (`SHELL-1a`). |
+| 2026-11-01 | A newly opened or loaded document now fits in the canvas area, zoomed out if needed, instead of always starting at 100 % (`VIEW-2`, `VIEW-2a`). |

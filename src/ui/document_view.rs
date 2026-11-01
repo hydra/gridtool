@@ -1,4 +1,4 @@
-use eframe::egui::{Rect, TextureHandle};
+use eframe::egui::{Rect, TextureHandle, Vec2};
 use egui_ltreeview::TreeViewState;
 use gridtool::action::Action;
 use gridtool::document::Document;
@@ -30,6 +30,8 @@ pub struct DocumentView {
     pub tree_state: TreeViewState<TreeNode>,
     /// Where the canvas was drawn last frame, in screen points; `None` before it first is.
     pub canvas_rect: Option<Rect>,
+    /// Whether the document is still to be fitted to the settled canvas.
+    fit_pending: bool,
     /// The active object as last checked by [`Self::tool_of_new_active_object`].
     last_active: Option<ObjectId>,
 }
@@ -48,8 +50,19 @@ impl DocumentView {
             is_dragging_rotate_handle: false,
             tree_state: TreeViewState::default(),
             canvas_rect: None,
+            fit_pending: true,
             last_active: None,
         }
+    }
+
+    /// Notes where the canvas is this frame. A newly opened document is fitted to it, again
+    /// each frame until the panels around the canvas have settled, and then left to the user.
+    pub fn set_canvas_rect(&mut self, canvas: Rect, document_size: Vec2) {
+        if self.fit_pending {
+            self.viewport = Viewport::fitting(document_size, canvas);
+            self.fit_pending = self.canvas_rect != Some(canvas);
+        }
+        self.canvas_rect = Some(canvas);
     }
 
     /// Abandons whatever a tool is part-way through, without committing anything:
@@ -142,6 +155,46 @@ mod tests {
             rgba: vec![255; 4],
         };
         DocumentView::new(upload_texture(&egui::Context::default(), "test", &image))
+    }
+
+    const BIG_DOCUMENT: Vec2 = Vec2::new(4000.0, 3000.0);
+
+    fn canvas(width: f32) -> Rect {
+        Rect::from_min_size(egui::Pos2::ZERO, Vec2::new(width, 600.0))
+    }
+
+    #[test]
+    fn a_new_document_is_refitted_until_the_canvas_settles() {
+        let mut view = view();
+
+        view.set_canvas_rect(canvas(800.0), BIG_DOCUMENT);
+        assert_eq!(
+            view.viewport,
+            Viewport::fitting(BIG_DOCUMENT, canvas(800.0))
+        );
+
+        // The panels around the canvas took their room after the first frame.
+        view.set_canvas_rect(canvas(500.0), BIG_DOCUMENT);
+        assert_eq!(
+            view.viewport,
+            Viewport::fitting(BIG_DOCUMENT, canvas(500.0))
+        );
+    }
+
+    #[test]
+    fn once_the_canvas_has_settled_the_view_is_the_users() {
+        let mut view = view();
+        view.set_canvas_rect(canvas(800.0), BIG_DOCUMENT);
+        view.set_canvas_rect(canvas(800.0), BIG_DOCUMENT);
+
+        view.viewport.pan_by(Vec2::new(10.0, 20.0));
+        let moved = view.viewport;
+        view.set_canvas_rect(canvas(800.0), BIG_DOCUMENT);
+        assert_eq!(view.viewport, moved);
+
+        // Resizing the window does not fit the document again.
+        view.set_canvas_rect(canvas(500.0), BIG_DOCUMENT);
+        assert_eq!(view.viewport, moved);
     }
 
     #[test]

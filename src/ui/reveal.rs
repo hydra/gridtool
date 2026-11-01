@@ -6,11 +6,7 @@ use eframe::egui::{Pos2, Rect, Vec2};
 use gridtool::document::Outline;
 use gridtool::geometry::Point;
 
-use super::viewport::Viewport;
-
-/// The space kept clear between a revealed object and the edge of the canvas, in screen
-/// points, when the view has to zoom out to fit it.
-pub const FIT_MARGIN: f32 = 16.0;
+use super::viewport::{Viewport, fit_room};
 
 /// Makes `outline` visible in the canvas `view` (a screen rect) if none of it is: pans so
 /// that `focus` is at the centre, then zooms out about the centre until the outline fits.
@@ -34,8 +30,7 @@ pub fn reveal(
         return;
     }
     viewport.center_on(focus, document_size);
-    let room = view.shrink(FIT_MARGIN);
-    let room = if room.is_positive() { room } else { view };
+    let room = fit_room(view);
     let factor = fit_factor(&on_screen(viewport), room.center(), room.size() * 0.5);
     if factor < 1.0 {
         viewport.zoom_about(view.center(), view.center(), factor);
@@ -116,6 +111,7 @@ fn polygon_contains(points: &[Pos2], point: Pos2) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ui::viewport::FIT_MARGIN;
 
     const VIEW: Rect = Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(800.0, 600.0));
     const DOCUMENT_SIZE: Vec2 = Vec2::new(4000.0, 3000.0);
