@@ -9,6 +9,8 @@ as a plan, a drawing or a photo. Calibrate the image's scale from one or two kno
 then measure distances and overlay real-world grids of any cell size, aligned to a scale
 or measurement line. Every change can be undone, and documents can be saved and loaded.
 
+## Screenshot
+
 <a href="assets/screenshots/Screenshot%202026-11-01%20213112.png"><img src="assets/screenshots/Screenshot%202026-11-01%20213112.png" width="800" alt="GridTool with two documents side by side, a site plan with a grid and filled areas and a calibrated aerial photo with a measured area, and the Objects, History, Point-to-point and Areas panels docked around them"></a>
 
 ## Features
@@ -29,6 +31,16 @@ or measurement line. Every change can be undone, and documents can be saved and 
 
 * Dominic Clifton - Product owner and technical lead.
 * ClaudeAI - Coder.
+
+## Support me
+
+If you find this tool useful, please consider support me using the links below:
+
+* ko-fi - https://ko-fi.com/dominicclifton
+
+## AI/LLM usage
+
+Although the code in this project is not human written, many, many humans together made this possible. LLMs don't have anything to learn from unless we show them the way, humans are required to guide them and correct them.
 
 ## License
 
