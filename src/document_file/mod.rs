@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::document::Document;
 use crate::geometry::Point;
 use crate::imaging::{DecodedImage, ImageLoadError, decode_file};
+use crate::tr;
 
 pub use v1::DocumentV1;
 pub use v2::DocumentV2;
@@ -213,29 +214,21 @@ pub enum InvalidDocument {
 
 impl fmt::Display for InvalidDocument {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::EmptySize => f.write_str("the document has no size"),
-            Self::PointOutside(point) => write!(f, "point {point} is outside the document"),
-            Self::WrongScalePointCount => {
-                f.write_str("the number of scale points does not match the method")
-            }
-            Self::TwoPointNotInVersion => {
-                f.write_str("this version of the file cannot have a 2-point scale")
-            }
-            Self::TooFewAreaPoints(count) => {
-                write!(f, "an area has {count} points, but needs at least 3")
-            }
+        f.write_str(&match self {
+            Self::EmptySize => tr!("error-document-empty"),
+            Self::PointOutside(point) => tr!("error-document-point-outside", { point: point }),
+            Self::WrongScalePointCount => tr!("error-document-scale-point-count"),
+            Self::TwoPointNotInVersion => tr!("error-document-two-point-version"),
+            Self::TooFewAreaPoints(count) => tr!("error-document-area-points", { count: count }),
             Self::TooFewShapePoints(count) => {
-                write!(f, "a shape has too few points ({count})")
+                tr!("error-document-shape-points", { count: count })
             }
-            Self::FilledOpenShape(id) => {
-                write!(f, "shape {id} has a fill but is not closed")
-            }
-            Self::NotPositive(value) => write!(f, "{value} should be a positive number"),
-            Self::BadOpacity(value) => write!(f, "opacity {value} is not between 0 and 1"),
-            Self::BadFillAngle(value) => write!(f, "fill angle {value} is out of range"),
-            Self::BadObjectId(id) => write!(f, "object id {id} is invalid or used twice"),
-        }
+            Self::FilledOpenShape(id) => tr!("error-document-filled-open-shape", { id: id }),
+            Self::NotPositive(value) => tr!("error-document-not-positive", { value: value }),
+            Self::BadOpacity(value) => tr!("error-document-opacity", { value: value }),
+            Self::BadFillAngle(value) => tr!("error-document-fill-angle", { value: value }),
+            Self::BadObjectId(id) => tr!("error-document-object-id", { id: id }),
+        })
     }
 }
 
@@ -247,10 +240,10 @@ pub enum SaveError {
 
 impl fmt::Display for SaveError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Serialize(error) => write!(f, "could not encode the document: {error}"),
-            Self::Io(error) => write!(f, "could not write the file: {error}"),
-        }
+        f.write_str(&match self {
+            Self::Serialize(error) => tr!("error-save-encode", { error: error }),
+            Self::Io(error) => tr!("error-save-write", { error: error }),
+        })
     }
 }
 
@@ -274,27 +267,25 @@ pub enum LoadError {
 
 impl fmt::Display for LoadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Io(error) => write!(f, "could not read the file: {error}"),
-            Self::Parse(error) => write!(f, "the file is not a GridTool document: {error}"),
-            Self::Invalid(reason) => write!(f, "the document is invalid: {reason}"),
+        f.write_str(&match self {
+            Self::Io(error) => tr!("error-load-read", { error: error }),
+            Self::Parse(error) => tr!("error-load-parse", { error: error }),
+            Self::Invalid(reason) => tr!("error-load-invalid", { reason: reason }),
             Self::Image { path, error } => {
-                write!(f, "could not open the image {}: {error}", path.display())
+                tr!("error-load-image", { path: path.display(), error: error })
             }
             Self::ImageSizeMismatch {
                 path,
                 expected,
                 actual,
-            } => write!(
-                f,
-                "the image {} is {}×{} pixels, but the document expects {}×{}",
-                path.display(),
-                actual.0,
-                actual.1,
-                expected.0,
-                expected.1
-            ),
-        }
+            } => tr!("error-load-image-size", {
+                path: path.display(),
+                actual_width: actual.0,
+                actual_height: actual.1,
+                expected_width: expected.0,
+                expected_height: expected.1,
+            }),
+        })
     }
 }
 

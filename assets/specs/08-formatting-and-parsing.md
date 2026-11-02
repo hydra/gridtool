@@ -2,6 +2,8 @@
 
 ## Formatting
 
+Numbers are written and read in the same way in every language (`PREF-6`).
+
 **FMT-1 — Trimmed decimals.** "Format with up to *n* decimals" means:
 1. Round to *n* decimal places.
 2. If there is a decimal point, remove trailing zeros, and then remove the decimal point

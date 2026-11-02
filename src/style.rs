@@ -7,6 +7,7 @@ use crate::calibration::Scale;
 use crate::color::Rgb;
 use crate::geometry::{Bounds, Point};
 use crate::polygon::{self, HatchDirection};
+use crate::tr;
 use crate::units::LengthUnit;
 
 /// Real-world distance between fill lines by default, in the fill's unit.
@@ -41,11 +42,11 @@ pub enum LineStyle {
 impl LineStyle {
     pub const ALL: [LineStyle; 3] = [LineStyle::Thin, LineStyle::Thick, LineStyle::Dashed];
 
-    pub fn name(self) -> &'static str {
+    pub fn name(self) -> String {
         match self {
-            LineStyle::Thin => "Thin",
-            LineStyle::Thick => "Thick",
-            LineStyle::Dashed => "Dashed",
+            LineStyle::Thin => tr!("line-style-thin"),
+            LineStyle::Thick => tr!("line-style-thick"),
+            LineStyle::Dashed => tr!("line-style-dashed"),
         }
     }
 }
@@ -68,12 +69,12 @@ impl FillStyle {
         FillStyle::Crosshatch,
     ];
 
-    pub fn name(self) -> &'static str {
+    pub fn name(self) -> String {
         match self {
-            FillStyle::None => "None",
-            FillStyle::Solid => "Solid",
-            FillStyle::Lines => "Lines",
-            FillStyle::Crosshatch => "Crosshatch",
+            FillStyle::None => tr!("fill-style-none"),
+            FillStyle::Solid => tr!("fill-style-solid"),
+            FillStyle::Lines => tr!("fill-style-lines"),
+            FillStyle::Crosshatch => tr!("fill-style-crosshatch"),
         }
     }
 
@@ -346,18 +347,22 @@ impl StyleEdit {
 impl fmt::Display for StyleEdit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let percent = |opacity: f32| (opacity * 100.0).round();
-        match *self {
-            Self::LineStyle(style) => write!(f, "line style to {}", style.name()),
-            Self::LineColor(color) => write!(f, "line color to {color}"),
-            Self::LineOpacity(opacity) => write!(f, "line opacity to {}%", percent(opacity)),
-            Self::FillStyle(style, _) => write!(f, "fill style to {}", style.name()),
-            Self::FillColor(Some(color)) => write!(f, "fill color to {color}"),
-            Self::FillColor(None) => f.write_str("fill color to none"),
-            Self::FillSpacing(spacing) => write!(f, "fill spacing to {spacing}"),
-            Self::FillUnit(unit) => write!(f, "fill units to {unit}"),
-            Self::FillAngle(degrees) => write!(f, "fill angle to {degrees}°"),
-            Self::FillOpacity(opacity) => write!(f, "fill opacity to {}%", percent(opacity)),
-        }
+        f.write_str(&match *self {
+            Self::LineStyle(style) => tr!("edit-line-style", { style: style.name() }),
+            Self::LineColor(color) => tr!("edit-line-color", { color: color }),
+            Self::LineOpacity(opacity) => {
+                tr!("edit-line-opacity", { percent: percent(opacity) })
+            }
+            Self::FillStyle(style, _) => tr!("edit-fill-style", { style: style.name() }),
+            Self::FillColor(Some(color)) => tr!("edit-fill-color", { color: color }),
+            Self::FillColor(None) => tr!("edit-fill-color-none"),
+            Self::FillSpacing(spacing) => tr!("edit-fill-spacing", { spacing: spacing }),
+            Self::FillUnit(unit) => tr!("edit-fill-unit", { unit: unit }),
+            Self::FillAngle(degrees) => tr!("edit-fill-angle", { degrees: degrees }),
+            Self::FillOpacity(opacity) => {
+                tr!("edit-fill-opacity", { percent: percent(opacity) })
+            }
+        })
     }
 }
 

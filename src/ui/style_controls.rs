@@ -9,6 +9,7 @@ use gridtool::style::{
     FillAngles, FillAppearance, FillStyle, LineAppearance, LineStyle, StyleEdit, Styled,
     normalized_fill_angle,
 };
+use gridtool::tr;
 
 use super::color_swatch;
 use super::commit_field::CommitField;
@@ -91,9 +92,7 @@ impl StyleControls {
                 && let Some(reason) = scale_problem
             {
                 ui.separator();
-                ui.weak(format!(
-                    "Fill lines not shown: they need a scale ({reason})"
-                ));
+                ui.weak(tr!("style-fill-lines-hidden", { reason: reason }));
             }
         }
         events
@@ -107,7 +106,7 @@ impl StyleControls {
         displayed: LineAppearance,
         events: &mut StyleEvents,
     ) {
-        ui.label("Line:");
+        ui.label(tr!("style-line-label"));
         events.commit(
             style_buttons(ui, &LineStyle::ALL, stored.style, LineStyle::name)
                 .map(StyleEdit::LineStyle),
@@ -115,15 +114,15 @@ impl StyleControls {
         color(
             ui,
             id.with("line_color"),
-            "Line color:",
-            "Choose the colour of the line",
+            &tr!("style-line-color-label"),
+            &tr!("style-line-color-tooltip"),
             stored.color,
             StyleEdit::LineColor,
             events,
         );
         opacity(
             ui,
-            "Line opacity:",
+            &tr!("style-line-opacity-label"),
             stored.opacity,
             displayed.opacity,
             StyleEdit::LineOpacity,
@@ -140,7 +139,7 @@ impl StyleControls {
         context: FillContext,
         events: &mut StyleEvents,
     ) {
-        ui.label("Fill:");
+        ui.label(tr!("style-fill-label"));
         events.commit(
             style_buttons(ui, &FillStyle::ALL, stored.style, FillStyle::name)
                 .map(|style| fill_style_edit(style, stored.angle, context.angles)),
@@ -159,7 +158,7 @@ impl StyleControls {
             );
             opacity(
                 ui,
-                "Fill opacity:",
+                &tr!("style-fill-opacity-label"),
                 stored.opacity,
                 displayed.opacity,
                 StyleEdit::FillOpacity,
@@ -177,8 +176,8 @@ impl StyleControls {
         fill: FillAppearance,
         events: &mut StyleEvents,
     ) {
-        let tooltip = "Distance between the fill lines";
-        let label = ui.label("Distance:").on_hover_text(tooltip);
+        let tooltip = tr!("style-spacing-tooltip");
+        let label = ui.label(tr!("style-spacing-label")).on_hover_text(&tooltip);
         let (field, committed) = self.fields.show(
             ui,
             id.with("fill_spacing"),
@@ -193,7 +192,7 @@ impl StyleControls {
                 ui,
                 id.with("fill_unit"),
                 fill.unit,
-                "Units of the distance between the fill lines",
+                &tr!("style-spacing-unit-tooltip"),
             )
             .map(StyleEdit::FillUnit),
         );
@@ -211,13 +210,13 @@ impl StyleControls {
         let left = icon_button(
             ui,
             icons::ROTATE_90_LEFT,
-            &format!("Rotate the fill lines {FILL_ROTATION_STEP}° left"),
+            &tr!("style-rotate-left-tooltip", { degrees: FILL_ROTATION_STEP }),
             true,
         );
         let right = icon_button(
             ui,
             icons::ROTATE_90_RIGHT,
-            &format!("Rotate the fill lines {FILL_ROTATION_STEP}° right"),
+            &tr!("style-rotate-right-tooltip", { degrees: FILL_ROTATION_STEP }),
             true,
         );
         if left {
@@ -227,8 +226,8 @@ impl StyleControls {
             events.commit(Some(rotated_fill(fill.angle, FILL_ROTATION_STEP)));
         }
 
-        let tooltip = "Angle of the fill lines, in degrees clockwise from vertical";
-        let label = ui.label("Angle:").on_hover_text(tooltip);
+        let tooltip = tr!("style-angle-tooltip");
+        let label = ui.label(tr!("style-angle-label")).on_hover_text(&tooltip);
         let (field, committed) = self.fields.show(
             ui,
             id.with("fill_angle"),
@@ -272,7 +271,7 @@ fn style_buttons<S: Copy + PartialEq>(
     ui: &mut egui::Ui,
     styles: &[S],
     current: S,
-    name: fn(S) -> &'static str,
+    name: fn(S) -> String,
 ) -> Option<S> {
     let mut picked = None;
     for &style in styles {
@@ -306,27 +305,27 @@ fn fill_color(
     line_color: LineColor,
     events: &mut StyleEvents,
 ) {
-    ui.add(egui::Label::new("Fill color:").extend());
+    ui.add(egui::Label::new(tr!("style-fill-color-label")).extend());
     let (icon, tooltip, swatch_tooltip) = match stored {
         None => (
             icons::LOCKED,
-            "The fill uses the line's colour. Click to choose its own",
-            "Click the padlock to choose the colour of the fill",
+            tr!("style-fill-locked-tooltip"),
+            tr!("style-fill-locked-swatch-tooltip"),
         ),
         Some(_) => (
             icons::UNLOCKED,
-            "The fill has its own colour. Click to use the line's colour, forgetting this one",
-            "Choose the colour of the fill",
+            tr!("style-fill-own-tooltip"),
+            tr!("style-fill-own-swatch-tooltip"),
         ),
     };
-    if selectable_icon_button(ui, icon, stored.is_none(), tooltip, true) {
+    if selectable_icon_button(ui, icon, stored.is_none(), &tooltip, true) {
         events.commit(Some(padlock_edit(stored, line_color.stored)));
     }
     ui.add_enabled_ui(stored.is_some(), |ui| {
         swatch(
             ui,
             id,
-            swatch_tooltip,
+            &swatch_tooltip,
             stored.unwrap_or(line_color.displayed),
             |color| StyleEdit::FillColor(Some(color)),
             events,

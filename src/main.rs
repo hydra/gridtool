@@ -6,6 +6,7 @@ mod crash_report;
 mod file_picker;
 mod open_document;
 mod open_image;
+mod preferences;
 #[cfg(test)]
 mod readme_about;
 mod session;
@@ -14,6 +15,7 @@ mod ui;
 use eframe::egui;
 
 use app::GridToolApp;
+use preferences::Preferences;
 
 const APP_NAME: &str = "GridTool";
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
@@ -27,7 +29,7 @@ fn main() -> eframe::Result {
             .with_title(APP_NAME)
             .with_inner_size([1280.0, 800.0])
             .with_icon(app_icon()),
-        // Only the layout of the panels is restored; see `GridToolApp::save`.
+        // Only the layout of the panels and the preferences are restored; see `GridToolApp::save`.
         persist_window: false,
         ..Default::default()
     };
@@ -39,7 +41,14 @@ fn main() -> eframe::Result {
             egui_material_icons::initialize(&cc.egui_ctx);
             ui::app_style::apply(&cc.egui_ctx);
             let layout = cc.storage.and_then(app::saved_layout);
-            Ok(Box::new(GridToolApp::with_saved_layout(layout.as_deref())))
+            let preferences = cc
+                .storage
+                .map_or_else(Preferences::default, Preferences::load);
+            preferences.apply(&cc.egui_ctx);
+            Ok(Box::new(GridToolApp::with_saved_state(
+                layout.as_deref(),
+                preferences,
+            )))
         }),
     )
 }

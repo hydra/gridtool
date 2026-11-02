@@ -7,6 +7,7 @@ use gridtool::action::{Action, StyleTarget};
 use gridtool::area::Area;
 use gridtool::document::Document;
 use gridtool::style::{StyleEdit, Styled};
+use gridtool::tr;
 
 use super::color_swatch;
 use super::format::format_length;
@@ -16,7 +17,15 @@ use super::selection::Selection;
 use super::table_rows::{TableOutput, TableRows, row_color};
 use super::unit_picker;
 
-const COLUMN_HEADERS: [&str; 5] = ["#", "Color", "Area", "Units", ""];
+fn column_headers() -> [String; 5] {
+    [
+        "#".to_owned(),
+        tr!("column-color"),
+        tr!("column-area"),
+        tr!("column-units"),
+        String::new(),
+    ]
+}
 
 /// Draws the table into `ui`, returning what the user did. The row of the active object is
 /// selected and, if `reveal`, scrolled into view.
@@ -27,12 +36,13 @@ pub fn show(
     reveal: bool,
 ) -> TableOutput {
     if document.areas().is_empty() {
-        ui.weak("No areas yet. Use the Measure area tool to add one.");
+        ui.weak(tr!("areas-empty"));
         return TableOutput::default();
     }
 
     let active = selection.active();
     let selected_row = active.and_then(|id| document.area_index(id));
+    let headers = column_headers();
     egui::ScrollArea::both()
         .id_salt("areas_scroll")
         .auto_shrink(false)
@@ -40,9 +50,9 @@ pub fn show(
             let mut rows = TableRows::default();
             let table = egui::Grid::new("areas_table")
                 .with_row_color(row_color(selected_row))
-                .num_columns(COLUMN_HEADERS.len())
+                .num_columns(headers.len())
                 .show(ui, |ui| {
-                    for header in COLUMN_HEADERS {
+                    for header in headers {
                         ui.strong(header);
                     }
                     ui.end_row();
@@ -75,7 +85,7 @@ fn row(ui: &mut egui::Ui, document: &Document, index: usize, area: &Area) -> Opt
             egui::Id::unique(("area_color", index)),
             area.line().color,
             color_swatch::ROW_SWATCH_SIZE,
-            "Choose the line colour of this area",
+            &tr!("area-color-tooltip"),
         )
         .committed
         .map(|color| Action::SetStyle {
@@ -89,18 +99,24 @@ fn row(ui: &mut egui::Ui, document: &Document, index: usize, area: &Area) -> Opt
             ui.label(format_length(value));
         }
         Err(reason) => {
-            ui.weak("—").on_hover_text(format!("Scale: {reason}"));
+            ui.weak("—")
+                .on_hover_text(tr!("scale-problem", { reason: reason }));
         }
     }
 
     actions.extend(
-        unit_picker::show_area(ui, ("area_unit", index), area.unit(), "Units of this area")
-            .map(|unit| Action::SetAreaUnit { index, unit }),
+        unit_picker::show_area(
+            ui,
+            ("area_unit", index),
+            area.unit(),
+            &tr!("area-unit-tooltip"),
+        )
+        .map(|unit| Action::SetAreaUnit { index, unit }),
     );
 
     if ui
         .button(inline_icon_text(icons::DELETE))
-        .on_hover_text("Delete area")
+        .on_hover_text(tr!("area-delete-tooltip"))
         .clicked()
     {
         actions.push(Action::DeleteArea { index });
@@ -176,7 +192,7 @@ mod tests {
 
     #[test]
     fn the_colour_is_in_the_second_column() {
-        assert_eq!(COLUMN_HEADERS[1], "Color");
+        assert_eq!(column_headers()[1], "Color");
     }
 
     #[test]

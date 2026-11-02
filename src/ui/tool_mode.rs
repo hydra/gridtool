@@ -1,5 +1,6 @@
 use egui_material_icons::MaterialIcon;
 use gridtool::object::ObjectKind;
+use gridtool::tr;
 
 use super::icons;
 
@@ -67,16 +68,16 @@ impl ToolMode {
         }
     }
 
-    pub fn name(self) -> &'static str {
+    pub fn name(self) -> String {
         match self {
-            ToolMode::Pan => "Pan & zoom",
-            ToolMode::Rotate => "Rotate view",
-            ToolMode::Scale => "Scale",
-            ToolMode::Measure => "Measure distance",
-            ToolMode::Area => "Measure area",
-            ToolMode::Grid => "Grid",
-            ToolMode::Origin => "Origin",
-            ToolMode::DrawLine => "Draw line",
+            ToolMode::Pan => tr!("tool-pan"),
+            ToolMode::Rotate => tr!("tool-rotate"),
+            ToolMode::Scale => tr!("tool-scale"),
+            ToolMode::Measure => tr!("tool-measure"),
+            ToolMode::Area => tr!("tool-area"),
+            ToolMode::Grid => tr!("tool-grid"),
+            ToolMode::Origin => tr!("tool-origin"),
+            ToolMode::DrawLine => tr!("tool-draw-line"),
         }
     }
 }

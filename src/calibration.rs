@@ -3,6 +3,7 @@
 use std::fmt;
 
 use crate::geometry::Point;
+use crate::tr;
 use crate::units::LengthUnit;
 
 /// How the reference lines are defined by the calibration points.
@@ -50,18 +51,18 @@ impl CalibrationMethod {
         }
     }
 
-    pub fn name(self) -> &'static str {
+    pub fn name(self) -> String {
         match self {
-            CalibrationMethod::TwoPoint => "2-point",
-            CalibrationMethod::ThreePoint => "3-point",
-            CalibrationMethod::FourPoint => "4-point",
+            CalibrationMethod::TwoPoint => tr!("method-two-point"),
+            CalibrationMethod::ThreePoint => tr!("method-three-point"),
+            CalibrationMethod::FourPoint => tr!("method-four-point"),
         }
     }
 }
 
 impl fmt::Display for CalibrationMethod {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.name())
+        f.write_str(&self.name())
     }
 }
 
@@ -106,16 +107,16 @@ pub enum CalibrationError {
 
 impl fmt::Display for CalibrationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::WrongPointCount { method, actual } => write!(
-                f,
-                "{method} calibration needs {} points, got {actual}",
-                method.point_count()
-            ),
+        f.write_str(&match self {
+            Self::WrongPointCount { method, actual } => tr!("error-calibration-point-count", {
+                method: method,
+                expected: method.point_count(),
+                actual: actual,
+            }),
             Self::PointIndexOutOfRange { index, count } => {
-                write!(f, "point {} does not exist (there are {count})", index + 1)
+                tr!("error-calibration-point-missing", { number: index + 1, count: count })
             }
-        }
+        })
     }
 }
 
@@ -194,15 +195,13 @@ pub enum ScaleError {
 
 impl fmt::Display for ScaleError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::MissingPoints => f.write_str("place the calibration points"),
-            Self::MissingDistance(line) => write!(f, "enter the distance of line {line}"),
-            Self::ZeroLengthLine(line) => write!(f, "line {line} has zero length"),
-            Self::Indeterminate => {
-                f.write_str("lines A and B need different orientations to separate X and Y")
-            }
-            Self::Inconsistent => f.write_str("the distances do not fit the lines"),
-        }
+        f.write_str(&match self {
+            Self::MissingPoints => tr!("error-scale-missing-points"),
+            Self::MissingDistance(line) => tr!("error-scale-missing-distance", { line: line }),
+            Self::ZeroLengthLine(line) => tr!("error-scale-zero-length", { line: line }),
+            Self::Indeterminate => tr!("error-scale-indeterminate"),
+            Self::Inconsistent => tr!("error-scale-inconsistent"),
+        })
     }
 }
 

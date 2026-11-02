@@ -2,6 +2,7 @@
 //! part of the canvas are generated, so arbitrarily small cells can be drawn when zoomed
 //! in far enough.
 
+use gridtool::tr;
 use std::fmt;
 
 use eframe::egui::{self, Stroke};
@@ -30,10 +31,9 @@ impl fmt::Display for GridHidden {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(f),
-            Self::TooSmallAtThisZoom => write!(
-                f,
-                "the cells are under {MIN_SCREEN_SPACING} px on screen; zoom in to see them"
-            ),
+            Self::TooSmallAtThisZoom => {
+                f.write_str(&tr!("grid-too-small", { spacing: MIN_SCREEN_SPACING }))
+            }
         }
     }
 }

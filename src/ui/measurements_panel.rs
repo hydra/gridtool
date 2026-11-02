@@ -9,6 +9,7 @@ use gridtool::document::Document;
 use gridtool::geometry::Point;
 use gridtool::measurement::{Endpoint, Measurement};
 use gridtool::style::{StyleEdit, Styled};
+use gridtool::tr;
 
 use super::color_swatch;
 use super::commit_field::CommitField;
@@ -22,11 +23,22 @@ use super::unit_picker;
 /// The widest coordinate a field must show in full: six digits and a decimal point.
 const WIDEST_COORDINATE: &str = "0000.00";
 const DELETE_ICON: MaterialIcon = icons::DELETE;
-const COLUMN_HEADERS: [&str; 9] = [
-    "#", "Color", "x1", "y1", "x2", "y2", "Distance", "Units", "",
-];
 /// One coordinate column per axis of each endpoint.
 const COORDINATE_COLUMNS: usize = 4;
+
+fn column_headers() -> [String; 9] {
+    [
+        "#".to_owned(),
+        tr!("column-color"),
+        "x1".to_owned(),
+        "y1".to_owned(),
+        "x2".to_owned(),
+        "y2".to_owned(),
+        tr!("column-distance"),
+        tr!("column-units"),
+        String::new(),
+    ]
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Axis {
@@ -84,7 +96,7 @@ impl MeasurementsPanel {
         reveal: bool,
     ) -> TableOutput {
         if document.measurements().is_empty() {
-            ui.weak("No measurements yet. Use the Measure distance tool to add one.");
+            ui.weak(tr!("measurements-empty"));
             return TableOutput::default();
         }
 
@@ -98,11 +110,12 @@ impl MeasurementsPanel {
                 let min_width = min_field_width(ui);
                 let field_width = coordinate_field_width(self.layout, available, min_width);
                 let mut rows = TableRows::default();
+                let headers = column_headers();
                 let table = egui::Grid::new("measurements_table")
                     .with_row_color(row_color(selected_row))
-                    .num_columns(COLUMN_HEADERS.len())
+                    .num_columns(headers.len())
                     .show(ui, |ui| {
-                        for header in COLUMN_HEADERS {
+                        for header in headers {
                             ui.strong(header);
                         }
                         ui.end_row();
@@ -151,7 +164,7 @@ impl MeasurementsPanel {
                 egui::Id::unique(("measurement_color", index)),
                 measurement.line().color,
                 color_swatch::ROW_SWATCH_SIZE,
-                "Choose the line colour of this measurement",
+                &tr!("measurement-color-tooltip"),
             )
             .committed
             .map(|color| Action::SetStyle {
@@ -182,7 +195,8 @@ impl MeasurementsPanel {
                 ui.label(format_length(distance));
             }
             Err(reason) => {
-                ui.weak("—").on_hover_text(format!("Scale: {reason}"));
+                ui.weak("—")
+                    .on_hover_text(tr!("scale-problem", { reason: reason }));
             }
         }
 
@@ -191,14 +205,14 @@ impl MeasurementsPanel {
                 ui,
                 ("measurement_unit", index),
                 measurement.unit(),
-                "Units of this measurement",
+                &tr!("measurement-unit-tooltip"),
             )
             .map(|unit| Action::SetMeasurementUnit { index, unit }),
         );
 
         if ui
             .button(inline_icon_text(DELETE_ICON))
-            .on_hover_text("Delete measurement")
+            .on_hover_text(tr!("measurement-delete-tooltip"))
             .clicked()
         {
             actions.push(Action::DeleteMeasurement { index });
@@ -279,7 +293,7 @@ mod tests {
 
     #[test]
     fn the_colour_is_in_the_second_column() {
-        assert_eq!(COLUMN_HEADERS[1], "Color");
+        assert_eq!(column_headers()[1], "Color");
     }
 
     #[test]

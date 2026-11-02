@@ -2,6 +2,7 @@
 //! Panels can be dragged, resized, grouped as tabs and closed. The Documents area stays where
 //! it is and never shares a tab group, so a panel can only ever be dropped beside it.
 
+use gridtool::tr;
 use std::collections::HashSet;
 
 use eframe::egui;
@@ -48,12 +49,12 @@ impl Panel {
         Self::History,
     ];
 
-    pub fn title(self) -> &'static str {
+    pub fn title(self) -> String {
         match self {
-            Self::Objects => "Objects",
-            Self::PointToPoint => "Point-to-point",
-            Self::Areas => "Areas",
-            Self::History => "History",
+            Self::Objects => tr!("panel-objects"),
+            Self::PointToPoint => tr!("panel-point-to-point"),
+            Self::Areas => tr!("panel-areas"),
+            Self::History => tr!("panel-history"),
         }
     }
 
@@ -410,7 +411,7 @@ impl Behavior<WorkspacePane> for WorkspaceBehavior<'_> {
 
     fn tab_title_for_pane(&mut self, pane: &WorkspacePane) -> egui::WidgetText {
         match pane {
-            WorkspacePane::Documents => "Documents".into(),
+            WorkspacePane::Documents => tr!("panel-documents").into(),
             WorkspacePane::Panel(panel) => panel.title().into(),
         }
     }

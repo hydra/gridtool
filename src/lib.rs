@@ -2,7 +2,8 @@
 //! to it, with undo/redo history.
 //!
 //! Nothing in this crate depends on the GUI, so all document operations can be driven
-//! from unit tests or a command-line front end.
+//! from unit tests or a command-line front end. What it says about them, in history labels and
+//! error messages, is in the language chosen in [`i18n`].
 
 pub mod action;
 pub mod area;
@@ -13,6 +14,7 @@ pub mod document_file;
 pub mod editor;
 pub mod geometry;
 pub mod grid;
+pub mod i18n;
 pub mod imaging;
 pub mod measurement;
 pub mod object;

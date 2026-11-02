@@ -1,7 +1,9 @@
 //! The About dialog. What it says comes from where it is already written: the authors and
 //! repository from `Cargo.toml`, and the description from the README, by way of the build script.
+//! The description is therefore in the language of the README, whatever language is in use.
 
 use eframe::egui::{self, ColorImage, RichText, TextureHandle, TextureOptions};
+use gridtool::tr;
 
 use super::dialog::DialogButton;
 
@@ -39,7 +41,7 @@ impl AboutDialog {
                 ui.add(
                     egui::Image::new(&self.icon)
                         .fit_to_exact_size(egui::Vec2::splat(ICON_SIZE))
-                        .alt_text(format!("{} icon", crate::APP_NAME)),
+                        .alt_text(tr!("about-icon", { app: crate::APP_NAME })),
                 );
                 ui.add_space(SPACING);
                 ui.label(RichText::new(crate::APP_NAME).size(NAME_SIZE).strong());
@@ -179,6 +181,8 @@ mod tests {
         let names: Vec<&str> = README
             .lines()
             .skip_while(|line| line.trim() != "## Authors")
+            .skip(1)
+            .take_while(|line| !line.starts_with("## "))
             .filter_map(|line| line.strip_prefix("* "))
             .filter_map(|line| line.split(" - ").next())
             .collect();

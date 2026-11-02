@@ -26,6 +26,7 @@ or measurement line. Every change can be undone, and documents can be saved and 
 - **View**: pan, zoom about the cursor, and rotate the view about a movable origin, without changing the document.
 - **Undo and redo**: every change is recorded in a history panel.
 - **Documents**: save and load your work, with a prompt to save unsaved changes.
+- **Theme and language**: system, light or dark theme, in English or Spanish.
 
 ## Authors
 
@@ -41,6 +42,13 @@ If you find this tool useful, please consider support me using the links below:
 ## AI/LLM usage
 
 Although the code in this project is not human written, many, many humans together made this possible. LLMs don't have anything to learn from unless we show them the way, humans are required to guide them and correct them.
+
+## Languages
+
+Multiple languages are supported and can be changed on-the-fly.
+English is the primary language. Spanish was machine translated.
+
+Contributions/PRs for corrections and other languages welcomed.
 
 ## License
 

@@ -72,7 +72,7 @@ impl Fixture {
         let mut fixture = Self {
             folder,
             ctx,
-            app: GridToolApp::new(session, Workspace::default()),
+            app: GridToolApp::new(session, Workspace::default(), Preferences::default()),
             picks,
             time: 0.0,
             cursor: egui::CursorIcon::Default,
@@ -854,6 +854,26 @@ fn a_two_point_scale_is_placed_with_two_clicks_and_undone_as_one() {
             .calibration()
             .points()
             .is_none()
+    );
+}
+
+#[test]
+fn a_theme_chosen_from_the_tool_bar_is_put_into_use_and_saved() {
+    let mut fixture = Fixture::new("theme");
+
+    let ctx = fixture.ctx.clone();
+    fixture
+        .app
+        .handle(&ctx, TopPanelAction::SetTheme(egui::ThemePreference::Dark));
+
+    assert_eq!(
+        ctx.options(|options| options.theme_preference),
+        egui::ThemePreference::Dark
+    );
+    assert_eq!(fixture.app.preferences.theme, egui::ThemePreference::Dark);
+    assert_eq!(
+        fixture.app.tool_bar_state().theme,
+        egui::ThemePreference::Dark
     );
 }
 

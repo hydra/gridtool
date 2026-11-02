@@ -1,5 +1,6 @@
 use eframe::egui;
 use gridtool::editor::Editor;
+use gridtool::tr;
 
 /// Lists every recorded action. The row for the current position in the undo/redo
 /// stack is highlighted; undone actions are dimmed.
@@ -15,7 +16,7 @@ pub fn show(ui: &mut egui::Ui, editor: &Editor) {
 
 fn history_rows(ui: &mut egui::Ui, editor: &Editor) {
     let applied = editor.applied_count();
-    history_row(ui, "Opened image".to_owned(), applied == 0, false);
+    history_row(ui, tr!("history-opened-image"), applied == 0, false);
     for (index, action) in editor.actions().enumerate() {
         let position = index + 1;
         history_row(

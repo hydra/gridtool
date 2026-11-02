@@ -6,6 +6,7 @@
 //! it needs to ask a question; then it waits in [`Session::dialog`] until
 //! [`Session::answer`] is called.
 
+use gridtool::tr;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
@@ -142,7 +143,7 @@ impl Session {
             Some(Ok(opened)) => self.add(OpenDocument::from_image(ctx, opened)),
             Some(Err(error)) => {
                 self.prompt = Some(Prompt::Error(Dialog::error(
-                    "Could not open image",
+                    &tr!("dialog-error-open-image"),
                     error.to_string(),
                 )));
             }
@@ -171,7 +172,7 @@ impl Session {
             // The open documents are kept.
             Err(error) => {
                 self.prompt = Some(Prompt::Error(Dialog::error(
-                    "Could not load document",
+                    &tr!("dialog-error-load"),
                     format!("{}: {error}", path.display()),
                 )));
             }
@@ -225,7 +226,7 @@ impl Session {
             Some(open) => {
                 let name = open
                     .file()
-                    .map_or_else(|| UNSAVED_NAME.to_owned(), file_name);
+                    .map_or_else(|| tr!("document-unsaved-name"), file_name);
                 format!("{name} - {}", crate::APP_NAME)
             }
         }
@@ -316,7 +317,7 @@ impl Session {
             }
             Err(error) => {
                 self.prompt = Some(Prompt::Error(Dialog::error(
-                    "Could not save document",
+                    &tr!("dialog-error-save"),
                     format!("{}: {error}", path.display()),
                 )));
             }
@@ -358,9 +359,6 @@ impl Session {
             .map(|(id, _)| *id)
     }
 }
-
-/// The name shown for a document that has no file yet.
-const UNSAVED_NAME: &str = "unsaved document";
 
 /// Whether two paths lead to the same file, however they are written.
 fn is_same_file(a: &Path, b: &Path) -> bool {

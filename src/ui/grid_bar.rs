@@ -6,6 +6,7 @@ use gridtool::action::Action;
 use gridtool::document::Document;
 use gridtool::grid::{CellDimension, CellShape, Grid};
 use gridtool::object::ObjectId;
+use gridtool::tr;
 
 use super::color_swatch;
 use super::commit_field::CommitField;
@@ -38,7 +39,7 @@ impl GridBar {
 
         // Every widget must be drawn each frame, so collect actions eagerly.
         let mut actions = Vec::new();
-        ui.strong(format!("Grid {}", index + 1));
+        ui.strong(tr!("grid-title", { number: index + 1 }));
         ui.separator();
         actions.extend(shape_buttons(ui, index, stored));
         ui.separator();
@@ -50,7 +51,7 @@ impl GridBar {
         let displayed = selection.displayed_grid(id, stored);
         if let Err(reason) = grid_display::visibility(&displayed, document, zoom) {
             ui.separator();
-            ui.weak(format!("Grid not shown: {reason}"));
+            ui.weak(tr!("grid-hidden", { reason: reason }));
         }
         actions.into_iter().next()
     }
@@ -62,19 +63,16 @@ impl GridBar {
         index: usize,
         grid: &Grid,
     ) -> Option<Action> {
-        let dimensions: &[(CellDimension, &str)] = match grid.shape() {
-            CellShape::Square => &[(CellDimension::Side, "Side length of each square cell")],
-            CellShape::Rectangle => &[
-                (CellDimension::A, "Cell size along the alignment line"),
-                (
-                    CellDimension::B,
-                    "Cell size perpendicular to the alignment line",
-                ),
+        let dimensions = match grid.shape() {
+            CellShape::Square => vec![(CellDimension::Side, tr!("grid-side-tooltip"))],
+            CellShape::Rectangle => vec![
+                (CellDimension::A, tr!("grid-size-a-tooltip")),
+                (CellDimension::B, tr!("grid-size-b-tooltip")),
             ],
         };
         let mut actions = Vec::new();
-        for &(dimension, tooltip) in dimensions {
-            let label = ui.label(dimension.to_string()).on_hover_text(tooltip);
+        for (dimension, tooltip) in dimensions {
+            let label = ui.label(dimension.to_string()).on_hover_text(&tooltip);
             let field_id = egui::Id::unique(("grid_size", id, dimension));
             let current = grid.size(dimension);
             let (field, committed) =
@@ -93,15 +91,20 @@ impl GridBar {
             );
         }
         actions.extend(
-            unit_picker::show(ui, ("grid_unit", id), grid.unit(), "Units of the cell size")
-                .map(|unit| Action::SetGridUnit { index, unit }),
+            unit_picker::show(
+                ui,
+                ("grid_unit", id),
+                grid.unit(),
+                &tr!("grid-unit-tooltip"),
+            )
+            .map(|unit| Action::SetGridUnit { index, unit }),
         );
         actions.into_iter().next()
     }
 }
 
 fn shape_buttons(ui: &mut egui::Ui, index: usize, grid: &Grid) -> Option<Action> {
-    ui.label("Cell shape:");
+    ui.label(tr!("grid-shape-label"));
     let mut action = None;
     for shape in CellShape::ALL {
         if ui
@@ -124,13 +127,13 @@ fn color_picker(
     stored: &Grid,
     selection: &mut Selection,
 ) -> Option<Action> {
-    ui.label("Color:");
+    ui.label(tr!("grid-color-label"));
     let edit = color_swatch::show(
         ui,
         egui::Id::unique(("grid_color", id)),
         stored.color(),
         color_swatch::BAR_SWATCH_SIZE,
-        "Choose the grid colour",
+        &tr!("grid-color-tooltip"),
     );
     if let Some(color) = edit.preview {
         let displayed = selection.displayed_grid(id, stored);
@@ -150,7 +153,7 @@ fn grid_opacity(
     stored: &Grid,
     selection: &mut Selection,
 ) -> Option<Action> {
-    ui.label("Opacity:");
+    ui.label(tr!("grid-opacity-label"));
     let displayed = selection.displayed_grid(id, stored);
     let edit = opacity_slider::show(ui, displayed.opacity());
     if let Some(opacity) = edit.preview {

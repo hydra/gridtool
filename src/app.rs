@@ -1,8 +1,10 @@
 use eframe::egui;
 use gridtool::action::Action;
+use gridtool::i18n;
 
 use crate::file_picker::{RfdDocumentPicker, RfdImagePicker};
 use crate::open_document::OpenDocument;
+use crate::preferences::Preferences;
 use crate::session::{DocumentId, Session};
 use crate::ui::about_dialog::AboutDialog;
 use crate::ui::object_tree::TreePick;
@@ -35,10 +37,11 @@ pub struct GridToolApp {
     activating: Option<DocumentId>,
     /// The About dialog, while it is open.
     about: Option<AboutDialog>,
+    preferences: Preferences,
 }
 
 impl GridToolApp {
-    pub fn new(session: Session, workspace: Workspace) -> Self {
+    pub fn new(session: Session, workspace: Workspace, preferences: Preferences) -> Self {
         Self {
             session,
             workspace,
@@ -48,14 +51,16 @@ impl GridToolApp {
             shown_document: None,
             activating: None,
             about: None,
+            preferences,
         }
     }
 
     /// The application as it runs, with the panels arranged by a layout from [`saved_layout`].
-    pub fn with_saved_layout(layout: Option<&str>) -> Self {
+    pub fn with_saved_state(layout: Option<&str>, preferences: Preferences) -> Self {
         Self::new(
             Session::new(Box::new(RfdImagePicker), Box::new(RfdDocumentPicker)),
             Workspace::from_saved_layout(layout),
+            preferences,
         )
     }
 
@@ -73,6 +78,8 @@ impl GridToolApp {
             .unwrap_or_default();
         ToolBarState {
             open_panels: Panel::ALL.map(|panel| self.workspace.is_open(panel)),
+            theme: self.preferences.theme,
+            language: self.preferences.language,
             ..state
         }
     }
@@ -89,6 +96,14 @@ impl GridToolApp {
             TopPanelAction::TogglePanel(panel) => self.workspace.toggle(panel),
             TopPanelAction::ResetLayout => self.workspace.reset_layout(),
             TopPanelAction::About => self.about = Some(AboutDialog::new(ctx)),
+            TopPanelAction::SetTheme(theme) => {
+                self.preferences.theme = theme;
+                ctx.set_theme(theme);
+            }
+            TopPanelAction::SetLanguage(language) => {
+                self.preferences.language = language;
+                i18n::set_language(language);
+            }
         }
         ctx.request_repaint();
     }
@@ -253,9 +268,10 @@ impl eframe::App for GridToolApp {
         if let Some(layout) = self.workspace.save_layout() {
             storage.set_string(LAYOUT_KEY, layout);
         }
+        self.preferences.save(storage);
     }
 
-    /// Only the layout of the panels is restored.
+    /// Only the layout of the panels and the preferences are restored.
     fn persist_egui_memory(&self) -> bool {
         false
     }

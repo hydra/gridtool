@@ -8,6 +8,7 @@ use crate::color::Rgb;
 use crate::geometry::{Bounds, BoundsHandle, Point};
 use crate::polygon;
 use crate::style::{FillAppearance, FillStyle, LineAppearance, LineStyle, Styled};
+use crate::tr;
 use crate::units::LengthUnit;
 
 /// The fewest points that make a line.
@@ -39,7 +40,7 @@ pub struct TooFewPoints(pub usize);
 
 impl fmt::Display for TooFewPoints {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "a shape cannot have only {} points", self.0)
+        f.write_str(&tr!("error-shape-too-few-points", { count: self.0 }))
     }
 }
 

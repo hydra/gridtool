@@ -2,6 +2,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use super::format;
+use crate::tr;
 
 /// An image decoded into tightly packed 8-bit RGBA pixels.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,13 +27,13 @@ pub enum ImageLoadError {
 
 impl fmt::Display for ImageLoadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
+        f.write_str(&match self {
             Self::UnsupportedFormat(path) => {
-                write!(f, "unsupported image format: {}", path.display())
+                tr!("error-image-unsupported", { path: path.display() })
             }
-            Self::Io(error) => write!(f, "could not read file: {error}"),
-            Self::Decode(error) => write!(f, "could not decode image: {error}"),
-        }
+            Self::Io(error) => tr!("error-image-read", { error: error }),
+            Self::Decode(error) => tr!("error-image-decode", { error: error }),
+        })
     }
 }
 

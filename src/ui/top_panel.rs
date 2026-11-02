@@ -1,4 +1,6 @@
-use eframe::egui;
+use eframe::egui::{self, ThemePreference};
+use gridtool::i18n::Language;
+use gridtool::tr;
 
 use super::icon_button::{icon_button, icon_text, selectable_icon_button};
 use super::icons;
@@ -21,6 +23,8 @@ pub enum TopPanelAction {
     TogglePanel(Panel),
     ResetLayout,
     About,
+    SetTheme(ThemePreference),
+    SetLanguage(Language),
 }
 
 /// Which tool bar buttons should be enabled.
@@ -34,6 +38,8 @@ pub struct ToolBarState {
     pub can_redo: bool,
     /// Which panels are open, by [`Panel::index`].
     pub open_panels: [bool; Panel::ALL.len()],
+    pub theme: ThemePreference,
+    pub language: Language,
 }
 
 impl ToolBarState {
@@ -59,24 +65,36 @@ pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> TopP
         .show(ui, |ui| {
             let row = ui.horizontal(|ui| {
                 let mut action = None;
-                let mut button = |ui: &mut egui::Ui, icon, tooltip, enabled, clicked| {
+                let mut button = |ui: &mut egui::Ui, icon, tooltip: &str, enabled, clicked| {
                     if icon_button(ui, icon, tooltip, enabled) {
                         action = Some(clicked);
                     }
                 };
-                button(ui, icons::NEW, "New…", true, TopPanelAction::New);
-                button(ui, icons::LOAD, "Load…", true, TopPanelAction::Load);
+                button(
+                    ui,
+                    icons::NEW,
+                    &tr!("toolbar-new"),
+                    true,
+                    TopPanelAction::New,
+                );
+                button(
+                    ui,
+                    icons::LOAD,
+                    &tr!("toolbar-load"),
+                    true,
+                    TopPanelAction::Load,
+                );
                 button(
                     ui,
                     icons::SAVE,
-                    "Save",
+                    &tr!("toolbar-save"),
                     state.has_document && state.has_unsaved_changes,
                     TopPanelAction::Save,
                 );
                 button(
                     ui,
                     icons::SAVE_AS,
-                    "Save as…",
+                    &tr!("toolbar-save-as"),
                     state.has_document,
                     TopPanelAction::SaveAs,
                 );
@@ -88,7 +106,7 @@ pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> TopP
                     }
                     let selected = state.active_tool(*mode) == Some(tool);
                     let enabled = state.has_document;
-                    if selectable_icon_button(ui, tool.icon(), selected, tool.name(), enabled) {
+                    if selectable_icon_button(ui, tool.icon(), selected, &tool.name(), enabled) {
                         *mode = tool;
                     }
                 }
@@ -97,24 +115,33 @@ pub fn show(ui: &mut egui::Ui, mode: &mut ToolMode, state: ToolBarState) -> TopP
                 button(
                     ui,
                     icons::UNDO,
-                    "Undo",
+                    &tr!("toolbar-undo"),
                     state.can_undo,
                     TopPanelAction::Undo,
                 );
                 button(
                     ui,
                     icons::REDO,
-                    "Redo",
+                    &tr!("toolbar-redo"),
                     state.can_redo,
                     TopPanelAction::Redo,
                 );
 
                 ui.add_space(SECTION_SPACING);
                 let panels = panels_menu(ui, state);
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    button(ui, icons::ABOUT, "About", true, TopPanelAction::About)
-                });
-                action.or(panels)
+                let preference = ui
+                    .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        button(
+                            ui,
+                            icons::ABOUT,
+                            &tr!("toolbar-about"),
+                            true,
+                            TopPanelAction::About,
+                        );
+                        settings_menu(ui, state)
+                    })
+                    .inner;
+                action.or(panels).or(preference)
             });
             TopPanel {
                 action: row.inner,
@@ -135,13 +162,62 @@ fn panels_menu(ui: &mut egui::Ui, state: ToolBarState) -> Option<TopPanelAction>
             }
         }
         ui.separator();
-        if ui.button("Reset layout").clicked() {
+        if ui.button(tr!("toolbar-reset-layout")).clicked() {
             action = Some(TopPanelAction::ResetLayout);
         }
         action
     });
-    menu.response.on_hover_text("Panels");
+    menu.response.on_hover_text(tr!("toolbar-panels"));
     menu.inner.flatten()
+}
+
+const THEMES: [ThemePreference; 3] = [
+    ThemePreference::System,
+    ThemePreference::Light,
+    ThemePreference::Dark,
+];
+
+fn theme_name(theme: ThemePreference) -> String {
+    match theme {
+        ThemePreference::System => tr!("theme-button-system"),
+        ThemePreference::Light => tr!("theme-button-light"),
+        ThemePreference::Dark => tr!("theme-button-dark"),
+    }
+}
+
+/// The menu that chooses the theme and language of the whole application.
+fn settings_menu(ui: &mut egui::Ui, state: ToolBarState) -> Option<TopPanelAction> {
+    let menu = ui.menu_button(icon_text(icons::SETTINGS), |ui| {
+        ui.strong(tr!("settings-theme"));
+        let theme = options(ui, state.theme, &THEMES, theme_name);
+        ui.separator();
+        ui.strong(tr!("settings-language"));
+        let language = options(ui, state.language, &Language::ALL, Language::name);
+        theme
+            .map(TopPanelAction::SetTheme)
+            .or(language.map(TopPanelAction::SetLanguage))
+    });
+    menu.response.on_hover_text(tr!("toolbar-settings"));
+    menu.inner.flatten()
+}
+
+/// One row for each of `options`, returning the one the user picked this frame, if any.
+fn options<T: Copy + PartialEq>(
+    ui: &mut egui::Ui,
+    current: T,
+    options: &[T],
+    name: fn(T) -> String,
+) -> Option<T> {
+    let mut picked = None;
+    for &option in options {
+        if ui
+            .selectable_label(option == current, name(option))
+            .clicked()
+        {
+            picked = Some(option);
+        }
+    }
+    picked
 }
 
 #[cfg(test)]
@@ -335,10 +411,10 @@ mod tests {
                 .1
                 .center()
         };
-        for title in Panel::ALL.map(Panel::title) {
-            position_of(title);
+        for panel in Panel::ALL {
+            position_of(&panel.title());
         }
-        let point_to_point = position_of(Panel::PointToPoint.title());
+        let point_to_point = position_of(&Panel::PointToPoint.title());
 
         for events in click(point_to_point) {
             frame(events);
@@ -347,6 +423,94 @@ mod tests {
             chosen,
             Some(TopPanelAction::TogglePanel(Panel::PointToPoint))
         );
+    }
+
+    /// Opens the settings menu, and picks the row showing `option` from it.
+    fn pick_from_the_settings_menu(option: &str) -> Option<TopPanelAction> {
+        let ctx = egui::Context::default();
+        egui_material_icons::initialize(&ctx);
+        let mut chosen = None;
+        let mut frame = |events: Vec<Event>| {
+            let input = RawInput {
+                screen_rect: Some(Rect::from_min_max(Pos2::ZERO, Pos2::new(WIDTH, 600.0))),
+                events,
+                ..Default::default()
+            };
+            let mut mode = ToolMode::Pan;
+            let mut output = ctx.run_ui(input, |ui| {
+                if let Some(action) = show(ui, &mut mode, ToolBarState::default()).action {
+                    chosen = Some(action);
+                }
+            });
+            output.textures_delta.clear();
+            output
+                .shapes
+                .iter()
+                .filter_map(|clipped| match &clipped.shape {
+                    egui::Shape::Text(text) => {
+                        Some((text.galley.job.text.clone(), text.visual_bounding_rect()))
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        let click = |pos| {
+            [
+                vec![Event::PointerMoved(pos)],
+                vec![Event::PointerButton {
+                    pos,
+                    button: PointerButton::Primary,
+                    pressed: true,
+                    modifiers: Modifiers::NONE,
+                }],
+                vec![Event::PointerButton {
+                    pos,
+                    button: PointerButton::Primary,
+                    pressed: false,
+                    modifiers: Modifiers::NONE,
+                }],
+            ]
+        };
+        let position_of = |texts: &[(String, Rect)], wanted: &str| {
+            texts
+                .iter()
+                .find(|(text, _)| text == wanted)
+                .unwrap_or_else(|| panic!("{wanted} in {texts:?}"))
+                .1
+                .center()
+        };
+
+        let texts = frame(Vec::new());
+        for events in click(position_of(&texts, icons::SETTINGS.codepoint)) {
+            frame(events);
+        }
+        frame(Vec::new());
+        let texts = frame(Vec::new());
+        for events in click(position_of(&texts, option)) {
+            frame(events);
+        }
+        chosen
+    }
+
+    #[test]
+    fn the_settings_menu_picks_any_theme() {
+        for theme in THEMES {
+            assert_eq!(
+                pick_from_the_settings_menu(&theme_name(theme)),
+                Some(TopPanelAction::SetTheme(theme))
+            );
+        }
+    }
+
+    #[test]
+    fn the_settings_menu_picks_any_language() {
+        // The app carries out the choice, so the language of this test program stays as it is.
+        for language in Language::ALL {
+            assert_eq!(
+                pick_from_the_settings_menu(&language.name()),
+                Some(TopPanelAction::SetLanguage(language))
+            );
+        }
     }
 
     #[test]

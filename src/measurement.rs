@@ -7,6 +7,7 @@ use crate::calibration::{Calibration, ScaleError};
 use crate::color::Rgb;
 use crate::geometry::{Bounds, BoundsHandle, Edge, Point};
 use crate::style::{FillAppearance, LineAppearance, LineStyle, Styled};
+use crate::tr;
 use crate::units::LengthUnit;
 
 /// One end of a measurement line.
@@ -22,9 +23,9 @@ impl Endpoint {
 
 impl fmt::Display for Endpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Endpoint::Start => "start",
-            Endpoint::End => "end",
+        f.write_str(&match self {
+            Endpoint::Start => tr!("endpoint-start"),
+            Endpoint::End => tr!("endpoint-end"),
         })
     }
 }

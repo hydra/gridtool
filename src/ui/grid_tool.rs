@@ -6,6 +6,7 @@ use gridtool::calibration::Line;
 use gridtool::document::Document;
 use gridtool::geometry::Point;
 use gridtool::grid::{Grid, GridSource};
+use gridtool::tr;
 
 use super::selection::Selection;
 
@@ -20,10 +21,10 @@ pub enum GridVia {
 impl GridVia {
     pub const ALL: [GridVia; 2] = [GridVia::Scale, GridVia::Measurement];
 
-    pub fn name(self) -> &'static str {
+    pub fn name(self) -> String {
         match self {
-            GridVia::Scale => "Via scale",
-            GridVia::Measurement => "Via measurement",
+            GridVia::Scale => tr!("grid-via-scale"),
+            GridVia::Measurement => tr!("grid-via-measurement"),
         }
     }
 }
@@ -106,16 +107,16 @@ pub fn add_grid(document: &Document, source: GridSource) -> Option<Action> {
     Some(Action::AddGrid(Grid::new(source, unit)))
 }
 
-fn hint(via: GridVia, document: &Document) -> &'static str {
+fn hint(via: GridVia, document: &Document) -> String {
     match via {
         GridVia::Scale if document.calibration().points().is_none() => {
-            "Place the scale points first (Scale tool)."
+            tr!("grid-hint-place-scale")
         }
-        GridVia::Scale => "Click a scale line to add a grid aligned to it.",
+        GridVia::Scale => tr!("grid-hint-click-scale"),
         GridVia::Measurement if document.measurements().is_empty() => {
-            "Add a measurement first (Measure distance tool)."
+            tr!("grid-hint-add-measurement")
         }
-        GridVia::Measurement => "Click a measurement line to add a grid aligned to it.",
+        GridVia::Measurement => tr!("grid-hint-click-measurement"),
     }
 }
 

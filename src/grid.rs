@@ -8,6 +8,7 @@ use crate::color::Rgb;
 use crate::document::Document;
 use crate::geometry::{Bounds, Point};
 use crate::object::ObjectId;
+use crate::tr;
 use crate::units::LengthUnit;
 
 /// The initial cell size, in the grid's unit.
@@ -38,10 +39,10 @@ pub enum CellShape {
 impl CellShape {
     pub const ALL: [CellShape; 2] = [CellShape::Square, CellShape::Rectangle];
 
-    pub fn name(self) -> &'static str {
+    pub fn name(self) -> String {
         match self {
-            CellShape::Square => "Square",
-            CellShape::Rectangle => "Rectangle",
+            CellShape::Square => tr!("cell-shape-square"),
+            CellShape::Rectangle => tr!("cell-shape-rectangle"),
         }
     }
 }
@@ -81,12 +82,12 @@ pub enum GridError {
 
 impl fmt::Display for GridError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::SourceMissing => f.write_str("its alignment line no longer exists"),
-            Self::ZeroLengthSource => f.write_str("its alignment line has zero length"),
-            Self::NoScale(reason) => write!(f, "it needs a scale ({reason})"),
-            Self::TooDense => f.write_str("the cells are too small to draw"),
-        }
+        f.write_str(&match self {
+            Self::SourceMissing => tr!("error-grid-source-gone"),
+            Self::ZeroLengthSource => tr!("error-grid-source-zero-length"),
+            Self::NoScale(reason) => tr!("error-grid-no-scale", { reason: reason }),
+            Self::TooDense => tr!("error-grid-too-dense"),
+        })
     }
 }
 

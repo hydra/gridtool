@@ -4,6 +4,7 @@
 use std::panic;
 use std::path::Path;
 
+use gridtool::tr;
 use human_panic::{Metadata, PanicStyle, handle_dump, print_msg};
 use rfd::{MessageButtons, MessageDialog, MessageLevel};
 
@@ -22,7 +23,7 @@ pub fn install() {
         let _ = print_msg(report.as_deref(), &metadata);
         MessageDialog::new()
             .set_level(MessageLevel::Error)
-            .set_title(format!("{} crashed", crate::APP_NAME))
+            .set_title(tr!("crash-title", { app: crate::APP_NAME }))
             .set_description(crash_message(report.as_deref()))
             .set_buttons(MessageButtons::Ok)
             .show();
@@ -31,19 +32,15 @@ pub fn install() {
 
 /// What the dialog says, given where the crash report was saved, if it could be.
 fn crash_message(report: Option<&Path>) -> String {
-    let (name, repository) = (crate::APP_NAME, crate::REPOSITORY);
-    let closing = format!(
-        "{name} had a problem and has to close. Changes that were not saved have been lost."
-    );
+    let closing = tr!("crash-closing", { app: crate::APP_NAME });
     match report {
         Some(report) => format!(
-            "{closing}\n\n\
-             A crash report was saved to:\n{}\n\n\
-             To help get this fixed, please attach it to an issue at {repository}/issues. \
-             Nothing is sent automatically.",
-            report.display()
+            "{closing}\n\n{}\n{}\n\n{}",
+            tr!("crash-report-saved"),
+            report.display(),
+            tr!("crash-report-help", { url: crate::REPOSITORY })
         ),
-        None => format!("{closing}\n\nA crash report could not be saved."),
+        None => format!("{closing}\n\n{}", tr!("crash-no-report")),
     }
 }
 

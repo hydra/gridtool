@@ -1,5 +1,6 @@
 use eframe::egui;
 use gridtool::document::Document;
+use gridtool::tr;
 
 use super::angle::{format_degrees, parse_degrees};
 use super::viewport::Viewport;
@@ -16,7 +17,7 @@ pub struct RotationBar {
 impl RotationBar {
     /// Shows the controls. Typed rotations pivot about the document origin.
     pub fn show(&mut self, ui: &mut egui::Ui, viewport: &mut Viewport, document: &Document) {
-        let label = ui.label("View rotation (°):");
+        let label = ui.label(tr!("rotation-label"));
         let field = ui
             .add(egui::TextEdit::singleline(&mut self.angle_text).desired_width(ANGLE_FIELD_WIDTH))
             .labelled_by(label.id);

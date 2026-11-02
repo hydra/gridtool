@@ -9,6 +9,7 @@ repository = "https://github.com/hydra/gridtool"
 [dependencies]
 eframe = { version = "0.37.0", features = ["persistence"] }
 egui = "0.37.0"
+egui-i18n = { version = "0.2.0", features = ["fluent"] }
 egui_ltreeview = "0.9.0"
 egui_tiles = "0.18.0"
 egui_material_icons = "0.9.0"

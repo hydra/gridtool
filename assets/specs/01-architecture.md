@@ -33,6 +33,10 @@ and text parsing and formatting. The tests MUST run without opening a window.
 **ARCH-8 — Platform abstraction.** Native services such as the file-open dialog MUST
 sit behind an interface, so that logic which uses them can be tested with a fake.
 
+**ARCH-8a — Language.** What the core says, in history descriptions and error messages, is in the
+current language (`PREF`). Translation does not depend on a UI toolkit, and the core works without
+being set up first, in the default language.
+
 **ARCH-9 — Code quality.** The code SHOULD follow clean-code principles (DRY, SOLID)
 and SHOULD be organised into cohesive modules.
 

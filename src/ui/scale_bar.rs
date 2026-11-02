@@ -4,6 +4,7 @@ use eframe::egui;
 use gridtool::action::Action;
 use gridtool::calibration::{Calibration, CalibrationMethod, Line};
 use gridtool::document::Document;
+use gridtool::tr;
 
 use super::commit_field::CommitField;
 use super::format::format_trimmed;
@@ -44,7 +45,7 @@ impl ScaleBar {
                 ui,
                 "scale_unit",
                 calibration.unit(),
-                units_tooltip(tool.method()),
+                &units_tooltip(tool.method()),
             )
             .map(Action::SetUnit),
         );
@@ -85,10 +86,10 @@ fn method_buttons(ui: &mut egui::Ui, tool: &mut ScaleTool) {
     }
 }
 
-fn units_tooltip(method: CalibrationMethod) -> &'static str {
+fn units_tooltip(method: CalibrationMethod) -> String {
     match method.lines() {
-        [_] => "Units of distance A",
-        _ => "Units of distances A and B",
+        [_] => tr!("scale-units-one-tooltip"),
+        _ => tr!("scale-units-two-tooltip"),
     }
 }
 
@@ -106,15 +107,14 @@ fn scale_result(ui: &mut egui::Ui, calibration: &Calibration) {
     match calibration.scale() {
         Ok(scale) => {
             let format = |value| format_trimmed(value, SCALE_DECIMALS);
-            ui.label(format!(
-                "X: {} {unit}/px   Y: {} {unit}/px",
-                format(scale.x_per_pixel),
-                format(scale.y_per_pixel),
-                unit = scale.unit
-            ));
+            ui.label(tr!("scale-result", {
+                x: format(scale.x_per_pixel),
+                y: format(scale.y_per_pixel),
+                unit: scale.unit,
+            }));
         }
         Err(reason) => {
-            ui.weak(format!("Scale: {reason}"));
+            ui.weak(tr!("scale-problem", { reason: reason }));
         }
     }
 }

@@ -14,6 +14,7 @@ use crate::measurement::{Endpoint, Measurement};
 use crate::object::{Identified, ObjectId};
 use crate::shape::DrawnShape;
 use crate::style::{InvalidStyle, StyleEdit, Styled};
+use crate::tr;
 use crate::units::LengthUnit;
 
 /// The object a style edit applies to, by its place in its list.
@@ -26,11 +27,11 @@ pub enum StyleTarget {
 
 impl fmt::Display for StyleTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Measurement(index) => write!(f, "measurement {}", index + 1),
-            Self::Area(index) => write!(f, "area {}", index + 1),
-            Self::Shape(index) => write!(f, "shape {}", index + 1),
-        }
+        f.write_str(&match self {
+            Self::Measurement(index) => tr!("target-measurement", { number: index + 1 }),
+            Self::Area(index) => tr!("target-area", { number: index + 1 }),
+            Self::Shape(index) => tr!("target-shape", { number: index + 1 }),
+        })
     }
 }
 
@@ -186,62 +187,49 @@ pub enum ActionError {
 
 impl fmt::Display for ActionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::PointOutsideDocument(point) => write!(f, "point {point} is outside the document"),
-            Self::NoScalePoints => f.write_str("there are no scale points to move"),
+        let message = match self {
+            Self::PointOutsideDocument(point) => tr!("error-point-outside", { point: point }),
+            Self::NoScalePoints => tr!("error-no-scale-points"),
             Self::InvalidDistance(distance) => {
-                write!(f, "distance must be a positive number, got {distance}")
+                tr!("error-invalid-distance", { distance: distance })
             }
-            Self::MeasurementIndexOutOfRange { index, count } => write!(
-                f,
-                "measurement {} does not exist (there are {count})",
-                index + 1
-            ),
+            Self::MeasurementIndexOutOfRange { index, count } => {
+                tr!("error-measurement-missing", { number: index + 1, count: count })
+            }
             Self::AreaIndexOutOfRange { index, count } => {
-                write!(f, "area {} does not exist (there are {count})", index + 1)
+                tr!("error-area-missing", { number: index + 1, count: count })
             }
-            Self::AreaPointIndexOutOfRange { point, count } => write!(
-                f,
-                "area point {} does not exist (there are {count})",
-                point + 1
-            ),
-            Self::AreaPointCountChanged { expected, actual } => write!(
-                f,
-                "an area with {expected} points cannot be given {actual} points"
-            ),
+            Self::AreaPointIndexOutOfRange { point, count } => {
+                tr!("error-area-point-missing", { number: point + 1, count: count })
+            }
+            Self::AreaPointCountChanged { expected, actual } => {
+                tr!("error-area-point-count", { expected: expected, actual: actual })
+            }
             Self::GridIndexOutOfRange { index, count } => {
-                write!(f, "grid {} does not exist (there are {count})", index + 1)
+                tr!("error-grid-missing", { number: index + 1, count: count })
             }
-            Self::GridSourceMissing => f.write_str("the grid's alignment line does not exist"),
-            Self::InvalidCellSize(size) => {
-                write!(f, "cell size must be a positive number, got {size}")
-            }
-            Self::InvalidOpacity(opacity) => {
-                write!(f, "opacity must be between 0 and 1, got {opacity}")
-            }
+            Self::GridSourceMissing => tr!("error-grid-source-missing"),
+            Self::InvalidCellSize(size) => tr!("error-invalid-cell-size", { size: size }),
+            Self::InvalidOpacity(opacity) => tr!("error-invalid-opacity", { opacity: opacity }),
             Self::ShapeIndexOutOfRange { index, count } => {
-                write!(f, "shape {} does not exist (there are {count})", index + 1)
+                tr!("error-shape-missing", { number: index + 1, count: count })
             }
-            Self::ShapePointIndexOutOfRange { point, count } => write!(
-                f,
-                "shape point {} does not exist (there are {count})",
-                point + 1
-            ),
-            Self::ShapePointCountChanged { expected, actual } => write!(
-                f,
-                "a shape with {expected} points cannot be given {actual} points"
-            ),
-            Self::HasNoFill(target) => {
-                write!(f, "{target} encloses no area, so has no fill")
+            Self::ShapePointIndexOutOfRange { point, count } => {
+                tr!("error-shape-point-missing", { number: point + 1, count: count })
             }
+            Self::ShapePointCountChanged { expected, actual } => {
+                tr!("error-shape-point-count", { expected: expected, actual: actual })
+            }
+            Self::HasNoFill(target) => tr!("error-no-fill", { target: target }),
             Self::InvalidFillSpacing(spacing) => {
-                write!(f, "fill spacing must be a positive number, got {spacing}")
+                tr!("error-invalid-fill-spacing", { spacing: spacing })
             }
             Self::InvalidFillAngle(degrees) => {
-                write!(f, "fill angle must be from 0 up to 360, got {degrees}")
+                tr!("error-invalid-fill-angle", { degrees: degrees })
             }
-            Self::Calibration(error) => error.fmt(f),
-        }
+            Self::Calibration(error) => return error.fmt(f),
+        };
+        f.write_str(&message)
     }
 }
 
@@ -598,99 +586,115 @@ fn measurement_mut(document: &mut Document, index: usize) -> Result<&mut Measure
 
 impl fmt::Display for Action {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Action::SetScalePoints(points) => write!(f, "Set {} scale points", points.method()),
+        f.write_str(&match self {
+            Action::SetScalePoints(points) => {
+                tr!("action-set-scale-points", { method: points.method() })
+            }
             Action::MoveScalePoint { index, to } => {
-                write!(f, "Move scale point {} to {to}", index + 1)
+                tr!("action-move-scale-point", { number: index + 1, to: to })
             }
             Action::SetDistance {
                 line,
                 distance: Some(distance),
-            } => write!(f, "Set distance {line} to {distance}"),
+            } => tr!("action-set-distance", { line: line, distance: distance }),
             Action::SetDistance {
                 line,
                 distance: None,
-            } => write!(f, "Clear distance {line}"),
-            Action::SetUnit(unit) => write!(f, "Set units to {unit}"),
-            Action::SetOrigin(origin) => write!(f, "Set origin to {origin}"),
-            Action::AddMeasurement(measurement) => write!(
-                f,
-                "Add measurement from {} to {}",
-                measurement.start(),
-                measurement.end()
-            ),
+            } => tr!("action-clear-distance", { line: line }),
+            Action::SetUnit(unit) => tr!("action-set-unit", { unit: unit }),
+            Action::SetOrigin(origin) => tr!("action-set-origin", { origin: origin }),
+            Action::AddMeasurement(measurement) => tr!("action-add-measurement", {
+                start: measurement.start(),
+                end: measurement.end(),
+            }),
             Action::MoveMeasurementPoint {
                 index,
                 endpoint,
                 to,
-            } => write!(f, "Move measurement {} {endpoint} to {to}", index + 1),
+            } => tr!("action-move-measurement-point", {
+                number: index + 1,
+                endpoint: endpoint,
+                to: to,
+            }),
             Action::ResizeMeasurement { index, start, end } => {
-                write!(f, "Resize measurement {} to {start} - {end}", index + 1)
+                tr!("action-resize-measurement", { number: index + 1, start: start, end: end })
             }
             Action::MoveMeasurement { index, start, end } => {
-                write!(f, "Move measurement {} to {start} - {end}", index + 1)
+                tr!("action-move-measurement", { number: index + 1, start: start, end: end })
             }
             Action::SetMeasurementUnit { index, unit } => {
-                write!(f, "Set measurement {} units to {unit}", index + 1)
+                tr!("action-set-measurement-unit", { number: index + 1, unit: unit })
             }
             Action::DeleteMeasurement { index } => {
-                write!(f, "Delete measurement {}", index + 1)
+                tr!("action-delete-measurement", { number: index + 1 })
             }
-            Action::AddArea(area) => write!(f, "Add area with {} points", area.points().len()),
+            Action::AddArea(area) => tr!("action-add-area", { count: area.points().len() }),
             Action::MoveAreaPoint { index, point, to } => {
-                write!(f, "Move area {} point {} to {to}", index + 1, point + 1)
+                tr!("action-move-area-point", { number: index + 1, point: point + 1, to: to })
             }
-            Action::ResizeArea { index, .. } => write!(f, "Resize area {}", index + 1),
-            Action::MoveArea { index, .. } => write!(f, "Move area {}", index + 1),
+            Action::ResizeArea { index, .. } => tr!("action-resize-area", { number: index + 1 }),
+            Action::MoveArea { index, .. } => tr!("action-move-area", { number: index + 1 }),
             Action::SetAreaUnit { index, unit } => {
-                write!(f, "Set area {} units to {unit}", index + 1)
+                tr!("action-set-area-unit", { number: index + 1, unit: unit })
             }
-            Action::DeleteArea { index } => write!(f, "Delete area {}", index + 1),
-            Action::DuplicateArea { index } => write!(f, "Duplicate area {}", index + 1),
+            Action::DeleteArea { index } => tr!("action-delete-area", { number: index + 1 }),
+            Action::DuplicateArea { index } => {
+                tr!("action-duplicate-area", { number: index + 1 })
+            }
             Action::DuplicateMeasurement { index } => {
-                write!(f, "Duplicate measurement {}", index + 1)
+                tr!("action-duplicate-measurement", { number: index + 1 })
             }
-            Action::DuplicateGrid { index } => write!(f, "Duplicate grid {}", index + 1),
-            Action::DeleteGrid { index } => write!(f, "Delete grid {}", index + 1),
+            Action::DuplicateGrid { index } => {
+                tr!("action-duplicate-grid", { number: index + 1 })
+            }
+            Action::DeleteGrid { index } => tr!("action-delete-grid", { number: index + 1 }),
             Action::AddGrid(grid) => match grid.source() {
-                GridSource::ScaleLine(line) => write!(f, "Add grid aligned to scale line {line}"),
-                GridSource::Measurement(_) => f.write_str("Add grid aligned to a measurement"),
+                GridSource::ScaleLine(line) => {
+                    tr!("action-add-grid-scale-line", { line: line })
+                }
+                GridSource::Measurement(_) => tr!("action-add-grid-measurement"),
             },
             Action::SetGridShape { index, shape } => {
-                write!(f, "Set grid {} cell shape to {}", index + 1, shape.name())
+                tr!("action-set-grid-shape", { number: index + 1, shape: shape.name() })
             }
             Action::SetGridSize {
                 index,
                 dimension,
                 size,
-            } => write!(f, "Set grid {} size {dimension} to {size}", index + 1),
+            } => tr!("action-set-grid-size", {
+                number: index + 1,
+                dimension: dimension,
+                size: size,
+            }),
             Action::SetGridUnit { index, unit } => {
-                write!(f, "Set grid {} units to {unit}", index + 1)
+                tr!("action-set-grid-unit", { number: index + 1, unit: unit })
             }
             Action::SetGridColor { index, color } => {
-                write!(f, "Set grid {} color to {color}", index + 1)
+                tr!("action-set-grid-color", { number: index + 1, color: color })
             }
-            Action::SetGridOpacity { index, opacity } => write!(
-                f,
-                "Set grid {} opacity to {}%",
-                index + 1,
-                (opacity * 100.0).round()
-            ),
+            Action::SetGridOpacity { index, opacity } => tr!("action-set-grid-opacity", {
+                number: index + 1,
+                percent: (opacity * 100.0).round(),
+            }),
             Action::AddShape(shape) if shape.is_closed() => {
-                write!(f, "Add closed shape with {} points", shape.points().len())
+                tr!("action-add-closed-shape", { count: shape.points().len() })
             }
-            Action::AddShape(shape) => {
-                write!(f, "Add line with {} points", shape.points().len())
-            }
+            Action::AddShape(shape) => tr!("action-add-line", { count: shape.points().len() }),
             Action::MoveShapePoint { index, point, to } => {
-                write!(f, "Move shape {} point {} to {to}", index + 1, point + 1)
+                tr!("action-move-shape-point", { number: index + 1, point: point + 1, to: to })
             }
-            Action::ResizeShape { index, .. } => write!(f, "Resize shape {}", index + 1),
-            Action::MoveShape { index, .. } => write!(f, "Move shape {}", index + 1),
-            Action::SetStyle { target, edit } => write!(f, "Set {target} {edit}"),
-            Action::DeleteShape { index } => write!(f, "Delete shape {}", index + 1),
-            Action::DuplicateShape { index } => write!(f, "Duplicate shape {}", index + 1),
-        }
+            Action::ResizeShape { index, .. } => {
+                tr!("action-resize-shape", { number: index + 1 })
+            }
+            Action::MoveShape { index, .. } => tr!("action-move-shape", { number: index + 1 }),
+            Action::SetStyle { target, edit } => {
+                tr!("action-set-style", { target: target, edit: edit })
+            }
+            Action::DeleteShape { index } => tr!("action-delete-shape", { number: index + 1 }),
+            Action::DuplicateShape { index } => {
+                tr!("action-duplicate-shape", { number: index + 1 })
+            }
+        })
     }
 }
 

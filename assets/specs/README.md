@@ -27,6 +27,7 @@ must satisfy them.
 | [14-areas.md](14-areas.md) | Measure area tool, area measurements, Areas table | `AREA` |
 | [15-shapes.md](15-shapes.md) | Draw line tool, drawn shapes and their styles, shape properties row | `DRAW` |
 | [16-workspace.md](16-workspace.md) | Dockable panels, the Documents area, multiple documents, the active document | `WORK` |
+| [17-preferences.md](17-preferences.md) | Theme and language, the Settings menu, translation files | `PREF` |
 
 ## Conventions
 
@@ -36,7 +37,8 @@ must satisfy them.
   **MAY** means it is optional.
 - Lengths written as "px" or "points" are **logical screen units** (device-independent
   pixels), unless a requirement says they are *image pixels*.
-- Text in `code style` that appears inside quotation marks must be reproduced exactly.
+- Text in `code style` that appears inside quotation marks must be reproduced exactly. It is the
+  `en-US` text; other languages show its translation (`PREF-6`).
 - Icons are described by meaning. The current Google Material Symbols icon name is given
   for reference (`SHELL-6`), and any icon with the same meaning is acceptable.
 - Each area ends with **acceptance criteria**. These are concrete scenarios that an
@@ -116,3 +118,4 @@ must satisfy them.
 | 2026-11-01 | A panic in a release build now saves a crash report and shows a dialog saying where it is (`SHELL-1c`). |
 | 2026-11-01 | Added an About button at the right-hand end of the tool bar, and its dialog (`SHELL-5`, `SHELL-13`). |
 | 2026-11-01 | Added the 2-point calibration method, with one line and the same scale on both axes, and file format version 7 (`SCALE-1`, `SCALE-17`, `FILE-6f`). A loaded document now selects the method of its scale points (`SCALE-10`). |
+| 2026-11-02 | Added a Settings menu at the right-hand end of the tool bar, with the theme (System, Light or Dark) and language (`en-US` or `es-ES`), both kept between runs, and translation files holding everything the application says (`17`, `SHELL-5`). Numbers keep the decimal point "." in every language. |

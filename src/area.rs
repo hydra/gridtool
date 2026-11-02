@@ -8,6 +8,7 @@ use crate::color::Rgb;
 use crate::geometry::{Bounds, BoundsHandle, Point};
 use crate::polygon;
 use crate::style::{FillAppearance, FillStyle, LineAppearance, LineStyle, Styled};
+use crate::tr;
 use crate::units::LengthUnit;
 
 /// The fewest points that enclose an area.
@@ -39,11 +40,10 @@ pub struct TooFewPoints(pub usize);
 
 impl fmt::Display for TooFewPoints {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "an area needs at least {MIN_POINTS} points, got {}",
-            self.0
-        )
+        f.write_str(&tr!("error-area-too-few-points", {
+            minimum: MIN_POINTS,
+            count: self.0,
+        }))
     }
 }
 

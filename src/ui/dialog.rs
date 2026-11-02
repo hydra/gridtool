@@ -1,10 +1,11 @@
 //! Modal message dialogs with a fixed set of buttons, e.g. "Unsaved changes".
 
 use eframe::egui;
+use gridtool::tr;
 
 const MIN_WIDTH: f32 = 280.0;
 
-/// A dialog button. Each has a fixed label.
+/// A dialog button. Each has a fixed label, in the current language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DialogButton {
     Yes,
@@ -14,12 +15,12 @@ pub enum DialogButton {
 }
 
 impl DialogButton {
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
         match self {
-            DialogButton::Yes => "Yes",
-            DialogButton::No => "No",
-            DialogButton::Cancel => "Cancel",
-            DialogButton::Ok => "OK",
+            DialogButton::Yes => tr!("dialog-yes"),
+            DialogButton::No => tr!("dialog-no"),
+            DialogButton::Cancel => tr!("dialog-cancel"),
+            DialogButton::Ok => tr!("dialog-ok"),
         }
     }
 }
@@ -41,8 +42,8 @@ impl Dialog {
     /// the default.
     pub fn unsaved_changes(name: &str) -> Self {
         Self {
-            title: "Unsaved changes".to_owned(),
-            message: format!("Do you want to save {name} now?"),
+            title: tr!("dialog-unsaved-title"),
+            message: tr!("dialog-unsaved-message", { name: name }),
             buttons: &[DialogButton::Yes, DialogButton::No, DialogButton::Cancel],
             default: DialogButton::Cancel,
         }
@@ -51,8 +52,8 @@ impl Dialog {
     /// Asks whether to replace an existing file; No is the default.
     pub fn overwrite(file_name: &str) -> Self {
         Self {
-            title: "File already exists".to_owned(),
-            message: format!("{file_name} already exists. Do you want to replace it?"),
+            title: tr!("dialog-overwrite-title"),
+            message: tr!("dialog-overwrite-message", { file: file_name }),
             buttons: &[DialogButton::Yes, DialogButton::No],
             default: DialogButton::No,
         }

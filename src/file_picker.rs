@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use gridtool::document_file;
 use gridtool::imaging::format::SUPPORTED_EXTENSIONS;
+use gridtool::tr;
 
 /// Asks the user to choose an image file. Abstracted so the app logic can be tested
 /// without showing a native dialog.
@@ -17,8 +18,8 @@ pub struct RfdImagePicker;
 impl ImageFilePicker for RfdImagePicker {
     fn pick_image(&self) -> Option<PathBuf> {
         rfd::FileDialog::new()
-            .set_title("Open image")
-            .add_filter("Images", SUPPORTED_EXTENSIONS)
+            .set_title(tr!("picker-open-image"))
+            .add_filter(tr!("picker-images"), SUPPORTED_EXTENSIONS)
             .pick_file()
     }
 }
@@ -34,8 +35,6 @@ pub trait DocumentFilePicker {
     fn pick_save_path(&self, suggestion: &Path) -> Option<PathBuf>;
 }
 
-const DOCUMENT_FILTER_NAME: &str = "GridTool document";
-
 /// Native file dialog implementation backed by `rfd`.
 #[derive(Debug, Default)]
 pub struct RfdDocumentPicker;
@@ -43,15 +42,15 @@ pub struct RfdDocumentPicker;
 impl DocumentFilePicker for RfdDocumentPicker {
     fn pick_document(&self) -> Option<PathBuf> {
         rfd::FileDialog::new()
-            .set_title("Load document")
-            .add_filter(DOCUMENT_FILTER_NAME, &[document_file::EXTENSION])
+            .set_title(tr!("picker-load-document"))
+            .add_filter(tr!("picker-document-filter"), &[document_file::EXTENSION])
             .pick_file()
     }
 
     fn pick_save_path(&self, suggestion: &Path) -> Option<PathBuf> {
         let mut dialog = rfd::FileDialog::new()
-            .set_title("Save document as")
-            .add_filter(DOCUMENT_FILTER_NAME, &[document_file::EXTENSION]);
+            .set_title(tr!("picker-save-document"))
+            .add_filter(tr!("picker-document-filter"), &[document_file::EXTENSION]);
         if let Some(folder) = suggestion.parent().filter(|folder| folder.is_dir()) {
             dialog = dialog.set_directory(folder);
         }

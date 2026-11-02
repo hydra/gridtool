@@ -9,6 +9,7 @@ use gridtool::document::Document;
 use gridtool::object::{ObjectId, ObjectKind};
 use gridtool::shape::DrawnShape;
 use gridtool::style::{StyleEdit, Styled};
+use gridtool::tr;
 
 use super::document_view::DocumentView;
 use super::grid_bar::GridBar;
@@ -20,15 +21,13 @@ use super::style_controls::{StyleControls, StyleEvents};
 use super::tool_mode::ToolMode;
 use super::unit_picker;
 
-const NO_DOCUMENT_HELP: &str = "Open an image to get started";
-const PAN_HELP: &str = "Drag to pan the view. Scroll to zoom.";
-const ORIGIN_HELP: &str =
-    "Click on the image to move the origin, the point the view rotates about.";
-
 /// "Shape <n> (line)" or "Shape <n> (area)".
 pub fn shape_label(index: usize, shape: &DrawnShape) -> String {
-    let kind = if shape.is_closed() { "area" } else { "line" };
-    format!("Shape {} ({kind})", index + 1)
+    if shape.is_closed() {
+        tr!("object-shape-area", { number: index + 1 })
+    } else {
+        tr!("object-shape-line", { number: index + 1 })
+    }
 }
 
 #[derive(Default)]
@@ -55,7 +54,7 @@ impl ToolControls {
                 ui.horizontal_wrapped(|ui| {
                     ui.set_row_height(min_height);
                     let Some((view, document)) = open else {
-                        ui.weak(NO_DOCUMENT_HELP);
+                        ui.weak(tr!("help-no-document"));
                         return None;
                     };
                     let active = view.selection.active().and_then(|id| {
@@ -91,14 +90,14 @@ impl ToolControls {
             ObjectKind::Measurement => {
                 let index = document.measurement_index(id)?;
                 let stored = &document.measurements()[index];
-                ui.strong(format!("Measurement {}", index + 1));
+                ui.strong(tr!("object-measurement", { number: index + 1 }));
                 ui.separator();
                 actions.extend(
                     unit_picker::show(
                         ui,
                         ("object_unit", id),
                         stored.unit(),
-                        "Units of this measurement",
+                        &tr!("measurement-unit-tooltip"),
                     )
                     .map(|unit| Action::SetMeasurementUnit { index, unit }),
                 );
@@ -113,14 +112,14 @@ impl ToolControls {
             ObjectKind::Area => {
                 let index = document.area_index(id)?;
                 let stored = &document.areas()[index];
-                ui.strong(format!("Area {}", index + 1));
+                ui.strong(tr!("object-area", { number: index + 1 }));
                 ui.separator();
                 actions.extend(
                     unit_picker::show_area(
                         ui,
                         ("object_unit", id),
                         stored.unit(),
-                        "Units of this area",
+                        &tr!("area-unit-tooltip"),
                     )
                     .map(|unit| Action::SetAreaUnit { index, unit }),
                 );
@@ -192,11 +191,11 @@ impl ToolControls {
     ) -> Option<Action> {
         match mode {
             ToolMode::Pan => {
-                ui.weak(PAN_HELP);
+                ui.weak(tr!("help-pan"));
                 None
             }
             ToolMode::Origin => {
-                ui.weak(ORIGIN_HELP);
+                ui.weak(tr!("help-origin"));
                 None
             }
             ToolMode::Rotate => {
@@ -210,10 +209,10 @@ impl ToolControls {
             }
             ToolMode::Measure => {
                 let settings = &mut view.measure_tool.settings;
-                ui.strong("New measurement");
+                ui.strong(tr!("new-measurement"));
                 ui.separator();
                 let unit = settings.unit(document.calibration().unit());
-                let tooltip = "Units of new measurements";
+                let tooltip = &tr!("new-measurement-unit-tooltip");
                 if let Some(unit) = unit_picker::show(ui, "new_measurement_unit", unit, tooltip) {
                     settings.set_unit(unit);
                 }
@@ -223,10 +222,10 @@ impl ToolControls {
             }
             ToolMode::Area => {
                 let settings = &mut view.area_tool.settings;
-                ui.strong("New area");
+                ui.strong(tr!("new-area"));
                 ui.separator();
                 let unit = settings.unit(document.calibration().unit());
-                let tooltip = "Units of new areas";
+                let tooltip = &tr!("new-area-unit-tooltip");
                 if let Some(unit) = unit_picker::show_area(ui, "new_area_unit", unit, tooltip) {
                     settings.set_unit(unit);
                 }
@@ -235,7 +234,7 @@ impl ToolControls {
                 None
             }
             ToolMode::DrawLine => {
-                ui.strong("New shape");
+                ui.strong(tr!("new-shape"));
                 ui.separator();
                 let settings = &mut view.line_tool.settings;
                 self.new_object_style(ui, "new_shape", settings, document);
@@ -469,12 +468,12 @@ mod tests {
             harness.settled_canvas_top();
 
             assert_eq!(
-                harness.shows_text(PAN_HELP),
+                harness.shows_text(&tr!("help-pan")),
                 mode == ToolMode::Pan,
                 "{mode:?}"
             );
             assert_eq!(
-                harness.shows_text(ORIGIN_HELP),
+                harness.shows_text(&tr!("help-origin")),
                 mode == ToolMode::Origin,
                 "{mode:?}"
             );
@@ -512,7 +511,7 @@ mod tests {
         let mut harness = Harness::new(ToolMode::Pan).with_active_shape(FillStyle::Solid);
         harness.settled_canvas_top();
 
-        assert!(!harness.shows_text(PAN_HELP));
+        assert!(!harness.shows_text(&tr!("help-pan")));
     }
 
     #[test]
@@ -550,7 +549,7 @@ mod tests {
         output.textures_delta.clear();
 
         assert!(output.shapes.iter().any(|clipped| match &clipped.shape {
-            egui::Shape::Text(shape) => shape.galley.job.text.contains(NO_DOCUMENT_HELP),
+            egui::Shape::Text(shape) => shape.galley.job.text.contains(&tr!("help-no-document")),
             _ => false,
         }));
     }
@@ -561,7 +560,7 @@ mod tests {
             let mut harness = Harness::new(mode);
             harness.settled_canvas_top();
 
-            assert!(!harness.shows_text(NO_DOCUMENT_HELP), "{mode:?}");
+            assert!(!harness.shows_text(&tr!("help-no-document")), "{mode:?}");
         }
     }
 

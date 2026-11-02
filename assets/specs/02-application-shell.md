@@ -105,7 +105,9 @@ object is chosen.
 | 17 | Redo button | redo arrow (`redo`) | "`Redo`" |
 | 18 | Horizontal spacer, 16 px | — | — |
 | 19 | Panels menu (`WORK-5`) | panels (`dashboard`) | "`Panels`" |
-| 20 | About button (`SHELL-13`), at the right-hand end of the tool bar, with the free space before it | information (`info`) | "`About`" |
+| 20 | Free space | — | — |
+| 21 | Settings menu (`PREF-1`) | settings (`settings`) | "`Settings`" |
+| 22 | About button (`SHELL-13`), at the right-hand end of the tool bar | information (`info`) | "`About`" |
 
 The buttons act on the active document (`WORK-10`). Items 14 onward up to the next spacer are the **drawing tools** group; future drawing tools
 are added to it.
@@ -217,7 +219,8 @@ If another dialog needs to ask something while it is open (`FILE-11`), that dial
   - While it is open, clicks do not reach the canvas.
   - A question from a file command replaces it.
 
-- Scroll bars (`SHELL-12`): they do not float over the content, in the dark or the light theme.
+- Scroll bars (`SHELL-12`): they do not float over the content, in the dark or the light theme
+  (`PREF-2`).
 
 - The default tool mode is Pan & zoom.
 - Every mode has a distinct icon and a distinct name.

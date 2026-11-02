@@ -10,6 +10,7 @@ use gridtool::action::Action;
 use gridtool::document::Document;
 use gridtool::grid::{Grid, GridSource};
 use gridtool::object::{ObjectId, ObjectKind};
+use gridtool::tr;
 
 use super::format::format_length;
 use super::icon_button::icon_button;
@@ -69,8 +70,9 @@ impl ObjectCommands {
     /// Shows the tool bar, returning the command the user clicked.
     fn show(self, ui: &mut egui::Ui) -> Option<Action> {
         ui.horizontal(|ui| {
-            let duplicate = command_button(ui, DUPLICATE_ICON, "Duplicate", self.duplicate);
-            let delete = command_button(ui, DELETE_ICON, "Delete", self.delete);
+            let duplicate =
+                command_button(ui, DUPLICATE_ICON, &tr!("tree-duplicate"), self.duplicate);
+            let delete = command_button(ui, DELETE_ICON, &tr!("tree-delete"), self.delete);
             duplicate.or(delete)
         })
         .inner
@@ -105,7 +107,7 @@ pub fn show(
     let action = commands.show(ui);
     ui.separator();
     let Some((document, state, selection)) = open else {
-        ui.weak("No document open");
+        ui.weak(tr!("tree-no-document"));
         return ObjectPanelOutput::default();
     };
     let pick = show_tree(ui, document, state, selection).inner;
@@ -211,35 +213,37 @@ fn tree(
         .allow_multi_selection(false)
         .allow_drag_and_drop(false)
         .show_state(ui, state, |builder| {
-            builder.dir(TreeNode::Document, "Document");
-            builder.dir(TreeNode::Measurements, "Measurements");
-            builder.dir(TreeNode::PointToPoint, "Point-to-point");
+            builder.dir(TreeNode::Document, tr!("tree-document"));
+            builder.dir(TreeNode::Measurements, tr!("tree-measurements"));
+            builder.dir(TreeNode::PointToPoint, tr!("tree-point-to-point"));
             for (index, measurement) in document.measurements().iter().enumerate() {
                 let label = match measurement.distance(document.calibration()) {
-                    Ok(distance) => format!(
-                        "Measurement {} ({} {})",
-                        index + 1,
-                        format_length(distance),
-                        measurement.unit()
-                    ),
-                    Err(_) => format!("Measurement {}", index + 1),
+                    Ok(distance) => tr!("object-measurement-with-length", {
+                        number: index + 1,
+                        length: format_length(distance),
+                        unit: measurement.unit(),
+                    }),
+                    Err(_) => tr!("object-measurement", { number: index + 1 }),
                 };
                 builder.leaf(TreeNode::Object(measurement.id()), label);
             }
             builder.close_dir();
-            builder.dir(TreeNode::Areas, "Area");
+            builder.dir(TreeNode::Areas, tr!("tree-area"));
             for (index, area) in document.areas().iter().enumerate() {
                 builder.leaf(TreeNode::Object(area.id()), area_label(document, index));
             }
             builder.close_dir();
             builder.close_dir();
-            builder.dir(TreeNode::Grids, "Grids");
+            builder.dir(TreeNode::Grids, tr!("tree-grids"));
             for (index, grid) in document.grids().iter().enumerate() {
-                let label = format!("Grid {} ({})", index + 1, source_label(document, grid));
+                let label = tr!("tree-grid", {
+                    number: index + 1,
+                    source: source_label(document, grid),
+                });
                 builder.leaf(TreeNode::Object(grid.id()), label);
             }
             builder.close_dir();
-            builder.dir(TreeNode::Shapes, "Shapes");
+            builder.dir(TreeNode::Shapes, tr!("tree-shapes"));
             for (index, shape) in document.shapes().iter().enumerate() {
                 builder.leaf(TreeNode::Object(shape.id()), shape_label(index, shape));
             }
@@ -256,23 +260,22 @@ fn tree(
 fn area_label(document: &Document, index: usize) -> String {
     let area = &document.areas()[index];
     match area.area(document.calibration()) {
-        Ok(value) => format!(
-            "Area {} ({} {})",
-            index + 1,
-            format_length(value),
-            area.unit().area_symbol()
-        ),
-        Err(_) => format!("Area {}", index + 1),
+        Ok(value) => tr!("object-area-with-value", {
+            number: index + 1,
+            value: format_length(value),
+            unit: area.unit().area_symbol(),
+        }),
+        Err(_) => tr!("object-area", { number: index + 1 }),
     }
 }
 
 /// Describes what a grid is aligned to, e.g. "scale line A" or "measurement 2".
 fn source_label(document: &Document, grid: &Grid) -> String {
     match grid.source() {
-        GridSource::ScaleLine(line) => format!("scale line {line}"),
+        GridSource::ScaleLine(line) => tr!("tree-source-scale-line", { line: line }),
         GridSource::Measurement(id) => match document.measurement_index(id) {
-            Some(index) => format!("measurement {}", index + 1),
-            None => "alignment line missing".to_owned(),
+            Some(index) => tr!("tree-source-measurement", { number: index + 1 }),
+            None => tr!("tree-source-missing"),
         },
     }
 }

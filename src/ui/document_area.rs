@@ -7,6 +7,7 @@ use egui_tiles::{
     Behavior, Container, ContainerKind, SimplificationOptions, Tile, TileId, Tiles, Tree,
     UiResponse,
 };
+use gridtool::tr;
 
 use crate::session::{DocumentId, Session};
 
@@ -143,7 +144,7 @@ impl DocumentArea {
     /// Shows the tabs and canvases, or how to get started if no document is open.
     pub fn show(&mut self, ui: &mut egui::Ui, session: &mut Session, output: &mut WorkspaceOutput) {
         if self.tree.is_empty() {
-            placeholder::show(ui, "Open an image to get started.");
+            placeholder::show(ui, tr!("placeholder-open-image"));
             return;
         }
         let documents_in_view = self
