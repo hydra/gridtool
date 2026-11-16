@@ -33,7 +33,7 @@ use super::scale_tool::ScaleTool;
 use super::selection::Selection;
 use super::shape_display::{paint_fill, paint_line, paint_shapes};
 use super::tool_mode::ToolMode;
-use super::viewport::{DocumentTransform, Viewport};
+use super::viewport::{DocumentTransform, Viewport, document_size};
 
 const OUTLINE_STROKE: Stroke = Stroke {
     width: 2.0,
@@ -112,8 +112,9 @@ pub fn show(
 ) -> CanvasOutput {
     let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
     let view_center = response.rect.center();
-    let document_size = Vec2::new(document.width() as f32, document.height() as f32);
-    view.set_canvas_rect(response.rect, document_size);
+    let document_size = document_size(document);
+    view.set_canvas_rect(response.rect, document);
+    view.follow_document_rotation(document);
 
     handle_zoom(ui, &response, view_center, &mut view.viewport);
     let activate =
@@ -158,10 +159,7 @@ fn handle_tool(
                 handle_pan(ui, response, &mut view.viewport);
                 None
             }
-            ToolMode::Rotate => {
-                handle_rotate(ui, response, transform, document, view);
-                None
-            }
+            ToolMode::Rotate => handle_rotate(ui, response, transform, document, view),
             ToolMode::Scale => {
                 handle_scale(ui, response, transform, document, &mut view.scale_tool)
             }
@@ -523,10 +521,10 @@ fn handle_rotate(
     transform: DocumentTransform,
     document: &Document,
     view: &mut DocumentView,
-) {
+) -> Option<Action> {
     // The view rotates about the document origin, which the arrow starts from.
     let center = transform.image_to_screen(document.origin());
-    let document_size = Vec2::new(document.width() as f32, document.height() as f32);
+    let document_size = document_size(document);
     let rotation = view.viewport.rotation_radians();
 
     if response.drag_started_by(PointerButton::Primary) {
@@ -550,9 +548,10 @@ fn handle_rotate(
         ui.set_cursor_icon(CursorIcon::Grab);
     }
 
-    if response.drag_stopped_by(PointerButton::Primary) {
-        view.is_dragging_rotate_handle = false;
-    }
+    // The rotation is committed once, when the drag ends.
+    let finished = response.drag_stopped_by(PointerButton::Primary)
+        && std::mem::take(&mut view.is_dragging_rotate_handle);
+    finished.then(|| view.rotation_action(document)).flatten()
 }
 
 /// Pointer input relevant to tools that place points by clicking and move them by
@@ -1327,11 +1326,71 @@ mod tests {
             tip,
             Vec2::new(-rotate_handle::ARROW_LENGTH, rotate_handle::ARROW_LENGTH),
         );
+        let [Action::SetRotation(degrees)] = harness.actions[..] else {
+            panic!("one rotation should be recorded, got {:?}", harness.actions);
+        };
+        assert!((degrees - 90.0).abs() < 1e-3);
 
+        // Once the app has applied it, the view stays turned, about the origin.
+        harness.actions[0].apply(&mut harness.document).unwrap();
+        harness.frame(Vec::new());
         assert!((harness.view.viewport.rotation_degrees() - 90.0).abs() < 1e-3);
         let now = harness.transform().image_to_screen(origin);
         assert!((now - pivot).length() < 1e-2, "origin moved to {now:?}");
-        assert!(harness.actions.is_empty(), "rotation is not an action");
+    }
+
+    #[test]
+    fn the_view_follows_a_change_to_the_document_rotation_about_the_origin() {
+        let mut harness = Harness::new(ToolMode::Pan);
+        let origin = Point::new(50.0, 50.0);
+        Action::SetOrigin(origin)
+            .apply(&mut harness.document)
+            .unwrap();
+        harness.frame(Vec::new());
+        let pivot = harness.transform().image_to_screen(origin);
+
+        // As undo or redo would.
+        Action::SetRotation(30.0)
+            .apply(&mut harness.document)
+            .unwrap();
+        harness.frame(Vec::new());
+
+        assert_eq!(harness.view.viewport.rotation_degrees(), 30.0);
+        let now = harness.transform().image_to_screen(origin);
+        assert!((now - pivot).length() < 1e-2, "origin moved to {now:?}");
+        assert!(harness.actions.is_empty());
+    }
+
+    #[test]
+    fn a_rotation_being_dragged_shows_until_the_drag_ends() {
+        let mut harness = Harness::new(ToolMode::Rotate);
+        let center = harness
+            .transform()
+            .image_to_screen(harness.document.origin());
+        let tip = rotate_handle::tip(center, 0.0);
+
+        harness.press_and_drag(tip, center + Vec2::new(0.0, rotate_handle::ARROW_LENGTH));
+        harness.frame(Vec::new());
+
+        assert!((harness.view.viewport.rotation_degrees() - 90.0).abs() < 1e-3);
+        assert_eq!(harness.document.rotation(), 0.0);
+        assert!(harness.actions.is_empty());
+    }
+
+    #[test]
+    fn escape_while_dragging_the_rotation_turns_the_view_back() {
+        let mut harness = Harness::new(ToolMode::Rotate);
+        let center = harness
+            .transform()
+            .image_to_screen(harness.document.origin());
+        let tip = rotate_handle::tip(center, 0.0);
+        harness.press_and_drag(tip, center + Vec2::new(0.0, rotate_handle::ARROW_LENGTH));
+
+        harness.view.cancel_tool();
+        harness.frame(Vec::new());
+
+        assert_eq!(harness.view.viewport.rotation_degrees(), 0.0);
+        assert!(harness.actions.is_empty());
     }
 
     #[test]

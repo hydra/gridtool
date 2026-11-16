@@ -53,7 +53,7 @@ must satisfy them.
 | **Unsaved changes** | An open document differs from the document as last loaded or saved, or it has never been saved. |
 | **Image coordinates** | Pixel coordinates on the un-rotated image. The origin is at the top-left corner, x increases to the right and y increases downwards. Values may be fractional. |
 | **Screen coordinates** | Positions in the application window, in logical screen units. |
-| **View** | How the document is displayed: pan, zoom and rotation. View state is never part of the document. |
+| **View** | How the document is displayed: pan, zoom and rotation. Pan and zoom are never part of the document; the rotation is saved with it, and changing it is an action (`ARCH-4`). |
 | **Action** | A single change to the document. It can be undone and redone. |
 | **Active document** | The open document that the tool bar, panels and commands are showing and acting on (`WORK-10`). |
 | **Tool mode** | The active tool. It decides what mouse input on the canvas does. |
@@ -118,4 +118,6 @@ must satisfy them.
 | 2026-11-01 | A panic in a release build now saves a crash report and shows a dialog saying where it is (`SHELL-1c`). |
 | 2026-11-01 | Added an About button at the right-hand end of the tool bar, and its dialog (`SHELL-5`, `SHELL-13`). |
 | 2026-11-01 | Added the 2-point calibration method, with one line and the same scale on both axes, and file format version 7 (`SCALE-1`, `SCALE-17`, `FILE-6f`). A loaded document now selects the method of its scale points (`SCALE-10`). |
+| 2026-11-16 | Images larger than the graphics device's biggest texture now open at full resolution, drawn as tiles, instead of crashing the application (`IMG-9`). |
+| 2026-11-16 | The view rotation is now saved with the document, so a loaded document opens turned the way it was saved (`DOC-1`, `VIEW-2`, `VIEW-2a`), in file format version 8 (`FILE-6g`). Each change of rotation is a new **Set view rotation** action (`HIST-2`), committed when an arrow drag ends or the rotation field is left, and undo and redo turn the view (`ARCH-4`, `VIEW-14`, `VIEW-16`, `VIEW-18`). Escape, or switching tool, while choosing a rotation turns the view back (`SHELL-10a`). |
 | 2026-11-02 | Added a Settings menu at the right-hand end of the tool bar, with the theme (System, Light or Dark) and language (`en-US` or `es-ES`), both kept between runs, and translation files holding everything the application says (`17`, `SHELL-5`). Numbers keep the decimal point "." in every language. |

@@ -208,6 +208,7 @@ error-shape-point-count = a una forma de { $expected } puntos no se le pueden da
 error-no-fill = { $target } no encierra ningún área, así que no tiene relleno
 error-invalid-fill-spacing = la separación del relleno debe ser un número positivo, se recibió { $spacing }
 error-invalid-fill-angle = el ángulo del relleno debe ser de 0 a menos de 360, se recibió { $degrees }
+error-invalid-rotation = el giro de la vista debe ser un número finito, se recibió { $degrees }
 
 error-area-too-few-points = un área necesita al menos { $minimum } puntos, se recibieron { $count }
 error-shape-too-few-points = una forma no puede tener solo { $count } puntos
@@ -240,6 +241,7 @@ error-document-filled-open-shape = la forma { $id } tiene relleno pero no está 
 error-document-not-positive = { $value } debería ser un número positivo
 error-document-opacity = la opacidad { $value } no está entre 0 y 1
 error-document-fill-angle = el ángulo de relleno { $value } está fuera de rango
+error-document-rotation = el giro de la vista { $value } está fuera de rango
 error-document-object-id = el identificador de objeto { $id } no es válido o está repetido
 
 error-save-encode = no se pudo codificar el documento: { $error }
@@ -259,6 +261,7 @@ action-set-distance = Establecer distancia { $line } en { $distance }
 action-clear-distance = Borrar distancia { $line }
 action-set-unit = Establecer unidades en { $unit }
 action-set-origin = Establecer origen en { $origin }
+action-set-rotation = Girar la vista a { $degrees }°
 action-add-measurement = Añadir medición de { $start } a { $end }
 action-move-measurement-point = Mover { $endpoint } de la medición { $number } a { $to }
 action-resize-measurement = Redimensionar medición { $number } a { $start } - { $end }

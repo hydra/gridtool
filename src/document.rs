@@ -36,6 +36,9 @@ pub struct Document {
     shapes: Vec<Identified<DrawnShape>>,
     /// The image's origin: the point the view rotates about. Always inside the document.
     origin: Point,
+    /// Clockwise view rotation in degrees, in [0, 360). Saved with the document so it reopens
+    /// the way it was turned; the view pivots about the origin.
+    rotation: f64,
     /// The id the next added object will get. Ids are never reused within a history.
     next_object_id: u64,
 }
@@ -52,6 +55,7 @@ impl Document {
             grids: Vec::new(),
             shapes: Vec::new(),
             origin: Point::new(f64::from(width) / 2.0, f64::from(height) / 2.0),
+            rotation: 0.0,
             next_object_id: 1,
         }
     }
@@ -63,6 +67,17 @@ impl Document {
 
     pub(crate) fn set_origin(&mut self, origin: Point) {
         self.origin = origin;
+    }
+
+    /// The clockwise view rotation, in degrees within [0, 360).
+    pub fn rotation(&self) -> f64 {
+        self.rotation
+    }
+
+    /// Sets the view rotation, which must already be normalised (see [`crate::angle`]).
+    pub(crate) fn set_rotation(&mut self, degrees: f64) {
+        debug_assert!(crate::angle::is_normalized_degrees(degrees));
+        self.rotation = degrees;
     }
 
     /// Creates a document the same size as `image`.
@@ -268,6 +283,7 @@ impl Document {
             grids: objects.grids,
             shapes: objects.shapes,
             origin,
+            rotation: 0.0,
             next_object_id,
         }
     }

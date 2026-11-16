@@ -208,6 +208,7 @@ error-shape-point-count = a shape with { $expected } points cannot be given { $a
 error-no-fill = { $target } encloses no area, so has no fill
 error-invalid-fill-spacing = fill spacing must be a positive number, got { $spacing }
 error-invalid-fill-angle = fill angle must be from 0 up to 360, got { $degrees }
+error-invalid-rotation = the view rotation must be a finite number, got { $degrees }
 
 error-area-too-few-points = an area needs at least { $minimum } points, got { $count }
 error-shape-too-few-points = a shape cannot have only { $count } points
@@ -240,6 +241,7 @@ error-document-filled-open-shape = shape { $id } has a fill but is not closed
 error-document-not-positive = { $value } should be a positive number
 error-document-opacity = opacity { $value } is not between 0 and 1
 error-document-fill-angle = fill angle { $value } is out of range
+error-document-rotation = view rotation { $value } is out of range
 error-document-object-id = object id { $id } is invalid or used twice
 
 error-save-encode = could not encode the document: { $error }
@@ -259,6 +261,7 @@ action-set-distance = Set distance { $line } to { $distance }
 action-clear-distance = Clear distance { $line }
 action-set-unit = Set units to { $unit }
 action-set-origin = Set origin to { $origin }
+action-set-rotation = Set view rotation to { $degrees }°
 action-add-measurement = Add measurement from { $start } to { $end }
 action-move-measurement-point = Move measurement { $number } { $endpoint } to { $to }
 action-resize-measurement = Resize measurement { $number } to { $start } - { $end }

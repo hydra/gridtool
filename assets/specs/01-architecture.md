@@ -15,9 +15,12 @@ also be possible without a GUI: from automated unit tests and from a command-lin
 front end. A command-line front end is not required yet, but nothing in the core may
 prevent one from being added.
 
-**ARCH-4 — View state is not document state.** Pan, zoom and view rotation (see `VIEW`)
-are presentation state. They MUST NOT be stored in the document, recorded as actions,
-or affected by undo/redo.
+**ARCH-4 — View state is not document state.** Pan and zoom (see `VIEW`) are presentation
+state. They MUST NOT be stored in the document, recorded as actions, or affected by
+undo/redo. The view rotation is the exception: it is stored in the document so that it is
+saved with it (`DOC-1`, `FILE-1`), each change is a **Set view rotation** action (`HIST-2`),
+and undo/redo turn the view back and forth (`VIEW-18`). A rotation being dragged or typed is
+shown before it is committed (`ARCH-5`).
 
 **ARCH-5 — Transient tool state is not document state.** In-progress interactions MUST
 stay in presentation state until they are committed as an action. Examples are points

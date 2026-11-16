@@ -6,6 +6,7 @@
 //! error messages, is in the language chosen in [`i18n`].
 
 pub mod action;
+pub mod angle;
 pub mod area;
 pub mod calibration;
 pub mod color;

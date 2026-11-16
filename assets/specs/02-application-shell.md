@@ -154,7 +154,8 @@ or changing the document:
 - the points placed so far for a new area (`AREA-2`) or drawn shape (`DRAW-2`)
 - a drag moving the active object, or of its points or resize handles, in progress (`OBJ-9`,
   `OBJ-15`, `OBJ-16`); the object keeps its shape and place and stays active
-- a rotate-handle drag in progress (`VIEW-13`); the view keeps the rotation it reached
+- a rotate-handle drag in progress (`VIEW-14`), and a view rotation being typed (`VIEW-16`);
+  the view turns back to the document's rotation (`VIEW-18`)
 
 Escape and switching mode cancel exactly the same things. Escape changes neither the tool
 mode nor the active object; switching mode also clears the active object (`OBJ-7a`). Escape

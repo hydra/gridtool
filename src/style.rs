@@ -3,6 +3,7 @@
 
 use std::fmt;
 
+use crate::angle;
 use crate::calibration::Scale;
 use crate::color::Rgb;
 use crate::geometry::{Bounds, Point};
@@ -12,22 +13,17 @@ use crate::units::LengthUnit;
 
 /// Real-world distance between fill lines by default, in the fill's unit.
 pub const DEFAULT_FILL_SPACING: f64 = 1.0;
-/// Fill angles are kept below this. 360 itself is the same as 0.
-const FULL_TURN: f64 = 360.0;
 /// How far a fill angle of 0, which is vertical, is from the image's x axis.
 const QUARTER_TURN: f64 = 90.0;
 
 /// `degrees` wrapped around a full turn, into [0, 360).
 pub fn normalized_fill_angle(degrees: f64) -> f64 {
-    // The remainder of a negative multiple of a full turn is negative zero.
-    let angle = degrees.rem_euclid(FULL_TURN).abs();
-    // The remainder of a tiny negative angle rounds up to the full turn itself.
-    if angle < FULL_TURN { angle } else { 0.0 }
+    angle::normalize_degrees(degrees)
 }
 
 /// Whether `degrees` is a fill angle as stored: in [0, 360).
 pub fn is_valid_fill_angle(degrees: f64) -> bool {
-    (0.0..FULL_TURN).contains(&degrees)
+    angle::is_normalized_degrees(degrees)
 }
 
 /// How a line is drawn.

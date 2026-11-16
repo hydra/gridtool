@@ -1,5 +1,7 @@
 //! Helpers for working with angles expressed in degrees.
 
+use gridtool::angle;
+
 use super::format::format_trimmed;
 
 const FULL_TURN_DEGREES: f32 = 360.0;
@@ -7,15 +9,12 @@ const DISPLAY_DECIMALS: usize = 2;
 
 /// Wraps an angle into the range `[0, 360)`. Non-finite angles become `0`.
 pub fn normalize_degrees(degrees: f32) -> f32 {
-    if !degrees.is_finite() {
-        return 0.0;
-    }
-    let wrapped = degrees.rem_euclid(FULL_TURN_DEGREES);
-    // `rem_euclid` can round up to exactly 360 for tiny negative inputs.
-    if wrapped >= FULL_TURN_DEGREES {
-        0.0
-    } else {
+    let wrapped = angle::normalize_degrees(f64::from(degrees)) as f32;
+    // Just below a full turn in double precision can round up to it in single.
+    if wrapped < FULL_TURN_DEGREES {
         wrapped
+    } else {
+        0.0
     }
 }
 

@@ -47,6 +47,8 @@ pub enum Action {
     SetUnit(LengthUnit),
     /// Moves the image's origin (the point the view rotates about).
     SetOrigin(Point),
+    /// Turns the view to a clockwise rotation in degrees, wrapped into [0, 360).
+    SetRotation(f64),
     /// Appends a measurement to the end of the list.
     AddMeasurement(Measurement),
     /// Moves one end of an existing measurement.
@@ -182,6 +184,7 @@ pub enum ActionError {
     HasNoFill(StyleTarget),
     InvalidFillSpacing(f64),
     InvalidFillAngle(f64),
+    InvalidRotation(f64),
     Calibration(CalibrationError),
 }
 
@@ -226,6 +229,9 @@ impl fmt::Display for ActionError {
             }
             Self::InvalidFillAngle(degrees) => {
                 tr!("error-invalid-fill-angle", { degrees: degrees })
+            }
+            Self::InvalidRotation(degrees) => {
+                tr!("error-invalid-rotation", { degrees: degrees })
             }
             Self::Calibration(error) => return error.fmt(f),
         };
@@ -281,6 +287,12 @@ impl Action {
             Action::SetOrigin(origin) => {
                 ensure_inside(document, *origin)?;
                 document.set_origin(*origin);
+            }
+            Action::SetRotation(degrees) => {
+                if !degrees.is_finite() {
+                    return Err(ActionError::InvalidRotation(*degrees));
+                }
+                document.set_rotation(crate::angle::normalize_degrees(*degrees));
             }
             Action::AddMeasurement(measurement) => {
                 for endpoint in Endpoint::ALL {
@@ -603,6 +615,9 @@ impl fmt::Display for Action {
             } => tr!("action-clear-distance", { line: line }),
             Action::SetUnit(unit) => tr!("action-set-unit", { unit: unit }),
             Action::SetOrigin(origin) => tr!("action-set-origin", { origin: origin }),
+            Action::SetRotation(degrees) => tr!("action-set-rotation", {
+                degrees: crate::angle::normalize_degrees(*degrees),
+            }),
             Action::AddMeasurement(measurement) => tr!("action-add-measurement", {
                 start: measurement.start(),
                 end: measurement.end(),

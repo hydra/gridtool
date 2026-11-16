@@ -71,5 +71,5 @@ when the field loses keyboard focus, which includes pressing Enter.
   the first field correctly.
 
 These are commit-on-blur fields: the scale distances A and B (`SCALE-14`) and the
-measurement coordinates (`MEAS-12`). The view rotation field is **not**, because it
-applies valid input live (`VIEW-16`).
+measurement coordinates (`MEAS-12`). The view rotation field is **not**: it applies
+valid input to the view live, and commits it when focus leaves (`VIEW-16`).

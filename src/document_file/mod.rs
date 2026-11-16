@@ -10,6 +10,7 @@ mod v2;
 mod v3;
 mod v4;
 mod v5;
+mod v8;
 
 use std::fmt;
 use std::fs;
@@ -29,6 +30,7 @@ pub use v2::DocumentV2;
 pub use v3::DocumentV3;
 pub use v4::DocumentV4;
 pub use v5::DocumentV5;
+pub use v8::DocumentV8;
 
 /// The extension of document files, without the dot.
 pub const EXTENSION: &str = "ron";
@@ -46,12 +48,14 @@ pub enum DocumentFile {
     V6(DocumentV5),
     /// The fields of version 6, with the 2-point calibration method.
     V7(DocumentV5),
+    /// Version 7 with the view rotation.
+    V8(DocumentV8),
 }
 
 impl DocumentFile {
     /// Describes `document` in the current format version.
     pub fn describe(document: &Document, image: String) -> Self {
-        Self::V7(DocumentV5::describe(document, image))
+        Self::V8(DocumentV8::describe(document, image))
     }
 
     /// The stored image reference.
@@ -62,6 +66,7 @@ impl DocumentFile {
             Self::V3(file) => &file.image,
             Self::V4(file) => &file.image,
             Self::V5(file) | Self::V6(file) | Self::V7(file) => &file.image,
+            Self::V8(file) => &file.image,
         }
     }
 
@@ -84,6 +89,7 @@ impl DocumentFile {
             Self::V5(file) => file.to_document_within_half_turn(),
             Self::V6(file) => file.to_document_without_two_point(),
             Self::V7(file) => file.to_document(),
+            Self::V8(file) => file.to_document(),
         }
     }
 
@@ -208,6 +214,8 @@ pub enum InvalidDocument {
     NotPositive(f64),
     BadOpacity(f32),
     BadFillAngle(f64),
+    /// A view rotation outside [0, 360).
+    BadRotation(f64),
     /// Zero, duplicated, or not below the stored next object id.
     BadObjectId(u64),
 }
@@ -227,6 +235,7 @@ impl fmt::Display for InvalidDocument {
             Self::NotPositive(value) => tr!("error-document-not-positive", { value: value }),
             Self::BadOpacity(value) => tr!("error-document-opacity", { value: value }),
             Self::BadFillAngle(value) => tr!("error-document-fill-angle", { value: value }),
+            Self::BadRotation(value) => tr!("error-document-rotation", { value: value }),
             Self::BadObjectId(id) => tr!("error-document-object-id", { id: id }),
         })
     }

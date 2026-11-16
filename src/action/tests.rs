@@ -150,6 +150,46 @@ fn sets_the_origin_inside_the_document_only() {
 }
 
 #[test]
+fn sets_the_view_rotation_wrapped_into_one_turn() {
+    let mut document = Document::new(100, 50);
+    assert_eq!(document.rotation(), 0.0);
+
+    Action::SetRotation(33.5).apply(&mut document).unwrap();
+    assert_eq!(document.rotation(), 33.5);
+    Action::SetRotation(-90.0).apply(&mut document).unwrap();
+    assert_eq!(document.rotation(), 270.0);
+    Action::SetRotation(720.0).apply(&mut document).unwrap();
+    assert_eq!(document.rotation(), 0.0);
+
+    let before = document.clone();
+    for degrees in [f64::NAN, f64::INFINITY] {
+        assert!(matches!(
+            Action::SetRotation(degrees).apply(&mut document),
+            Err(ActionError::InvalidRotation(_))
+        ));
+    }
+    assert_eq!(document, before);
+    assert_eq!(
+        Action::SetRotation(-45.0).to_string(),
+        "Set view rotation to 315°"
+    );
+}
+
+#[test]
+fn rotating_the_view_is_undoable() {
+    let mut editor = Editor::new(Document::new(100, 50));
+
+    assert!(editor.perform(Action::SetRotation(90.0)).unwrap());
+    assert!(!editor.perform(Action::SetRotation(450.0)).unwrap());
+    assert_eq!(editor.document().rotation(), 90.0);
+
+    assert!(editor.undo());
+    assert_eq!(editor.document().rotation(), 0.0);
+    assert!(editor.redo());
+    assert_eq!(editor.document().rotation(), 90.0);
+}
+
+#[test]
 fn describes_itself_for_the_history_list() {
     assert_eq!(
         Action::SetScalePoints(three_points()).to_string(),

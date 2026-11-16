@@ -8,6 +8,7 @@ completely, so loading it re-creates the exact document state (`DOC-1`).
 **FILE-1 — Contents.** A document file holds:
 - the image reference (`FILE-3`) and the image size in pixels
 - the origin (`ORIGIN-1`)
+- the view rotation (`DOC-1`)
 - the calibration (`SCALE-20`): the point set and method, both distances and the unit
 - every measurement (`MEAS-1`), in list order, with its object id, endpoints, unit, and
   line style, colour and opacity
@@ -22,8 +23,8 @@ completely, so loading it re-creates the exact document state (`DOC-1`).
 
 **FILE-2 — Not saved.** These are **not** saved:
 - the history (`HIST`). A loaded document starts with an empty history.
-- view state (`VIEW`): pan, zoom and rotation. A loaded document starts with the default
-  view (`VIEW-2`).
+- the rest of the view state (`VIEW`): pan and zoom. A loaded document starts with the
+  default view (`VIEW-2`), turned to the rotation it was saved with.
 - presentation state: the tool mode, the active object and tool progress.
 
 **FILE-3 — The image is referenced, not embedded.** The file stores the image's path:
@@ -113,9 +114,16 @@ turn. An angle that was not valid stays invalid, so loading still rejects it (`F
 version 6 unchanged. Fill angles in files of version 5 and earlier are still limited as those
 versions say, so one of a half turn or more is rejected there (`FILE-7`).
 
-**FILE-6f — Version 7 (current).** Version 7 has the same fields as version 6, with one change: the
+**FILE-6f — Version 7.** (no longer written; still loaded) Version 7 has the same fields as version 6, with one change: the
 point set's `method` may also be `TwoPoint`, with two points (`SCALE-1`). A version 6 file is migrated
 to version 7 unchanged. A file of version 6 or earlier with a `TwoPoint` method is rejected (`FILE-7`).
+
+**FILE-6g — Version 8 (current).** Version 8 is version 7 with one more field, after `origin`:
+- `rotation`: a number, the view rotation clockwise in degrees, from 0 up to but not
+  including 360 (`DOC-1`)
+
+A version 7 file, and so every earlier one, is migrated to version 8 with a rotation of 0, as
+those versions were always shown unrotated when opened.
 
 **FILE-7 — Validation on load.** A loaded description is checked as strictly as actions
 check their inputs (`HIST-2`), so a hand-edited or damaged file cannot produce an invalid
@@ -131,6 +139,7 @@ document. Loading fails when:
 - a distance, cell size or fill spacing is not finite and > 0
 - an opacity is outside [0, 1]
 - a fill angle is not from 0 up to but not including 360 or, in a file of version 5 or earlier, 180
+- the view rotation is not from 0 up to but not including 360, or is not a number
 - an object id is 0, used twice, or not below `next_object_id`
 
 **FILE-8 — Loading the image.** After the description is valid, the referenced image is

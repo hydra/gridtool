@@ -3,6 +3,7 @@
 
 use eframe::egui::emath::Rot2;
 use eframe::egui::{Pos2, Rect, Vec2};
+use gridtool::document::Document;
 use gridtool::geometry::{Bounds, Point};
 
 use super::angle::normalize_degrees;
@@ -19,6 +20,24 @@ pub const FIT_MARGIN: f32 = 16.0;
 pub fn fit_room(view: Rect) -> Rect {
     let room = view.shrink(FIT_MARGIN);
     if room.is_positive() { room } else { view }
+}
+
+/// The size of `document`, in image pixels.
+pub fn document_size(document: &Document) -> Vec2 {
+    Vec2::new(document.width() as f32, document.height() as f32)
+}
+
+/// The view rotation `document` is saved with, as the view holds it.
+pub fn document_rotation(document: &Document) -> f32 {
+    normalize_degrees(document.rotation() as f32)
+}
+
+/// The width and height of the screen-aligned box around a rectangle of `size` turned by
+/// `radians`.
+fn turned_extent(size: Vec2, radians: f32) -> Vec2 {
+    let (sin, cos) = radians.sin_cos();
+    let (sin, cos) = (sin.abs(), cos.abs());
+    Vec2::new(size.x * cos + size.y * sin, size.x * sin + size.y * cos)
 }
 
 /// User-controlled camera over the document. The document's center is drawn at
@@ -41,16 +60,18 @@ impl Default for Viewport {
 }
 
 impl Viewport {
-    /// The view of a newly opened document in canvas `view`: unrotated and centred, zoomed
-    /// out if it would not otherwise fit. A document that fits stays at actual size.
-    pub fn fitting(document_size: Vec2, view: Rect) -> Self {
+    /// The view of a newly opened document in canvas `view`, turned `rotation_degrees`
+    /// clockwise and centred, zoomed out if it would not otherwise fit. A document that fits
+    /// stays at actual size.
+    pub fn fitting(document_size: Vec2, view: Rect, rotation_degrees: f32) -> Self {
+        let rotation_degrees = normalize_degrees(rotation_degrees);
+        let turned = turned_extent(document_size, rotation_degrees.to_radians());
         let room = fit_room(view).size();
-        let zoom = (room.x / document_size.x)
-            .min(room.y / document_size.y)
-            .min(1.0);
+        let zoom = (room.x / turned.x).min(room.y / turned.y).min(1.0);
         Self {
+            pan: Vec2::ZERO,
             zoom: zoom.max(MIN_ZOOM),
-            ..Self::default()
+            rotation_degrees,
         }
     }
 
@@ -251,7 +272,7 @@ mod tests {
                 (600.0 - 2.0 * FIT_MARGIN) / 4000.0,
             ),
         ] {
-            let viewport = Viewport::fitting(size, VIEW);
+            let viewport = Viewport::fitting(size, VIEW, 0.0);
 
             assert!((viewport.zoom() - expected_zoom).abs() < 1e-6, "{size:?}");
             let room = VIEW.shrink(FIT_MARGIN - 0.01);
@@ -262,8 +283,34 @@ mod tests {
     }
 
     #[test]
+    fn fitting_a_turned_document_fits_its_turned_outline() {
+        // A tall document turned a quarter turn lies across the view.
+        let size = Vec2::new(1000.0, 4000.0);
+
+        let viewport = Viewport::fitting(size, VIEW, 90.0);
+
+        assert_eq!(viewport.rotation_degrees(), 90.0);
+        let expected_zoom = (800.0 - 2.0 * FIT_MARGIN) / 4000.0;
+        assert!((viewport.zoom() - expected_zoom).abs() < 1e-6);
+        let room = VIEW.shrink(FIT_MARGIN - 0.01);
+        let corners = viewport.transform(VIEW.center(), size).corners();
+        assert!(corners.iter().all(|corner| room.contains(*corner)));
+    }
+
+    #[test]
+    fn fitting_at_an_oblique_angle_keeps_every_corner_in_view() {
+        let size = Vec2::new(3000.0, 1000.0);
+
+        let viewport = Viewport::fitting(size, VIEW, 30.0);
+
+        let room = VIEW.shrink(FIT_MARGIN - 0.01);
+        let corners = viewport.transform(VIEW.center(), size).corners();
+        assert!(corners.iter().all(|corner| room.contains(*corner)));
+    }
+
+    #[test]
     fn fitting_leaves_a_document_that_fits_at_actual_size() {
-        let viewport = Viewport::fitting(Vec2::new(100.0, 50.0), VIEW);
+        let viewport = Viewport::fitting(Vec2::new(100.0, 50.0), VIEW, 0.0);
 
         assert_eq!(viewport, Viewport::default());
     }
@@ -272,14 +319,14 @@ mod tests {
     fn fitting_uses_the_whole_view_when_it_is_too_small_for_the_margin() {
         let view = Rect::from_min_size(Pos2::ZERO, Vec2::splat(20.0));
 
-        let viewport = Viewport::fitting(Vec2::splat(100.0), view);
+        let viewport = Viewport::fitting(Vec2::splat(100.0), view, 0.0);
 
         assert!((viewport.zoom() - 0.2).abs() < 1e-6);
     }
 
     #[test]
     fn fitting_stops_at_the_lowest_zoom() {
-        let viewport = Viewport::fitting(Vec2::splat(1_000_000.0), VIEW);
+        let viewport = Viewport::fitting(Vec2::splat(1_000_000.0), VIEW, 0.0);
 
         assert_eq!(viewport.zoom(), MIN_ZOOM);
     }

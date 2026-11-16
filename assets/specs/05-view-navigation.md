@@ -1,26 +1,34 @@
 # 05 — View Navigation
 
-The view controls how the document is displayed. All of it is presentation state: it is
-not part of the document, it is not recorded as actions, and undo/redo does not affect
-it (`ARCH-4`).
+The view controls how the document is displayed. Pan and zoom are presentation state: they
+are not part of the document, they are not recorded as actions, and undo/redo does not
+affect them. The rotation is stored in the document, so that it is saved with it, and each
+change to it is an action (`ARCH-4`, `DOC-1`, `VIEW-18`).
 
 ## View state
 
 **VIEW-1.** The view state has three parts:
 - **pan**: a 2-D offset in screen units
 - **zoom**: a scale factor, in screen units per image pixel
-- **rotation**: an angle in degrees
+- **rotation**: an angle in degrees. The view shows the document's rotation, except while a
+  new one is being chosen (`VIEW-18`)
 
-**VIEW-2 — Defaults.** Pan is `(0,0)`, rotation is `0°` and zoom is given by `VIEW-2a`.
-Every newly opened document starts with these defaults, whether it was made from an image
-or loaded from a file. A failed open leaves no document, so there is no view to keep.
+**VIEW-2 — Defaults.** Pan is `(0,0)`, rotation is the document's (`DOC-1`), and zoom is
+given by `VIEW-2a`. Every newly opened document starts with these defaults, whether it was
+made from an image, whose rotation is `0°`, or loaded from a file, which keeps the rotation it
+was saved with. A failed open leaves no document, so there is no view to keep.
 
-**VIEW-2a — Fit on opening.** The whole of a newly opened document fits in the canvas area,
-centred, with a margin of 16 screen units on every side:
+**VIEW-2a — Fit on opening.** The whole of a newly opened document, turned by its rotation
+θ, fits in the canvas area, centred, with a margin of 16 screen units on every side. The
+turned document's screen-aligned extent is used:
 
 ```
-zoom = min(1, (canvasWidth − 32) / documentWidth, (canvasHeight − 32) / documentHeight)
+turnedWidth  = documentWidth·|cos θ| + documentHeight·|sin θ|
+turnedHeight = documentWidth·|sin θ| + documentHeight·|cos θ|
+zoom = min(1, (canvasWidth − 32) / turnedWidth, (canvasHeight − 32) / turnedHeight)
 ```
+
+With no rotation, the extent is the document's own width and height.
 
 - A document that already fits stays at 100 %: it is never enlarged.
 - A canvas too small for the margin is used in full, with no margin.
@@ -158,6 +166,9 @@ A circle with a 12 px radius, drawn in the same stroke, marks the arrow tip.
   arrow follows the pointer. The view pivots about the origin (`VIEW-3a`), so the
   arrow's start stays put.
 - If the pointer is exactly on the origin, the rotation does not change.
+- When the drag ends, one **Set view rotation** action (`HIST-2`) is committed with the
+  rotation reached, unless it is the document's already. Nothing is committed while
+  dragging. Escape abandons the drag and the view turns back (`SHELL-10a`).
 - A drag that starts anywhere else does nothing.
 - The cursor is an open hand while hovering within 12 px of the tip, and a grabbing hand
   while dragging the arrow.
@@ -171,9 +182,19 @@ A circle with a 12 px radius, drawn in the same stroke, marks the arrow tip.
 - While the field does **not** have keyboard focus, it shows the current rotation
   formatted by `FMT-2`.
 - While it **has** focus, each edit that parses as a valid angle (`FMT-3`) is applied to
-  the view immediately.
-- Text that does not parse is ignored. When focus leaves, the field shows the current
-  rotation again.
+  the view immediately, as a preview: nothing is committed while typing.
+- Text that does not parse is ignored.
+- When focus leaves, by Enter, Tab or clicking elsewhere, one **Set view rotation** action
+  (`HIST-2`) is committed with the rotation the view shows, unless it is the document's
+  already. It is committed exactly once. The field then shows the current rotation again.
+- Escape leaves the field without committing, and the view turns back to the document's
+  rotation. So does switching tool mode while typing (`SHELL-10a`).
+
+**VIEW-18 — Following the document.** Whenever the document's rotation differs from the
+view's and no new rotation is being chosen (`VIEW-14`, `VIEW-16`), the view turns to the
+document's, pivoting about the origin (`VIEW-3a`). This is how undo and redo of a **Set view
+rotation** action turn the view, and how an abandoned rotation is undone. Pan and zoom are
+otherwise kept.
 
 ## Acceptance criteria
 
@@ -209,3 +230,15 @@ A circle with a 12 px radius, drawn in the same stroke, marks the arrow tip.
   zoom in keeps the image point under the cursor at the cursor's screen position.
 - Pointer direction maps to rotation: right gives 0, down gives π/2, left gives π.
   Pointing at the exact centre gives no rotation.
+- Fitting a 1000×4000 document turned 90° into an 800×600 canvas zooms to
+  (800 − 32) / 4000 and keeps every corner inside the margin. At 30° every corner of a
+  3000×1000 document is inside the margin too.
+- A document saved at 90° opens turned 90°, fitted as `VIEW-2a` says.
+- Canvas, simulated: dragging the arrow commits one **Set view rotation** action when the
+  drag ends and none before. Until it is applied, the view shows the dragged rotation.
+  Escape during the drag turns the view back and commits nothing.
+- Canvas, simulated: setting the document's rotation, as undo and redo do, turns the view
+  to it and keeps the origin's screen position.
+- Typing `45` in the rotation field turns the view to 45° at once. Pressing Enter commits
+  one **Set view rotation** action to 45, and the next frame commits nothing more. Escape
+  instead commits nothing, and the view turns back.

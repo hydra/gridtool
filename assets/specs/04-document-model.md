@@ -14,10 +14,12 @@
 - **shapes**: an ordered list of drawn shapes, with their styles (see `DRAW-8`).
 - **origin**: a point inside the document that the view rotates about. It defaults to the
   image centre (`ORIGIN-1`).
+- **rotation**: the view rotation (`VIEW-1`), clockwise in degrees within [0, 360). It is 0
+  for a document created from an image.
 - **object id counter**: the next object id to allocate. Every object carries a stable
   id (`OBJ-1`).
 
-View state (pan, zoom, rotation) is **not** part of the document (`ARCH-4`).
+The rest of the view state, pan and zoom, is **not** part of the document (`ARCH-4`).
 
 **DOC-2 — Initial size.** A document created from an image has the same width and height
 in pixels as the image.

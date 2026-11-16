@@ -1,4 +1,4 @@
-use eframe::egui::{Rect, Vec2};
+use eframe::egui::Rect;
 use egui_ltreeview::TreeViewState;
 use gridtool::action::Action;
 use gridtool::document::Document;
@@ -14,7 +14,7 @@ use super::object_tree::TreeNode;
 use super::scale_tool::ScaleTool;
 use super::selection::Selection;
 use super::tool_mode::ToolMode;
-use super::viewport::Viewport;
+use super::viewport::{Viewport, document_rotation, document_size};
 
 /// Presentation state for one open document: its image textures, how it is viewed, the
 /// active object, and in-progress tool interactions. Nothing here is part of the document.
@@ -32,6 +32,8 @@ pub struct DocumentView {
     pub grid_tool: GridTool,
     pub line_tool: LineTool,
     pub is_dragging_rotate_handle: bool,
+    /// The view rotation field has a rotation typed in that is not yet committed.
+    pub is_editing_rotation: bool,
     pub tree_state: TreeViewState<TreeNode>,
     /// Where the canvas was drawn last frame, in screen points; `None` before it first is.
     pub canvas_rect: Option<Rect>,
@@ -55,6 +57,7 @@ impl DocumentView {
             grid_tool: GridTool::default(),
             line_tool: LineTool::default(),
             is_dragging_rotate_handle: false,
+            is_editing_rotation: false,
             tree_state: TreeViewState::default(),
             canvas_rect: None,
             fit_pending: true,
@@ -64,17 +67,36 @@ impl DocumentView {
 
     /// Notes where the canvas is this frame. A newly opened document is fitted to it, again
     /// each frame until the panels around the canvas have settled, and then left to the user.
-    pub fn set_canvas_rect(&mut self, canvas: Rect, document_size: Vec2) {
+    pub fn set_canvas_rect(&mut self, canvas: Rect, document: &Document) {
         if self.fit_pending {
-            self.viewport = Viewport::fitting(document_size, canvas);
+            self.viewport =
+                Viewport::fitting(document_size(document), canvas, document_rotation(document));
             self.fit_pending = self.canvas_rect != Some(canvas);
         }
         self.canvas_rect = Some(canvas);
     }
 
+    /// Turns the view to the document's rotation, about the origin, unless the user is
+    /// choosing a new one: so undo, redo and loading turn the view, and a rotation being
+    /// dragged or typed shows until it is committed or abandoned.
+    pub fn follow_document_rotation(&mut self, document: &Document) {
+        let rotation = document_rotation(document);
+        let choosing = self.is_dragging_rotate_handle || self.is_editing_rotation;
+        if !choosing && self.viewport.rotation_degrees() != rotation {
+            self.viewport
+                .rotate_about(rotation, document.origin(), document_size(document));
+        }
+    }
+
+    /// The action that commits the rotation the view shows, if it is not the document's.
+    pub fn rotation_action(&self, document: &Document) -> Option<Action> {
+        let rotation = self.viewport.rotation_degrees();
+        (rotation != document_rotation(document)).then(|| Action::SetRotation(f64::from(rotation)))
+    }
+
     /// Abandons whatever a tool is part-way through, without committing anything:
     /// pending scale, measurement, area or line points, a scale point drag, a drag of the
-    /// active object, and a rotate-handle drag. Used by Escape and when switching tool mode.
+    /// active object, a rotate-handle drag, and a typed rotation. Used by Escape and when switching tool mode.
     pub fn cancel_tool(&mut self) {
         self.scale_tool.cancel();
         self.measure_tool.cancel();
@@ -82,6 +104,7 @@ impl DocumentView {
         self.line_tool.outline.cancel();
         self.selection.cancel_drag();
         self.is_dragging_rotate_handle = false;
+        self.is_editing_rotation = false;
     }
 
     /// Leaves the current tool for another: abandons what it was part-way through, and the
@@ -154,6 +177,7 @@ mod tests {
     use gridtool::style::{FillStyle, StyleEdit};
 
     use crate::ui::image_textures::ImageTextures;
+    use crate::ui::viewport::document_size;
 
     fn view() -> DocumentView {
         let image = DecodedImage {
@@ -168,44 +192,86 @@ mod tests {
         ))
     }
 
-    const BIG_DOCUMENT: Vec2 = Vec2::new(4000.0, 3000.0);
+    fn big_document() -> Document {
+        Document::new(4000, 3000)
+    }
+
+    fn big_document_size() -> egui::Vec2 {
+        document_size(&big_document())
+    }
 
     fn canvas(width: f32) -> Rect {
-        Rect::from_min_size(egui::Pos2::ZERO, Vec2::new(width, 600.0))
+        Rect::from_min_size(egui::Pos2::ZERO, egui::Vec2::new(width, 600.0))
     }
 
     #[test]
     fn a_new_document_is_refitted_until_the_canvas_settles() {
         let mut view = view();
 
-        view.set_canvas_rect(canvas(800.0), BIG_DOCUMENT);
+        view.set_canvas_rect(canvas(800.0), &big_document());
         assert_eq!(
             view.viewport,
-            Viewport::fitting(BIG_DOCUMENT, canvas(800.0))
+            Viewport::fitting(big_document_size(), canvas(800.0), 0.0)
         );
 
         // The panels around the canvas took their room after the first frame.
-        view.set_canvas_rect(canvas(500.0), BIG_DOCUMENT);
+        view.set_canvas_rect(canvas(500.0), &big_document());
         assert_eq!(
             view.viewport,
-            Viewport::fitting(BIG_DOCUMENT, canvas(500.0))
+            Viewport::fitting(big_document_size(), canvas(500.0), 0.0)
         );
+    }
+
+    #[test]
+    fn a_rotated_document_opens_turned_and_fitted() {
+        let mut document = big_document();
+        Action::SetRotation(90.0).apply(&mut document).unwrap();
+        let mut view = view();
+
+        view.set_canvas_rect(canvas(800.0), &document);
+
+        assert_eq!(
+            view.viewport,
+            Viewport::fitting(big_document_size(), canvas(800.0), 90.0)
+        );
+        assert_eq!(view.viewport.rotation_degrees(), 90.0);
     }
 
     #[test]
     fn once_the_canvas_has_settled_the_view_is_the_users() {
         let mut view = view();
-        view.set_canvas_rect(canvas(800.0), BIG_DOCUMENT);
-        view.set_canvas_rect(canvas(800.0), BIG_DOCUMENT);
+        let document = big_document();
+        view.set_canvas_rect(canvas(800.0), &document);
+        view.set_canvas_rect(canvas(800.0), &document);
 
-        view.viewport.pan_by(Vec2::new(10.0, 20.0));
+        view.viewport.pan_by(egui::Vec2::new(10.0, 20.0));
         let moved = view.viewport;
-        view.set_canvas_rect(canvas(800.0), BIG_DOCUMENT);
+        view.set_canvas_rect(canvas(800.0), &document);
         assert_eq!(view.viewport, moved);
 
         // Resizing the window does not fit the document again.
-        view.set_canvas_rect(canvas(500.0), BIG_DOCUMENT);
+        view.set_canvas_rect(canvas(500.0), &document);
         assert_eq!(view.viewport, moved);
+    }
+
+    #[test]
+    fn the_view_turns_to_the_document_rotation_unless_one_is_being_chosen() {
+        let mut document = Document::new(100, 100);
+        Action::SetRotation(45.0).apply(&mut document).unwrap();
+        let mut view = view();
+
+        view.is_editing_rotation = true;
+        view.follow_document_rotation(&document);
+        assert_eq!(view.viewport.rotation_degrees(), 0.0);
+        assert_eq!(
+            view.rotation_action(&document),
+            Some(Action::SetRotation(0.0))
+        );
+
+        view.is_editing_rotation = false;
+        view.follow_document_rotation(&document);
+        assert_eq!(view.viewport.rotation_degrees(), 45.0);
+        assert_eq!(view.rotation_action(&document), None);
     }
 
     #[test]

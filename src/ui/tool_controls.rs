@@ -198,10 +198,7 @@ impl ToolControls {
                 ui.weak(tr!("help-origin"));
                 None
             }
-            ToolMode::Rotate => {
-                self.rotation_bar.show(ui, &mut view.viewport, document);
-                None
-            }
+            ToolMode::Rotate => self.rotation_bar.show(ui, view, document),
             ToolMode::Scale => self.scale_bar.show(ui, document, &mut view.scale_tool),
             ToolMode::Grid => {
                 view.grid_tool.show_options(ui, document);
@@ -432,6 +429,57 @@ mod tests {
             }
             actions
         }
+    }
+
+    /// Presses and releases `key`, holding `modifiers`.
+    fn key(key: egui::Key, modifiers: Modifiers) -> Vec<Event> {
+        [true, false]
+            .map(|pressed| Event::Key {
+                key,
+                physical_key: None,
+                pressed,
+                repeat: false,
+                modifiers,
+            })
+            .to_vec()
+    }
+
+    /// Focuses the view rotation field (the only one in the row) and types `text` in place of
+    /// what it shows, returning any action that completed meanwhile.
+    fn type_rotation(harness: &mut Harness, text: &str) -> Option<Action> {
+        harness.frame(Vec::new());
+        harness.frame(key(egui::Key::Tab, Modifiers::NONE));
+        harness.frame(key(egui::Key::A, Modifiers::COMMAND));
+        harness.frame(vec![Event::Text(text.to_owned())]).0
+    }
+
+    #[test]
+    fn a_typed_rotation_shows_at_once_and_is_committed_once_when_the_field_is_left() {
+        let mut harness = Harness::new(ToolMode::Rotate);
+
+        assert_eq!(type_rotation(&mut harness, "45"), None);
+        assert_eq!(harness.view.viewport.rotation_degrees(), 45.0);
+        assert!(harness.view.is_editing_rotation);
+
+        let (action, _) = harness.frame(key(egui::Key::Enter, Modifiers::NONE));
+        assert_eq!(action, Some(Action::SetRotation(45.0)));
+        assert_eq!(harness.frame(Vec::new()).0, None);
+    }
+
+    #[test]
+    fn escape_abandons_a_typed_rotation() {
+        let mut harness = Harness::new(ToolMode::Rotate);
+        type_rotation(&mut harness, "45");
+
+        assert_eq!(
+            harness.frame(key(egui::Key::Escape, Modifiers::NONE)).0,
+            None
+        );
+        assert_eq!(harness.frame(Vec::new()).0, None);
+
+        assert!(!harness.view.is_editing_rotation);
+        harness.view.follow_document_rotation(&harness.document);
+        assert_eq!(harness.view.viewport.rotation_degrees(), 0.0);
     }
 
     #[test]

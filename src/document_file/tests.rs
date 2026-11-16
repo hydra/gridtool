@@ -12,7 +12,7 @@ use crate::units::LengthUnit;
 /// A document using every feature: calibration, measurements with a gap in their ids and
 /// a changed colour, areas with every property changed, grids with every property
 /// changed (one aligned to a deleted measurement), drawn shapes (a styled line and a
-/// closed shape with every property changed), a moved origin.
+/// closed shape with every property changed), a moved origin and a rotated view.
 fn rich_document() -> Document {
     let mut document = Document::new(200, 100);
     let measurement = |x: f64| {
@@ -44,6 +44,7 @@ fn rich_document() -> Document {
             distance: Some(0.3),
         },
         Action::SetUnit(LengthUnit::Metre),
+        Action::SetRotation(247.25),
         measurement(10.0),
         measurement(50.0),
         measurement(90.0),
@@ -238,7 +239,7 @@ fn files_are_tagged_with_their_format_version() {
         .to_ron()
         .unwrap();
 
-    assert!(text.starts_with("V7("), "{text}");
+    assert!(text.starts_with("V8("), "{text}");
 }
 
 /// A version 1 file exactly as the first release writes it. It must always load.
@@ -962,10 +963,7 @@ fn two_point_file() -> DocumentV5 {
     }
     .apply(&mut document)
     .unwrap();
-    let DocumentFile::V7(file) = DocumentFile::describe(&document, "a.png".to_owned()) else {
-        unreachable!("the current version is 7");
-    };
-    file
+    DocumentV5::describe(&document, "a.png".to_owned())
 }
 
 #[test]
@@ -1019,4 +1017,74 @@ fn a_two_point_scale_with_the_wrong_number_of_points_is_rejected() {
         DocumentFile::V7(file).to_document(),
         Err(InvalidDocument::WrongScalePointCount)
     );
+}
+
+/// A version 8 file exactly as the release that saved the view rotation writes it. It must
+/// always load.
+const VERSION_8_SAMPLE: &str = r#"V8((
+    image: "photo.png",
+    width: 200,
+    height: 100,
+    origin: (x: 20.0, y: 30.0),
+    rotation: 112.5,
+    calibration: (
+        points: Some((method: TwoPoint, points: [(x: 10.0, y: 10.0), (x: 110.0, y: 10.0)])),
+        distance_a: Some(50.0),
+        distance_b: None,
+        unit: Centimetre,
+    ),
+    measurements: [(
+        id: 1,
+        start: (x: 1.0, y: 2.0),
+        end: (x: 3.0, y: 4.0),
+        unit: Metre,
+        line_style: Thick,
+        line_color: (r: 0, g: 0, b: 255),
+        line_opacity: 1.0,
+    )],
+    areas: [],
+    grids: [],
+    shapes: [],
+    next_object_id: 2,
+))"#;
+
+#[test]
+fn version_8_files_load_with_their_rotation() {
+    let document = DocumentFile::from_ron(VERSION_8_SAMPLE)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    assert_eq!(document.rotation(), 112.5);
+    assert_eq!(document.origin(), Point::new(20.0, 30.0));
+    assert_eq!(document.measurements().len(), 1);
+    assert_eq!(
+        document.calibration().points().unwrap().method(),
+        CalibrationMethod::TwoPoint
+    );
+}
+
+#[test]
+fn files_from_before_version_8_load_unrotated() {
+    let version_7 = VERSION_5_SAMPLE.replacen("V5(", "V7(", 1);
+    let document = DocumentFile::from_ron(&version_7)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    assert_eq!(document.rotation(), 0.0);
+}
+
+#[test]
+fn a_rotation_outside_one_turn_is_rejected() {
+    for rotation in ["360.0", "-1.0", "NaN", "inf"] {
+        let text =
+            VERSION_8_SAMPLE.replacen("rotation: 112.5", &format!("rotation: {rotation}"), 1);
+        let result = DocumentFile::from_ron(&text).unwrap().to_document();
+
+        assert!(
+            matches!(result, Err(InvalidDocument::BadRotation(_))),
+            "{rotation}: {result:?}"
+        );
+    }
 }
