@@ -1,6 +1,6 @@
 [package]
 name = "gridtool"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2024"
 authors = ["Dominic Clifton", "ClaudeAI"]
 license = "MIT OR Apache-2.0"
