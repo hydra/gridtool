@@ -30,7 +30,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         WindowsResource::new()
             .set_icon(ico_path.to_str().ok_or("OUT_DIR is not valid UTF-8")?)
             .compile()?;
-        fs::copy(&ico_path, profile_dir(out_dir)?.join("gridtool.ico"))?;
+        let installer_ico_path = profile_dir(out_dir)?.join("gridtool.ico");
+        fs::copy(&ico_path, &installer_ico_path)?;
+        // The copy is outside OUT_DIR, so it can be deleted while the build stays fresh: CI's
+        // cache keeps the build script's output but not the profile directory's files. A watched
+        // file that is missing makes cargo run the build script again. The copy is given the
+        // PNG's time, as a watched file newer than this run would make every build run it again.
+        File::options()
+            .write(true)
+            .open(&installer_ico_path)?
+            .set_modified(fs::metadata(ICON_PNG)?.modified()?)?;
+        println!("cargo:rerun-if-changed={}", installer_ico_path.display());
     }
     Ok(())
 }
