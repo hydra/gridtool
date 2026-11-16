@@ -158,6 +158,7 @@ impl DocumentTransform {
 
     /// Screen positions of the document's corners, in the order top-left, top-right,
     /// bottom-right, bottom-left.
+    #[cfg(test)]
     pub fn corners(self) -> [Pos2; 4] {
         self.corners_outset(0.0)
     }

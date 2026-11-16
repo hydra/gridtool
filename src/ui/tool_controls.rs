@@ -290,7 +290,7 @@ mod tests {
     use gridtool::style::{FillStyle, LineStyle};
     use gridtool::units::LengthUnit;
 
-    use crate::ui::canvas::upload_texture;
+    use crate::ui::image_textures::ImageTextures;
 
     const WIDE: f32 = 1800.0;
     const NARROW: f32 = 300.0;
@@ -331,7 +331,7 @@ mod tests {
                 height: 1,
                 rgba: vec![255; 4],
             };
-            let view = DocumentView::new(upload_texture(&ctx, "test", &image));
+            let view = DocumentView::new(ImageTextures::upload(&ctx, "test", &image));
             Self {
                 ctx,
                 controls: ToolControls::default(),

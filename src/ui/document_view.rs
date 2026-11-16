@@ -1,4 +1,4 @@
-use eframe::egui::{Rect, TextureHandle, Vec2};
+use eframe::egui::{Rect, Vec2};
 use egui_ltreeview::TreeViewState;
 use gridtool::action::Action;
 use gridtool::document::Document;
@@ -7,6 +7,7 @@ use gridtool::units::LengthUnit;
 
 use super::area_tool::AreaTool;
 use super::grid_tool::GridTool;
+use super::image_textures::ImageTextures;
 use super::line_tool::LineTool;
 use super::measure_tool::MeasureTool;
 use super::object_tree::TreeNode;
@@ -15,10 +16,10 @@ use super::selection::Selection;
 use super::tool_mode::ToolMode;
 use super::viewport::Viewport;
 
-/// Presentation state for one open document: its image texture, how it is viewed, the
+/// Presentation state for one open document: its image textures, how it is viewed, the
 /// active object, and in-progress tool interactions. Nothing here is part of the document.
 pub struct DocumentView {
-    pub texture: TextureHandle,
+    pub image: ImageTextures,
     /// The active tool, which each document keeps for itself.
     pub mode: ToolMode,
     /// The press that made this document active is still held, so it is not for the tool.
@@ -41,9 +42,9 @@ pub struct DocumentView {
 }
 
 impl DocumentView {
-    pub fn new(texture: TextureHandle) -> Self {
+    pub fn new(image: ImageTextures) -> Self {
         Self {
-            texture,
+            image,
             mode: ToolMode::default(),
             ignore_primary_until_release: false,
             viewport: Viewport::default(),
@@ -152,7 +153,7 @@ mod tests {
     use gridtool::measurement::Measurement;
     use gridtool::style::{FillStyle, StyleEdit};
 
-    use crate::ui::canvas::upload_texture;
+    use crate::ui::image_textures::ImageTextures;
 
     fn view() -> DocumentView {
         let image = DecodedImage {
@@ -160,7 +161,11 @@ mod tests {
             height: 1,
             rgba: vec![255; 4],
         };
-        DocumentView::new(upload_texture(&egui::Context::default(), "test", &image))
+        DocumentView::new(ImageTextures::upload(
+            &egui::Context::default(),
+            "test",
+            &image,
+        ))
     }
 
     const BIG_DOCUMENT: Vec2 = Vec2::new(4000.0, 3000.0);

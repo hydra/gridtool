@@ -10,8 +10,8 @@ use gridtool::editor::Editor;
 use gridtool::imaging::DecodedImage;
 
 use crate::open_image::OpenedImage;
-use crate::ui::canvas;
 use crate::ui::document_view::DocumentView;
+use crate::ui::image_textures::ImageTextures;
 use crate::ui::object_tree::TreePick;
 use crate::ui::reveal;
 
@@ -65,7 +65,7 @@ impl OpenDocument {
     ) -> Self {
         let name = image_path.display().to_string();
         let saved = file.is_some().then(|| document.clone());
-        let mut view = DocumentView::new(canvas::upload_texture(ctx, &name, image));
+        let mut view = DocumentView::new(ImageTextures::upload(ctx, &name, image));
         view.scale_tool.sync_to(document.calibration());
         Self {
             editor: Editor::new(document),

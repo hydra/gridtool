@@ -22,6 +22,7 @@ mod history_panel;
 mod hit_test;
 mod icon_button;
 mod icons;
+pub mod image_textures;
 mod line_hit;
 mod line_tool;
 mod measure_tool;

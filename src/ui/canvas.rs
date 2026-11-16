@@ -3,14 +3,13 @@
 
 use eframe::egui::{
     self, Align2, Color32, CursorIcon, FontId, PointerButton, Pos2, Rect, Response, Sense, Shape,
-    Stroke, TextureHandle, Vec2,
+    Stroke, Vec2,
 };
 use gridtool::action::Action;
 use gridtool::calibration::{CalibrationMethod, Scale};
 use gridtool::document::Document;
 use gridtool::geometry::{Bounds, BoundsHandle, Point};
 use gridtool::grid::GridSource;
-use gridtool::imaging::DecodedImage;
 use gridtool::measurement::Endpoint;
 use gridtool::polygon;
 use gridtool::style::{ObjectStyle, Styled};
@@ -23,6 +22,7 @@ use super::grid_display::paint_grids;
 use super::grid_tool::add_grid;
 use super::grip_cursor::grip_cursor;
 use super::hit_test::nearest_within;
+use super::image_textures::ImageTextures;
 use super::line_hit::segment_at;
 use super::line_tool::LineTool;
 use super::measure_tool::MeasureTool;
@@ -91,12 +91,6 @@ pub const DASH_LENGTH: f32 = 6.0;
 pub const DASH_GAP: f32 = 4.0;
 /// How strongly one point of mouse-wheel scrolling changes the zoom.
 const SCROLL_ZOOM_SPEED: f32 = 0.002;
-
-/// Uploads a decoded image to the GPU so the canvas can draw it.
-pub fn upload_texture(ctx: &egui::Context, name: &str, image: &DecodedImage) -> TextureHandle {
-    let color_image = egui::ColorImage::from_rgba_unmultiplied(image.size(), &image.rgba);
-    ctx.load_texture(name, color_image, egui::TextureOptions::default())
-}
 
 /// What the user did on a canvas this frame.
 #[derive(Debug, Default)]
@@ -210,7 +204,7 @@ fn paint(
     view: &DocumentView,
     document: &Document,
 ) {
-    paint_document(painter, transform, &view.texture);
+    paint_document(painter, transform, &view.image);
     paint_grids(painter, transform, document, &view.selection);
     paint_shapes(painter, transform, document, &view.selection);
     paint_areas(painter, transform, document, &view.selection);
@@ -754,8 +748,8 @@ fn press_origin(ui: &egui::Ui) -> Option<Pos2> {
     ui.input(|input| input.pointer.press_origin())
 }
 
-fn paint_document(painter: &egui::Painter, transform: DocumentTransform, texture: &TextureHandle) {
-    painter.add(textured_quad(transform.corners(), texture));
+fn paint_document(painter: &egui::Painter, transform: DocumentTransform, image: &ImageTextures) {
+    image.paint(painter, transform);
 
     // The outline's centre line sits half a stroke outside the document, so the whole
     // stroke lies around the document rather than on top of it.
@@ -1123,35 +1117,12 @@ fn paint_label(painter: &egui::Painter, position: Pos2, text: String, color: Col
     );
 }
 
-/// A mesh drawing the whole texture onto the quad with the given corners
-/// (top-left, top-right, bottom-right, bottom-left).
-fn textured_quad(corners: [Pos2; 4], texture: &TextureHandle) -> egui::Mesh {
-    let uv = Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0));
-    let uvs = [
-        uv.left_top(),
-        uv.right_top(),
-        uv.right_bottom(),
-        uv.left_bottom(),
-    ];
-
-    let mut mesh = egui::Mesh::with_texture(texture.id());
-    for (pos, uv) in corners.into_iter().zip(uvs) {
-        mesh.vertices.push(egui::epaint::Vertex {
-            pos,
-            uv,
-            color: Color32::WHITE,
-        });
-    }
-    mesh.add_triangle(0, 1, 2);
-    mesh.add_triangle(0, 2, 3);
-    mesh
-}
-
 /// Headless tests that feed raw pointer events through a real egui context.
 #[cfg(test)]
 mod tests {
     use super::*;
     use eframe::egui::{Event, Modifiers, RawInput};
+    use gridtool::imaging::DecodedImage;
     use gridtool::measurement::Measurement;
     use gridtool::shape::DrawnShape;
     use gridtool::units::LengthUnit;
@@ -1194,7 +1165,7 @@ mod tests {
                 height: 1,
                 rgba: vec![255; 4],
             };
-            let texture = upload_texture(&ctx, "test", &image);
+            let image = ImageTextures::upload(&ctx, "test", &image);
             let mut document = Document::new(200, 100);
             Action::AddMeasurement(Measurement::new(
                 Point::new(50.0, 50.0),
@@ -1206,7 +1177,7 @@ mod tests {
             let mut harness = Self {
                 ctx,
                 mode,
-                view: DocumentView::new(texture),
+                view: DocumentView::new(image),
                 document,
                 actions: Vec::new(),
                 cursor: CursorIcon::Default,

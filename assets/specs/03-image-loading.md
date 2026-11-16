@@ -37,6 +37,12 @@ documents are kept. The new document has no file and has unsaved changes until i
 **IMG-8 — Display.** The decoded image is drawn as the document's content on the canvas
 and fills the document rectangle exactly (`VIEW-6`).
 
+**IMG-9 — Large images.** An image of any size that decodes MUST open and display at its native
+resolution, even when it is wider or taller than the largest texture the graphics device
+supports. It is then shown as adjacent tiles, each within the device limit, that together
+cover the document rectangle exactly with no gaps or overlaps. Exceeding the device limit
+MUST NOT crash the application.
+
 ## Acceptance criteria
 
 - Every supported extension is accepted, in any letter case.
@@ -49,3 +55,6 @@ and fills the document rectangle exactly (`VIEW-6`).
 - Cancelling the picker produces no change.
 - A picked file with an unsupported extension produces an unsupported-format error.
 - A picked valid file decodes, and the path it came from is kept.
+- A layout of tiles for a given device limit covers the image exactly, row by row, with
+  no tile wider or taller than the limit; a 4675×10976 image on an 8192 limit is two rows.
+- Cropping each tile out of an image and placing them back rebuilds the original pixels.
