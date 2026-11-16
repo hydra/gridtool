@@ -131,6 +131,28 @@ impl ToolControls {
                     ui, id, target, &**stored, &displayed, selection, settings, document,
                 ));
             }
+            ObjectKind::Route => {
+                let index = document.route_index(id)?;
+                let stored = &document.routes()[index];
+                ui.strong(tr!("object-route", { number: index + 1 }));
+                ui.separator();
+                actions.extend(
+                    unit_picker::show(
+                        ui,
+                        ("object_unit", id),
+                        stored.unit(),
+                        &tr!("route-unit-tooltip"),
+                    )
+                    .map(|unit| Action::SetRouteUnit { index, unit }),
+                );
+                ui.separator();
+                let displayed = selection.displayed_route(id, stored);
+                let target = StyleTarget::Route(index);
+                let settings = &mut view.route_tool.settings;
+                actions.extend(self.object_style(
+                    ui, id, target, &**stored, &displayed, selection, settings, document,
+                ));
+            }
             ObjectKind::Shape => {
                 let index = document.shape_index(id)?;
                 let stored = &document.shapes()[index];
@@ -228,6 +250,19 @@ impl ToolControls {
                 }
                 ui.separator();
                 self.new_object_style(ui, "new_area", settings, document);
+                None
+            }
+            ToolMode::Route => {
+                let settings = &mut view.route_tool.settings;
+                ui.strong(tr!("new-route"));
+                ui.separator();
+                let unit = settings.unit(document.calibration().unit());
+                let tooltip = &tr!("new-route-unit-tooltip");
+                if let Some(unit) = unit_picker::show(ui, "new_route_unit", unit, tooltip) {
+                    settings.set_unit(unit);
+                }
+                ui.separator();
+                self.new_object_style(ui, "new_route", settings, document);
                 None
             }
             ToolMode::DrawLine => {

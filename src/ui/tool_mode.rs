@@ -18,6 +18,8 @@ pub enum ToolMode {
     Measure,
     /// Add area measurements by clicking the corners of their outline.
     Area,
+    /// Add route measurements by clicking the points along them.
+    Route,
     /// Add grids aligned to a scale line or a measurement line.
     Grid,
     /// Click on the image to move the document origin (the rotation centre).
@@ -28,12 +30,13 @@ pub enum ToolMode {
 
 impl ToolMode {
     /// Every mode, in tool bar order.
-    pub const ALL: [ToolMode; 8] = [
+    pub const ALL: [ToolMode; 9] = [
         ToolMode::Pan,
         ToolMode::Rotate,
         ToolMode::Scale,
         ToolMode::Measure,
         ToolMode::Area,
+        ToolMode::Route,
         ToolMode::Grid,
         ToolMode::Origin,
         ToolMode::DrawLine,
@@ -47,6 +50,7 @@ impl ToolMode {
             ObjectKind::Area => ToolMode::Area,
             ObjectKind::Grid => ToolMode::Grid,
             ObjectKind::Shape => ToolMode::DrawLine,
+            ObjectKind::Route => ToolMode::Route,
         }
     }
 
@@ -62,6 +66,7 @@ impl ToolMode {
             ToolMode::Scale => icons::SCALE,
             ToolMode::Measure => icons::MEASURE,
             ToolMode::Area => icons::AREA,
+            ToolMode::Route => icons::ROUTE,
             ToolMode::Grid => icons::GRID,
             ToolMode::Origin => icons::ORIGIN,
             ToolMode::DrawLine => icons::DRAW_LINE,
@@ -75,6 +80,7 @@ impl ToolMode {
             ToolMode::Scale => tr!("tool-scale"),
             ToolMode::Measure => tr!("tool-measure"),
             ToolMode::Area => tr!("tool-area"),
+            ToolMode::Route => tr!("tool-route"),
             ToolMode::Grid => tr!("tool-grid"),
             ToolMode::Origin => tr!("tool-origin"),
             ToolMode::DrawLine => tr!("tool-draw-line"),
@@ -101,11 +107,17 @@ mod tests {
     }
 
     #[test]
-    fn area_follows_measure_and_grid_follows_area_in_the_tool_bar() {
+    fn area_follows_measure_route_follows_area_and_grid_follows_route_in_the_tool_bar() {
         let position = |mode| ToolMode::ALL.iter().position(|&m| m == mode).unwrap();
 
         assert_eq!(position(ToolMode::Area), position(ToolMode::Measure) + 1);
-        assert_eq!(position(ToolMode::Grid), position(ToolMode::Area) + 1);
+        assert_eq!(position(ToolMode::Route), position(ToolMode::Area) + 1);
+        assert_eq!(position(ToolMode::Grid), position(ToolMode::Route) + 1);
+    }
+
+    #[test]
+    fn a_route_brings_the_route_tool() {
+        assert_eq!(ToolMode::for_object(ObjectKind::Route), ToolMode::Route);
     }
 
     #[test]

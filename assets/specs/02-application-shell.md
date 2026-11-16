@@ -96,18 +96,19 @@ object is chosen.
 | 8 | Scale mode button | ruler (`straighten`) | "`Scale`" |
 | 9 | Measure distance mode button | tape measure (`measuring_tape`) | "`Measure distance`" |
 | 10 | Measure area mode button (`AREA-1`) | polygon (`pentagon`) | "`Measure area`" |
-| 11 | Grid mode button | grid (`grid_on`) | "`Grid`" |
-| 12 | Origin mode button | crosshair (`my_location`) | "`Origin`" (`ORIGIN-2`) |
-| 13 | Horizontal spacer, 16 px | — | — |
-| 14 | Draw line mode button (`DRAW-1`) | line segments joined at points (`polyline`) | "`Draw line`" |
-| 15 | Horizontal spacer, 16 px | — | — |
-| 16 | Undo button | undo arrow (`undo`) | "`Undo`" |
-| 17 | Redo button | redo arrow (`redo`) | "`Redo`" |
-| 18 | Horizontal spacer, 16 px | — | — |
-| 19 | Panels menu (`WORK-5`) | panels (`dashboard`) | "`Panels`" |
-| 20 | Free space | — | — |
-| 21 | Settings menu (`PREF-1`) | settings (`settings`) | "`Settings`" |
-| 22 | About button (`SHELL-13`), at the right-hand end of the tool bar | information (`info`) | "`About`" |
+| 11 | Measure route mode button (`ROUTE-1`) | path between two points (`route`) | "`Measure route`" |
+| 12 | Grid mode button | grid (`grid_on`) | "`Grid`" |
+| 13 | Origin mode button | crosshair (`my_location`) | "`Origin`" (`ORIGIN-2`) |
+| 14 | Horizontal spacer, 16 px | — | — |
+| 15 | Draw line mode button (`DRAW-1`) | line segments joined at points (`polyline`) | "`Draw line`" |
+| 16 | Horizontal spacer, 16 px | — | — |
+| 17 | Undo button | undo arrow (`undo`) | "`Undo`" |
+| 18 | Redo button | redo arrow (`redo`) | "`Redo`" |
+| 19 | Horizontal spacer, 16 px | — | — |
+| 20 | Panels menu (`WORK-5`) | panels (`dashboard`) | "`Panels`" |
+| 21 | Free space | — | — |
+| 22 | Settings menu (`PREF-1`) | settings (`settings`) | "`Settings`" |
+| 23 | About button (`SHELL-13`), at the right-hand end of the tool bar | information (`info`) | "`About`" |
 
 The buttons act on the active document (`WORK-10`). Items 14 onward up to the next spacer are the **drawing tools** group; future drawing tools
 are added to it.
@@ -166,12 +167,12 @@ for something else:
   away from it; a further Escape then cancels the tool
 
 **SHELL-10b — Removing the last point.** Pressing **Backspace** removes the last point
-placed for a new area (`AREA-3`) or drawn shape (`DRAW-3`). Like Escape, it does nothing
+placed for a new area (`AREA-3`), drawn shape (`DRAW-3`) or route (`ROUTE-3`). Like Escape, it does nothing
 while a dialog is open or while a widget such as a text field has keyboard focus (where it
 edits the text).
 
 **SHELL-10c — Finishing a line.** Pressing **Enter** finishes the drawn line being placed,
-leaving it open (`DRAW-5`). Like Escape, it does nothing while a dialog is open or while a
+leaving it open (`DRAW-5`), or the route being placed (`ROUTE-4`). Like Escape, it does nothing while a dialog is open or while a
 widget such as a text field has keyboard focus.
 
 ## Panels

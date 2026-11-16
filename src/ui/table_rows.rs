@@ -1,5 +1,6 @@
-//! Rows of a table that each stand for an object. A row is selected exactly when its object
-//! is the active object, so at most one row is selected across every table.
+//! Rows of a table that each stand for an object, or for part of one. A row is selected
+//! exactly when its object is the active object, so at most one row is selected across every
+//! table.
 
 use eframe::egui::{self, Color32, Rangef, Rect, Style};
 use gridtool::action::Action;
@@ -19,7 +20,11 @@ impl TableOutput {
     pub fn new(action: Option<Action>, pick: Option<ObjectId>) -> Self {
         let deleting = matches!(
             action,
-            Some(Action::DeleteMeasurement { .. } | Action::DeleteArea { .. })
+            Some(
+                Action::DeleteMeasurement { .. }
+                    | Action::DeleteArea { .. }
+                    | Action::DeleteRoute { .. }
+            )
         );
         Self {
             action,
@@ -42,37 +47,39 @@ pub fn row_color(
     }
 }
 
-/// Where the rows of a table were laid out this frame.
-#[derive(Debug, Default)]
-pub struct TableRows {
-    rows: Vec<(ObjectId, Rangef)>,
+/// Where the rows of a table were laid out this frame, each known by its key: by default the
+/// object it stands for.
+#[derive(Debug)]
+pub struct TableRows<K = ObjectId> {
+    rows: Vec<(K, Rangef)>,
 }
 
-impl TableRows {
-    /// Shows one row of a grid for the object `id` and ends the row.
+impl<K> Default for TableRows<K> {
+    fn default() -> Self {
+        Self { rows: Vec::new() }
+    }
+}
+
+impl<K: Copy + PartialEq> TableRows<K> {
+    /// Shows one row of a grid, known by `key`, and ends the row.
     pub fn row<R>(
         &mut self,
         ui: &mut egui::Ui,
-        id: ObjectId,
+        key: K,
         show: impl FnOnce(&mut egui::Ui) -> R,
     ) -> R {
         let top = ui.cursor().top();
         let inner = show(ui);
         ui.end_row();
-        self.rows.push((id, Rangef::new(top, ui.cursor().top())));
+        self.rows.push((key, Rangef::new(top, ui.cursor().top())));
         inner
     }
 
     /// Call once the grid is drawn, inside its scroll area, with the grid's `table` rect.
-    /// Scrolls the row of `reveal` into view, and returns the object of the row clicked this
+    /// Scrolls the row of `reveal` into view, and returns the key of the row clicked this
     /// frame. A click on a widget in a row counts as a click on the row, but one on something
     /// drawn over the table, such as a drop-down, does not.
-    pub fn finish(
-        &self,
-        ui: &mut egui::Ui,
-        table: Rect,
-        reveal: Option<ObjectId>,
-    ) -> Option<ObjectId> {
+    pub fn finish(&self, ui: &mut egui::Ui, table: Rect, reveal: Option<K>) -> Option<K> {
         if let Some(&(_, y)) = self.rows.iter().find(|(id, _)| Some(*id) == reveal) {
             // The whole visible width, so that this cannot scroll sideways.
             ui.scroll_to_rect(Rect::from_x_y_ranges(ui.clip_rect().x_range(), y), None);

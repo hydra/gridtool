@@ -11,6 +11,7 @@ mod v3;
 mod v4;
 mod v5;
 mod v8;
+mod v9;
 
 use std::fmt;
 use std::fs;
@@ -31,6 +32,7 @@ pub use v3::DocumentV3;
 pub use v4::DocumentV4;
 pub use v5::DocumentV5;
 pub use v8::DocumentV8;
+pub use v9::DocumentV9;
 
 /// The extension of document files, without the dot.
 pub const EXTENSION: &str = "ron";
@@ -50,12 +52,14 @@ pub enum DocumentFile {
     V7(DocumentV5),
     /// Version 7 with the view rotation.
     V8(DocumentV8),
+    /// Version 8 with routes.
+    V9(DocumentV9),
 }
 
 impl DocumentFile {
     /// Describes `document` in the current format version.
     pub fn describe(document: &Document, image: String) -> Self {
-        Self::V8(DocumentV8::describe(document, image))
+        Self::V9(DocumentV9::describe(document, image))
     }
 
     /// The stored image reference.
@@ -67,6 +71,7 @@ impl DocumentFile {
             Self::V4(file) => &file.image,
             Self::V5(file) | Self::V6(file) | Self::V7(file) => &file.image,
             Self::V8(file) => &file.image,
+            Self::V9(file) => &file.image,
         }
     }
 
@@ -90,6 +95,7 @@ impl DocumentFile {
             Self::V6(file) => file.to_document_without_two_point(),
             Self::V7(file) => file.to_document(),
             Self::V8(file) => file.to_document(),
+            Self::V9(file) => file.to_document(),
         }
     }
 
@@ -209,6 +215,7 @@ pub enum InvalidDocument {
     TwoPointNotInVersion,
     TooFewAreaPoints(usize),
     TooFewShapePoints(usize),
+    TooFewRoutePoints(usize),
     /// The id of an open shape stored with a fill.
     FilledOpenShape(u64),
     NotPositive(f64),
@@ -230,6 +237,9 @@ impl fmt::Display for InvalidDocument {
             Self::TooFewAreaPoints(count) => tr!("error-document-area-points", { count: count }),
             Self::TooFewShapePoints(count) => {
                 tr!("error-document-shape-points", { count: count })
+            }
+            Self::TooFewRoutePoints(count) => {
+                tr!("error-document-route-points", { count: count })
             }
             Self::FilledOpenShape(id) => tr!("error-document-filled-open-shape", { id: id }),
             Self::NotPositive(value) => tr!("error-document-not-positive", { value: value }),

@@ -3,6 +3,7 @@ use crate::calibration::CalibrationMethod;
 use crate::document::Outline;
 use crate::editor::Editor;
 
+mod routes;
 mod shapes;
 
 fn three_points() -> ScalePoints {

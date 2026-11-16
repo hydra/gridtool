@@ -21,6 +21,7 @@ use super::document_area::DocumentArea;
 use super::history_panel;
 use super::measurements_panel::MeasurementsPanel;
 use super::object_tree::{self, TreePick};
+use super::routes_panel::{RoutesOutput, RoutesPanel, SegmentPick};
 use super::table_rows::TableOutput;
 
 const PANEL_MARGIN: f32 = 6.0;
@@ -38,14 +39,16 @@ pub enum Panel {
     Objects,
     PointToPoint,
     Areas,
+    Routes,
     History,
 }
 
 impl Panel {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::Objects,
         Self::PointToPoint,
         Self::Areas,
+        Self::Routes,
         Self::History,
     ];
 
@@ -54,6 +57,7 @@ impl Panel {
             Self::Objects => tr!("panel-objects"),
             Self::PointToPoint => tr!("panel-point-to-point"),
             Self::Areas => tr!("panel-areas"),
+            Self::Routes => tr!("panel-routes"),
             Self::History => tr!("panel-history"),
         }
     }
@@ -63,7 +67,8 @@ impl Panel {
             Self::Objects => 0,
             Self::PointToPoint => 1,
             Self::Areas => 2,
-            Self::History => 3,
+            Self::Routes => 3,
+            Self::History => 4,
         }
     }
 }
@@ -83,6 +88,8 @@ pub struct WorkspaceOutput {
     pub tree_pick: Option<TreePick>,
     /// The object whose row was picked in a table.
     pub table_pick: Option<ObjectId>,
+    /// The route segment whose row was picked in the Routes table.
+    pub segment_pick: Option<SegmentPick>,
     /// The document the user clicked, to become the active one.
     pub activate: Option<DocumentId>,
     /// The document whose tab the user asked to close.
@@ -94,12 +101,18 @@ impl WorkspaceOutput {
         self.actions.extend(table.action);
         self.table_pick = self.table_pick.or(table.pick);
     }
+
+    fn add_routes(&mut self, routes: RoutesOutput) {
+        self.add_table(routes.table);
+        self.segment_pick = self.segment_pick.or(routes.segment);
+    }
 }
 
 /// What the tables remember between frames, for the document they are showing.
 #[derive(Default)]
 struct Tables {
     measurements: MeasurementsPanel,
+    routes: RoutesPanel,
     /// The active object when the tables were last shown.
     last_active: Option<ObjectId>,
 }
@@ -286,8 +299,13 @@ fn default_tree() -> Tree<WorkspacePane> {
     };
     let objects = panel_group(&mut tiles, WorkspacePane::Panel(Panel::Objects));
     let documents = panel_group(&mut tiles, WorkspacePane::Documents);
-    let tables = [Panel::PointToPoint, Panel::Areas, Panel::History]
-        .map(|panel| panel_group(&mut tiles, WorkspacePane::Panel(panel)));
+    let tables = [
+        Panel::PointToPoint,
+        Panel::Areas,
+        Panel::Routes,
+        Panel::History,
+    ]
+    .map(|panel| panel_group(&mut tiles, WorkspacePane::Panel(panel)));
     let tables = tiles.insert_vertical_tile(tables.to_vec());
     let root = tiles.insert_horizontal_tile(vec![objects, documents, tables]);
     if let Some(Tile::Container(Container::Linear(linear))) = tiles.get_mut(root) {
@@ -387,6 +405,13 @@ impl WorkspaceBehavior<'_> {
             Panel::Areas => {
                 let table = areas_panel::show(ui, document, selection, self.reveal);
                 self.output.add_table(table);
+            }
+            Panel::Routes => {
+                let routes = self
+                    .tables
+                    .routes
+                    .show(ui, document, selection, self.reveal);
+                self.output.add_routes(routes);
             }
             Panel::History => history_panel::show(ui, &open.editor),
             Panel::Objects => {}

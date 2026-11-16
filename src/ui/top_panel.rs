@@ -339,7 +339,7 @@ mod tests {
         let ctx = egui::Context::default();
         egui_material_icons::initialize(&ctx);
         let state = ToolBarState {
-            open_panels: [true, false, true, true],
+            open_panels: [true, false, true, true, true],
             ..Default::default()
         };
         let mut chosen = None;

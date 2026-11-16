@@ -5,6 +5,7 @@ use crate::grid::Grid;
 use crate::imaging::DecodedImage;
 use crate::measurement::Measurement;
 use crate::object::{Identified, ObjectId, ObjectKind};
+use crate::route::Route;
 use crate::shape::DrawnShape;
 
 /// The image-space shape an object is drawn as, e.g. to tell whether it is in view.
@@ -22,6 +23,7 @@ pub(crate) struct Objects {
     pub areas: Vec<Identified<Area>>,
     pub grids: Vec<Identified<Grid>>,
     pub shapes: Vec<Identified<DrawnShape>>,
+    pub routes: Vec<Identified<Route>>,
 }
 
 /// The thing being edited. Modified only through [`crate::action::Action`]s.
@@ -34,6 +36,7 @@ pub struct Document {
     areas: Vec<Identified<Area>>,
     grids: Vec<Identified<Grid>>,
     shapes: Vec<Identified<DrawnShape>>,
+    routes: Vec<Identified<Route>>,
     /// The image's origin: the point the view rotates about. Always inside the document.
     origin: Point,
     /// Clockwise view rotation in degrees, in [0, 360). Saved with the document so it reopens
@@ -54,6 +57,7 @@ impl Document {
             areas: Vec::new(),
             grids: Vec::new(),
             shapes: Vec::new(),
+            routes: Vec::new(),
             origin: Point::new(f64::from(width) / 2.0, f64::from(height) / 2.0),
             rotation: 0.0,
             next_object_id: 1,
@@ -153,6 +157,16 @@ impl Document {
         self.grids.iter().position(|grid| grid.id() == id)
     }
 
+    /// Route measurements, in the order they were added.
+    pub fn routes(&self) -> &[Identified<Route>] {
+        &self.routes
+    }
+
+    /// List position of the route with `id`, if it exists.
+    pub fn route_index(&self, id: ObjectId) -> Option<usize> {
+        self.routes.iter().position(|route| route.id() == id)
+    }
+
     /// Drawn shapes, in the order they were added.
     /// What sort of object `id` is, or `None` if there is no such object.
     pub fn object_kind(&self, id: ObjectId) -> Option<ObjectKind> {
@@ -164,6 +178,8 @@ impl Document {
             Some(ObjectKind::Grid)
         } else if self.shape_index(id).is_some() {
             Some(ObjectKind::Shape)
+        } else if self.route_index(id).is_some() {
+            Some(ObjectKind::Route)
         } else {
             None
         }
@@ -184,10 +200,11 @@ impl Document {
             || self.area_index(id).is_some()
             || self.grid_index(id).is_some()
             || self.shape_index(id).is_some()
+            || self.route_index(id).is_some()
     }
 
     /// The image point to bring into view for an object: the centre of a measurement's
-    /// bounding box, the centre of an area ([`Area::center`]) or drawn shape
+    /// or route's bounding box, the centre of an area ([`Area::center`]) or drawn shape
     /// ([`DrawnShape::center`]), or the midpoint of a grid's alignment line. `None` if the
     /// object (or a grid's alignment line) does not exist.
     pub fn object_focus_point(&self, id: ObjectId) -> Option<Point> {
@@ -200,13 +217,16 @@ impl Document {
         if let Some(index) = self.shape_index(id) {
             return Some(self.shapes[index].center());
         }
+        if let Some(index) = self.route_index(id) {
+            return Some(self.routes[index].bounds().center());
+        }
         let grid = &self.grids[self.grid_index(id)?];
         let (start, end) = grid.source_line(self).ok()?;
         Some(Bounds::around(start, end).center())
     }
 
     /// The shape of an object: a measurement's line, an area's closed outline, a drawn
-    /// shape's points, or a grid's alignment line. `None` if the object (or a grid's
+    /// shape's or route's points, or a grid's alignment line. `None` if the object (or a grid's
     /// alignment line) does not exist.
     pub fn object_outline(&self, id: ObjectId) -> Option<Outline> {
         if let Some(index) = self.shape_index(id) {
@@ -229,6 +249,12 @@ impl Document {
                 closed: true,
             });
         }
+        if let Some(index) = self.route_index(id) {
+            return Some(Outline {
+                points: self.routes[index].points().to_vec(),
+                closed: false,
+            });
+        }
         let grid = &self.grids[self.grid_index(id)?];
         let (start, end) = grid.source_line(self).ok()?;
         Some(Outline {
@@ -245,6 +271,15 @@ impl Document {
 
     pub(crate) fn measurements_mut(&mut self) -> &mut Vec<Identified<Measurement>> {
         &mut self.measurements
+    }
+
+    pub(crate) fn routes_mut(&mut self) -> &mut Vec<Identified<Route>> {
+        &mut self.routes
+    }
+
+    /// Adds a route read from a file, keeping its id. The caller checks the id is free.
+    pub(crate) fn add_loaded_route(&mut self, route: Identified<Route>) {
+        self.routes.push(route);
     }
 
     pub(crate) fn areas_mut(&mut self) -> &mut Vec<Identified<Area>> {
@@ -282,6 +317,7 @@ impl Document {
             areas: objects.areas,
             grids: objects.grids,
             shapes: objects.shapes,
+            routes: objects.routes,
             origin,
             rotation: 0.0,
             next_object_id,

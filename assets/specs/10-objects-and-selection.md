@@ -40,8 +40,11 @@ Document
 │  │  ├─ Measurement 1 (12.5 cm)
 │  │  ├─ Measurement 2
 │  │  └─ …
-│  └─ Area
-│     ├─ Area 1 (3.25 m²)
+│  ├─ Area
+│  │  ├─ Area 1 (3.25 m²)
+│  │  └─ …
+│  └─ Routes
+│     ├─ Route 1 (42.5 m)
 │     └─ …
 ├─ Grids
 │  ├─ Grid 1 (scale line A)
@@ -54,11 +57,14 @@ Document
 
 - **Root node:** "`Document`".
 - **Folders:** "`Measurements`", then "`Grids`" (`GRID-11`), then "`Shapes`" (`DRAW-15`),
-  under the root. Inside "`Measurements`": "`Point-to-point`", then "`Area`".
+  under the root. Inside "`Measurements`": "`Point-to-point`", then "`Area`", then
+  "`Routes`" (`ROUTE-11`).
 - **Point-to-point measurements:** one leaf per measurement, in list order (`MEAS-2`)
   and never sorted, in the "`Point-to-point`" folder.
 - **Areas:** one leaf per area, in list order (`AREA-6`), in the "`Area`" folder,
   labelled as `AREA-11` says.
+- **Routes:** one leaf per route, in list order (`ROUTE-6`), in the "`Routes`" folder,
+  labelled as `ROUTE-11` says.
 - **Leaf label:** "`Measurement <n> (<distance> <unit symbol>)`", where `n` is the 1-based
   list position and the distance is formatted by `FMT-7`. When the distance is
   unavailable, the label is "`Measurement <n>`".
@@ -75,12 +81,14 @@ Document
    - for an area, its closed outline, including the area inside it
    - for a drawn shape, the line through its points; if closed, its closed outline
      including the area inside it
+   - for a route, the open line through its points
    - for a grid, its alignment line
 
    The focus point is:
    - for a measurement, the centre of its bounding box (the midpoint of the line)
    - for an area, the centre of its area (`AREA-8`)
    - for a drawn shape, its centre (`DRAW-9`)
+   - for a route, the centre of its bounding box (`ROUTE-8`)
    - for a grid, the midpoint of its alignment line. If that line no longer exists, the
      view does not move.
 
@@ -150,7 +158,7 @@ shape to Draw line.
   tool's controls.
 
 **OBJ-8 — Selection box.** While there is an active object that has a bounding box
-(measurements, areas and drawn shapes; grids do not, see `GRID-12`), the canvas draws the following on
+(measurements, areas, drawn shapes and routes; grids do not, see `GRID-12`), the canvas draws the following on
 top of everything else, in every tool mode:
 - **Box.** A **dashed purple** (`#800080`) box, 1.5 px wide, with 6 px dashes and 4 px
   gaps, around the object's bounding box.
@@ -176,8 +184,9 @@ handles, and its points (`OBJ-15`), take priority over the tool:
 - **Panning.** A secondary-button drag on a handle pans as usual (`VIEW-11a`).
 - **Cursor.** As `OBJ-17` says.
 - **Committing.** When the drag ends, one **Resize measurement** action (`HIST-2`) is
-  committed with both new endpoints, or for an area or a drawn shape one **Resize area** or
-  **Resize shape** action with all of its new points (`OBJ-9b`). If nothing changed, no
+  committed with both new endpoints, or for an area, a drawn shape or a route one
+  **Resize area**, **Resize shape** or **Resize route** action with all of its new points
+  (`OBJ-9b`). If nothing changed, no
   action is committed.
 
 **OBJ-9a — How a handle moves a measurement.** Let `(dx, dy)` be the pointer's movement in
@@ -207,7 +216,7 @@ The endpoints follow the edges like this:
   - Dragging an edge past the opposite edge simply flips the line.
 - **Clamping.** Each endpoint is clamped to the document (`DOC-5`).
 
-**OBJ-9b — How a handle stretches an area or drawn shape.** Let the bounding box run from `min` to `max`
+**OBJ-9b — How a handle stretches an area, drawn shape or route.** Let the bounding box run from `min` to `max`
 along an axis, and let the grabbed edge on that axis move by `d` (`dx` or `dy`). The
 opposite edge stays put and every point stretches proportionally between them:
 - grabbing the max edge: `v' = min + (v − min) × (size + d) / size`
@@ -254,10 +263,10 @@ are disabled (`SHELL-7`).
 | 2 | Delete button | trash can (`delete`), the same icon as the measurements table (`MEAS-11`) | "`Delete`" |
 
 **OBJ-12 — Duplicate.** The Duplicate button is enabled exactly when there is an active
-object and that kind of object can be duplicated. Measurements, areas, grids and drawn
-shapes can all be duplicated. Clicking it:
-1. Commits one **Duplicate measurement**, **Duplicate area**, **Duplicate grid** or
-   **Duplicate shape** action (`HIST-2`) for the active object.
+object and that kind of object can be duplicated. Measurements, areas, grids, drawn
+shapes and routes can all be duplicated. Clicking it:
+1. Commits one **Duplicate measurement**, **Duplicate area**, **Duplicate grid**,
+   **Duplicate shape** or **Duplicate route** action (`HIST-2`) for the active object.
 2. The copy has **exactly the same properties** as the original, and only its object id
    differs (a new id, `OBJ-1`):
    - measurement: both endpoints, the unit and the colour
@@ -270,9 +279,9 @@ shapes can all be duplicated. Clicking it:
    original, its selection box (if any) is in the same place.
 
 **OBJ-13 — Delete.** The Delete button is enabled exactly when there is an active object
-and that kind of object can be deleted. Measurements, areas, grids and drawn shapes can all
-be deleted. Clicking it commits one **Delete measurement**, **Delete area**, **Delete grid**
-or **Delete shape** action (`HIST-2`) for the active object. The object no longer exists, so the active object is cleared
+and that kind of object can be deleted. Measurements, areas, grids, drawn shapes and routes
+can all be deleted. Clicking it commits one **Delete measurement**, **Delete area**,
+**Delete grid**, **Delete shape** or **Delete route** action (`HIST-2`) for the active object. The object no longer exists, so the active object is cleared
 (`OBJ-7`). Grids aligned to a deleted measurement remain but are not drawn (`GRID-4`).
 
 **OBJ-14 — Undo.** Duplicating and deleting are document actions, so they can be undone
@@ -281,8 +290,8 @@ id. Undo of a duplicate removes the copy; if the copy was active, the active obj
 cleared (`OBJ-7`).
 
 **OBJ-15 — Dragging the active object's points.** In **every** tool mode, the points of
-the active object can be dragged: a measurement's two endpoints, or the points of an area
-or drawn shape.
+the active object can be dragged: a measurement's two endpoints, or the points of an area,
+drawn shape or route.
 - **Starting.** A primary-button drag that *starts* within 10 px of a point's screen
   position drags that point. If several points are in range, the nearest one is used.
   Against the resize handles, the nearer of the two wins (`OBJ-9`).
@@ -291,14 +300,14 @@ or drawn shape.
   the document (`DOC-5`).
 - **No tool input.** As for resizing, the tool receives no primary-button input while a
   point is dragged, and a secondary-button drag pans as usual.
-- **Committing.** When the drag ends, one **Move measurement point**, **Move area point**
-  or **Move shape point** action (`HIST-2`) is committed. If nothing changed, no action is
+- **Committing.** When the drag ends, one **Move measurement point**, **Move area point**,
+  **Move shape point** or **Move route point** action (`HIST-2`) is committed. If nothing changed, no action is
   committed.
 - Only the active object's points can be dragged. The points of other objects cannot be
   grabbed.
 
 **OBJ-16 — Moving the active object.** In **every** tool mode, the active object can be moved
-by dragging it. Measurements, areas and drawn shapes can be moved; grids have no selection box
+by dragging it. Measurements, areas, drawn shapes and routes can be moved; grids have no selection box
 (`GRID-12`).
 - **Starting.** A primary-button drag that *starts* inside the selection box (`OBJ-8`, its
   bounding box grown by the 8 px padding, edges included), and not on a point (`OBJ-15`) or
@@ -311,8 +320,8 @@ by dragging it. Measurements, areas and drawn shapes can be moved; grids have no
   document, and the object can still slide along the other axis.
 - **No tool input.** As for resizing, the tool receives no primary-button input while the
   object is moved, and a secondary-button drag pans as usual.
-- **Committing.** When the drag ends, one **Move measurement**, **Move area** or **Move shape**
-  action (`HIST-2`) is committed. If nothing changed, no action is committed.
+- **Committing.** When the drag ends, one **Move measurement**, **Move area**, **Move shape**
+  or **Move route** action (`HIST-2`) is committed. If nothing changed, no action is committed.
 - **Clicks.** A click inside the box is not a drag: `OBJ-10` and `OBJ-10a` apply.
 
 **OBJ-17 — Cursor over the selection box.** While the pointer is over the canvas, the cursor

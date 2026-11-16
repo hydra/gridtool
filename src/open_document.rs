@@ -14,6 +14,7 @@ use crate::ui::document_view::DocumentView;
 use crate::ui::image_textures::ImageTextures;
 use crate::ui::object_tree::TreePick;
 use crate::ui::reveal;
+use crate::ui::routes_panel::SegmentPick;
 
 /// The last part of `path`, for showing to the user.
 pub fn file_name(path: &Path) -> String {
@@ -144,6 +145,23 @@ impl OpenDocument {
                 }
             }
             TreePick::NoObject => selection.select(None),
+        }
+    }
+
+    /// Applies a segment picked in the Routes table: its route becomes the active object
+    /// and, unless the whole segment is on the canvas, the segment is brought into view.
+    pub fn pick_segment(&mut self, (id, segment): SegmentPick) {
+        self.view.selection.select(Some(id));
+        let document = self.editor.document();
+        let Some(index) = document.route_index(id) else {
+            return;
+        };
+        let Some((from, to)) = document.routes()[index].segments().nth(segment) else {
+            return;
+        };
+        if let Some(canvas) = self.view.canvas_rect {
+            let size = egui::Vec2::new(document.width() as f32, document.height() as f32);
+            reveal::reveal_fully(&mut self.view.viewport, &[from, to], size, canvas);
         }
     }
 

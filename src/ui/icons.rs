@@ -17,6 +17,12 @@ pub const SCALE: MaterialIcon = material::ICON_STRAIGHTEN;
 pub const MEASURE: MaterialIcon = material::ICON_MEASURING_TAPE;
 /// A polygon outline.
 pub const AREA: MaterialIcon = material::ICON_PENTAGON;
+/// A path between two points.
+pub const ROUTE: MaterialIcon = material::ICON_ROUTE;
+/// Shows what is folded away.
+pub const EXPAND: MaterialIcon = material::ICON_CHEVRON_RIGHT;
+/// Folds away what is shown.
+pub const COLLAPSE: MaterialIcon = material::ICON_EXPAND_MORE;
 pub const GRID: MaterialIcon = material::ICON_GRID_ON;
 /// A crosshair.
 pub const ORIGIN: MaterialIcon = material::ICON_MY_LOCATION;
@@ -35,7 +41,7 @@ pub const SETTINGS: MaterialIcon = material::ICON_SETTINGS;
 pub const ABOUT: MaterialIcon = material::ICON_INFO;
 
 #[cfg(test)]
-pub const ALL: [MaterialIcon; 23] = [
+pub const ALL: [MaterialIcon; 26] = [
     NEW,
     LOAD,
     SAVE,
@@ -45,6 +51,9 @@ pub const ALL: [MaterialIcon; 23] = [
     SCALE,
     MEASURE,
     AREA,
+    ROUTE,
+    EXPAND,
+    COLLAPSE,
     GRID,
     ORIGIN,
     DRAW_LINE,

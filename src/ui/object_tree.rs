@@ -1,5 +1,5 @@
 //! Left-hand panel: a tree of the document's objects (Document > Measurements >
-//! Point-to-point / Area, Document > Grids and Document > Shapes, then each object in
+//! Point-to-point / Area / Routes, Document > Grids and Document > Shapes, then each object in
 //! document order). Clicking an object makes it the active object. An object that becomes
 //! active by another route is selected in the tree, with its folders opened and scrolled to.
 
@@ -25,6 +25,7 @@ pub enum TreeNode {
     Measurements,
     PointToPoint,
     Areas,
+    Routes,
     Grids,
     Shapes,
     Object(ObjectId),
@@ -173,6 +174,7 @@ fn folders_of(kind: ObjectKind) -> &'static [TreeNode] {
             TreeNode::PointToPoint,
         ],
         ObjectKind::Area => &[TreeNode::Document, TreeNode::Measurements, TreeNode::Areas],
+        ObjectKind::Route => &[TreeNode::Document, TreeNode::Measurements, TreeNode::Routes],
         ObjectKind::Grid => &[TreeNode::Document, TreeNode::Grids],
         ObjectKind::Shape => &[TreeNode::Document, TreeNode::Shapes],
     }
@@ -192,12 +194,14 @@ fn visible_rows(document: &Document, is_open: impl Fn(TreeNode) -> bool) -> Vec<
     };
     let measurements = document.measurements().iter().map(|m| m.id()).collect();
     let areas = document.areas().iter().map(|area| area.id()).collect();
+    let routes = document.routes().iter().map(|route| route.id()).collect();
     let grids = document.grids().iter().map(|grid| grid.id()).collect();
     let shapes = document.shapes().iter().map(|shape| shape.id()).collect();
     rows.push(TreeNode::Measurements);
     if is_open(TreeNode::Measurements) {
         folder(&mut rows, TreeNode::PointToPoint, measurements);
         folder(&mut rows, TreeNode::Areas, areas);
+        folder(&mut rows, TreeNode::Routes, routes);
     }
     folder(&mut rows, TreeNode::Grids, grids);
     folder(&mut rows, TreeNode::Shapes, shapes);
@@ -233,6 +237,11 @@ fn tree(
                 builder.leaf(TreeNode::Object(area.id()), area_label(document, index));
             }
             builder.close_dir();
+            builder.dir(TreeNode::Routes, tr!("tree-routes"));
+            for (index, route) in document.routes().iter().enumerate() {
+                builder.leaf(TreeNode::Object(route.id()), route_label(document, index));
+            }
+            builder.close_dir();
             builder.close_dir();
             builder.dir(TreeNode::Grids, tr!("tree-grids"));
             for (index, grid) in document.grids().iter().enumerate() {
@@ -266,6 +275,19 @@ fn area_label(document: &Document, index: usize) -> String {
             unit: area.unit().area_symbol(),
         }),
         Err(_) => tr!("object-area", { number: index + 1 }),
+    }
+}
+
+/// "Route <n> (<length> <unit>)", or "Route <n>" when the length cannot be calculated.
+fn route_label(document: &Document, index: usize) -> String {
+    let route = &document.routes()[index];
+    match route.length(document.calibration()) {
+        Ok(length) => tr!("object-route-with-length", {
+            number: index + 1,
+            length: format_length(length),
+            unit: route.unit(),
+        }),
+        Err(_) => tr!("object-route", { number: index + 1 }),
     }
 }
 
@@ -366,6 +388,10 @@ mod tests {
             [TreeNode::Document, TreeNode::Measurements, TreeNode::Areas]
         );
         assert_eq!(
+            folders_of(ObjectKind::Route),
+            [TreeNode::Document, TreeNode::Measurements, TreeNode::Routes]
+        );
+        assert_eq!(
             folders_of(ObjectKind::Grid),
             [TreeNode::Document, TreeNode::Grids]
         );
@@ -403,6 +429,7 @@ mod tests {
                 leaf(0),
                 leaf(1),
                 TreeNode::Areas,
+                TreeNode::Routes,
                 TreeNode::Grids,
                 TreeNode::Shapes,
             ]
@@ -414,6 +441,7 @@ mod tests {
                 TreeNode::Measurements,
                 TreeNode::PointToPoint,
                 TreeNode::Areas,
+                TreeNode::Routes,
                 TreeNode::Grids,
                 TreeNode::Shapes,
             ]

@@ -7,6 +7,7 @@ use gridtool::document::Document;
 use gridtool::geometry::{Bounds, BoundsHandle, Point};
 use gridtool::measurement::{Endpoint, Measurement};
 use gridtool::object::ObjectId;
+use gridtool::route::Route;
 use gridtool::shape::DrawnShape;
 
 /// The part of the active object a drag holds.
@@ -26,10 +27,12 @@ pub enum Shape {
     Measurement(Measurement),
     Area(Area),
     Drawn(DrawnShape),
+    Route(Route),
 }
 
 impl Shape {
-    /// The shape of the object with `id`, if it is a measurement, an area or a drawn shape.
+    /// The shape of the object with `id`, if it is a measurement, an area, a drawn shape or
+    /// a route.
     pub fn of(document: &Document, id: ObjectId) -> Option<Shape> {
         if let Some(index) = document.measurement_index(id) {
             return Some(Shape::Measurement(
@@ -38,6 +41,9 @@ impl Shape {
         }
         if let Some(index) = document.shape_index(id) {
             return Some(Shape::Drawn((*document.shapes()[index]).clone()));
+        }
+        if let Some(index) = document.route_index(id) {
+            return Some(Shape::Route((*document.routes()[index]).clone()));
         }
         let index = document.area_index(id)?;
         Some(Shape::Area((*document.areas()[index]).clone()))
@@ -51,6 +57,7 @@ impl Shape {
                 .to_vec(),
             Shape::Area(area) => area.points().to_vec(),
             Shape::Drawn(drawn) => drawn.points().to_vec(),
+            Shape::Route(route) => route.points().to_vec(),
         }
     }
 
@@ -59,6 +66,7 @@ impl Shape {
             Shape::Measurement(measurement) => measurement.bounds(),
             Shape::Area(area) => area.bounds(),
             Shape::Drawn(drawn) => drawn.bounds(),
+            Shape::Route(route) => route.bounds(),
         }
     }
 
@@ -77,6 +85,7 @@ impl Shape {
             }
             (Shape::Area(area), Grip::Whole) => Shape::Area(area.map_points(whole)),
             (Shape::Drawn(drawn), Grip::Whole) => Shape::Drawn(drawn.map_points(whole)),
+            (Shape::Route(route), Grip::Whole) => Shape::Route(route.map_points(whole)),
             (Shape::Measurement(measurement), Grip::Bounds(handle)) => {
                 Shape::Measurement(measurement.resized(handle, dx, dy).map_points(clamp))
             }
@@ -97,6 +106,13 @@ impl Shape {
             }
             (Shape::Drawn(drawn), Grip::Point(index)) => match drawn.points().get(index) {
                 Some(&point) => Shape::Drawn(drawn.with_point(index, clamp(moved(point)))),
+                None => self.clone(),
+            },
+            (Shape::Route(route), Grip::Bounds(handle)) => {
+                Shape::Route(route.resized(handle, dx, dy).map_points(clamp))
+            }
+            (Shape::Route(route), Grip::Point(index)) => match route.points().get(index) {
+                Some(&point) => Shape::Route(route.with_point(index, clamp(moved(point)))),
                 None => self.clone(),
             },
         }
@@ -153,6 +169,19 @@ impl Shape {
                 point,
                 to: *drawn.points().get(point)?,
             },
+            (Shape::Route(route), Grip::Whole) => Action::MoveRoute {
+                index,
+                points: route.points().to_vec(),
+            },
+            (Shape::Route(route), Grip::Bounds(_)) => Action::ResizeRoute {
+                index,
+                points: route.points().to_vec(),
+            },
+            (Shape::Route(route), Grip::Point(point)) => Action::MoveRoutePoint {
+                index,
+                point,
+                to: *route.points().get(point)?,
+            },
         })
     }
 
@@ -162,6 +191,7 @@ impl Shape {
             Shape::Measurement(_) => document.measurement_index(id),
             Shape::Area(_) => document.area_index(id),
             Shape::Drawn(_) => document.shape_index(id),
+            Shape::Route(_) => document.route_index(id),
         }
     }
 }

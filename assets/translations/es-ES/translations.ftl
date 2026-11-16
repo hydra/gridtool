@@ -26,6 +26,7 @@ tool-rotate = Girar vista
 tool-scale = Escala
 tool-measure = Medir distancia
 tool-area = Medir área
+tool-route = Medir ruta
 tool-grid = Cuadrícula
 tool-origin = Origen
 tool-draw-line = Dibujar línea
@@ -36,6 +37,7 @@ panel-documents = Documentos
 panel-objects = Objetos
 panel-point-to-point = Punto a punto
 panel-areas = Áreas
+panel-routes = Rutas
 panel-history = Historial
 
 placeholder-open-image = Abra una imagen para empezar.
@@ -75,11 +77,19 @@ column-color = Color
 column-area = Área
 column-units = Unidades
 column-distance = Distancia
+column-length = Longitud
 
 areas-empty = Aún no hay áreas. Use la herramienta Medir área para añadir una.
 area-color-tooltip = Elegir el color de línea de esta área
 area-unit-tooltip = Unidades de esta área
 area-delete-tooltip = Eliminar área
+
+routes-empty = Aún no hay rutas. Use la herramienta Medir ruta para añadir una.
+route-color-tooltip = Elegir el color de línea de esta ruta
+route-unit-tooltip = Unidades de esta ruta
+route-delete-tooltip = Eliminar ruta
+route-expand-tooltip = Mostrar los segmentos de esta ruta
+route-collapse-tooltip = Ocultar los segmentos de esta ruta
 
 measurements-empty = Aún no hay mediciones. Use la herramienta Medir distancia para añadir una.
 measurement-color-tooltip = Elegir el color de línea de esta medición
@@ -93,6 +103,7 @@ tree-document = Documento
 tree-measurements = Mediciones
 tree-point-to-point = Punto a punto
 tree-area = Área
+tree-routes = Rutas
 tree-grids = Cuadrículas
 tree-shapes = Formas
 tree-grid = Cuadrícula { $number } ({ $source })
@@ -104,6 +115,8 @@ object-measurement = Medición { $number }
 object-measurement-with-length = Medición { $number } ({ $length } { $unit })
 object-area = Área { $number }
 object-area-with-value = Área { $number } ({ $value } { $unit })
+object-route = Ruta { $number }
+object-route-with-length = Ruta { $number } ({ $length } { $unit })
 object-shape-line = Forma { $number } (línea)
 object-shape-area = Forma { $number } (área)
 
@@ -117,6 +130,8 @@ new-measurement = Nueva medición
 new-measurement-unit-tooltip = Unidades de las nuevas mediciones
 new-area = Nueva área
 new-area-unit-tooltip = Unidades de las nuevas áreas
+new-route = Nueva ruta
+new-route-unit-tooltip = Unidades de las nuevas rutas
 new-shape = Nueva forma
 
 rotation-label = Giro de la vista (°):
@@ -188,6 +203,7 @@ endpoint-end = fin
 target-measurement = medición { $number }
 target-area = área { $number }
 target-shape = forma { $number }
+target-route = ruta { $number }
 
 ## Why something could not be done
 
@@ -205,6 +221,9 @@ error-invalid-opacity = la opacidad debe estar entre 0 y 1, se recibió { $opaci
 error-shape-missing = la forma { $number } no existe (hay { $count })
 error-shape-point-missing = el punto de forma { $number } no existe (hay { $count })
 error-shape-point-count = a una forma de { $expected } puntos no se le pueden dar { $actual } puntos
+error-route-missing = la ruta { $number } no existe (hay { $count })
+error-route-point-missing = el punto { $number } de la ruta no existe (hay { $count })
+error-route-point-count = a una ruta de { $expected } puntos no se le pueden dar { $actual } puntos
 error-no-fill = { $target } no encierra ningún área, así que no tiene relleno
 error-invalid-fill-spacing = la separación del relleno debe ser un número positivo, se recibió { $spacing }
 error-invalid-fill-angle = el ángulo del relleno debe ser de 0 a menos de 360, se recibió { $degrees }
@@ -212,6 +231,7 @@ error-invalid-rotation = el giro de la vista debe ser un número finito, se reci
 
 error-area-too-few-points = un área necesita al menos { $minimum } puntos, se recibieron { $count }
 error-shape-too-few-points = una forma no puede tener solo { $count } puntos
+error-route-too-few-points = una ruta necesita al menos { $minimum } puntos, se recibieron { $count }
 
 error-calibration-point-count = la calibración de { $method } necesita { $expected } puntos, se recibieron { $actual }
 error-calibration-point-missing = el punto { $number } no existe (hay { $count })
@@ -237,6 +257,7 @@ error-document-scale-point-count = el número de puntos de escala no coincide co
 error-document-two-point-version = esta versión del archivo no admite una escala de 2 puntos
 error-document-area-points = un área tiene { $count } puntos, pero necesita al menos 3
 error-document-shape-points = una forma tiene demasiados pocos puntos ({ $count })
+error-document-route-points = una ruta tiene { $count } puntos, pero necesita al menos 2
 error-document-filled-open-shape = la forma { $id } tiene relleno pero no está cerrada
 error-document-not-positive = { $value } debería ser un número positivo
 error-document-opacity = la opacidad { $value } no está entre 0 y 1
@@ -292,6 +313,13 @@ action-resize-shape = Redimensionar forma { $number }
 action-move-shape = Mover forma { $number }
 action-delete-shape = Eliminar forma { $number }
 action-duplicate-shape = Duplicar forma { $number }
+action-add-route = Añadir ruta de { $count } puntos
+action-move-route-point = Mover punto { $point } de la ruta { $number } a { $to }
+action-resize-route = Redimensionar ruta { $number }
+action-move-route = Mover ruta { $number }
+action-set-route-unit = Establecer unidades de la ruta { $number } en { $unit }
+action-delete-route = Eliminar ruta { $number }
+action-duplicate-route = Duplicar ruta { $number }
 action-set-style = Cambiar en { $target }: { $edit }
 
 edit-line-style = estilo de línea a { $style }

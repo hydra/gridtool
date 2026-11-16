@@ -26,6 +26,7 @@ tool-rotate = Rotate view
 tool-scale = Scale
 tool-measure = Measure distance
 tool-area = Measure area
+tool-route = Measure route
 tool-grid = Grid
 tool-origin = Origin
 tool-draw-line = Draw line
@@ -36,6 +37,7 @@ panel-documents = Documents
 panel-objects = Objects
 panel-point-to-point = Point-to-point
 panel-areas = Areas
+panel-routes = Routes
 panel-history = History
 
 placeholder-open-image = Open an image to get started.
@@ -75,11 +77,19 @@ column-color = Color
 column-area = Area
 column-units = Units
 column-distance = Distance
+column-length = Length
 
 areas-empty = No areas yet. Use the Measure area tool to add one.
 area-color-tooltip = Choose the line colour of this area
 area-unit-tooltip = Units of this area
 area-delete-tooltip = Delete area
+
+routes-empty = No routes yet. Use the Measure route tool to add one.
+route-color-tooltip = Choose the line colour of this route
+route-unit-tooltip = Units of this route
+route-delete-tooltip = Delete route
+route-expand-tooltip = Show the segments of this route
+route-collapse-tooltip = Hide the segments of this route
 
 measurements-empty = No measurements yet. Use the Measure distance tool to add one.
 measurement-color-tooltip = Choose the line colour of this measurement
@@ -93,6 +103,7 @@ tree-document = Document
 tree-measurements = Measurements
 tree-point-to-point = Point-to-point
 tree-area = Area
+tree-routes = Routes
 tree-grids = Grids
 tree-shapes = Shapes
 tree-grid = Grid { $number } ({ $source })
@@ -104,6 +115,8 @@ object-measurement = Measurement { $number }
 object-measurement-with-length = Measurement { $number } ({ $length } { $unit })
 object-area = Area { $number }
 object-area-with-value = Area { $number } ({ $value } { $unit })
+object-route = Route { $number }
+object-route-with-length = Route { $number } ({ $length } { $unit })
 object-shape-line = Shape { $number } (line)
 object-shape-area = Shape { $number } (area)
 
@@ -117,6 +130,8 @@ new-measurement = New measurement
 new-measurement-unit-tooltip = Units of new measurements
 new-area = New area
 new-area-unit-tooltip = Units of new areas
+new-route = New route
+new-route-unit-tooltip = Units of new routes
 new-shape = New shape
 
 rotation-label = View rotation (°):
@@ -188,6 +203,7 @@ endpoint-end = end
 target-measurement = measurement { $number }
 target-area = area { $number }
 target-shape = shape { $number }
+target-route = route { $number }
 
 ## Why something could not be done
 
@@ -205,6 +221,9 @@ error-invalid-opacity = opacity must be between 0 and 1, got { $opacity }
 error-shape-missing = shape { $number } does not exist (there are { $count })
 error-shape-point-missing = shape point { $number } does not exist (there are { $count })
 error-shape-point-count = a shape with { $expected } points cannot be given { $actual } points
+error-route-missing = route { $number } does not exist (there are { $count })
+error-route-point-missing = route point { $number } does not exist (there are { $count })
+error-route-point-count = a route with { $expected } points cannot be given { $actual } points
 error-no-fill = { $target } encloses no area, so has no fill
 error-invalid-fill-spacing = fill spacing must be a positive number, got { $spacing }
 error-invalid-fill-angle = fill angle must be from 0 up to 360, got { $degrees }
@@ -212,6 +231,7 @@ error-invalid-rotation = the view rotation must be a finite number, got { $degre
 
 error-area-too-few-points = an area needs at least { $minimum } points, got { $count }
 error-shape-too-few-points = a shape cannot have only { $count } points
+error-route-too-few-points = a route needs at least { $minimum } points, got { $count }
 
 error-calibration-point-count = { $method } calibration needs { $expected } points, got { $actual }
 error-calibration-point-missing = point { $number } does not exist (there are { $count })
@@ -237,6 +257,7 @@ error-document-scale-point-count = the number of scale points does not match the
 error-document-two-point-version = this version of the file cannot have a 2-point scale
 error-document-area-points = an area has { $count } points, but needs at least 3
 error-document-shape-points = a shape has too few points ({ $count })
+error-document-route-points = a route has { $count } points, but needs at least 2
 error-document-filled-open-shape = shape { $id } has a fill but is not closed
 error-document-not-positive = { $value } should be a positive number
 error-document-opacity = opacity { $value } is not between 0 and 1
@@ -292,6 +313,13 @@ action-resize-shape = Resize shape { $number }
 action-move-shape = Move shape { $number }
 action-delete-shape = Delete shape { $number }
 action-duplicate-shape = Duplicate shape { $number }
+action-add-route = Add route with { $count } points
+action-move-route-point = Move route { $number } point { $point } to { $to }
+action-resize-route = Resize route { $number }
+action-move-route = Move route { $number }
+action-set-route-unit = Set route { $number } units to { $unit }
+action-delete-route = Delete route { $number }
+action-duplicate-route = Duplicate route { $number }
 action-set-style = Set { $target } { $edit }
 
 edit-line-style = line style to { $style }

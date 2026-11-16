@@ -11,6 +11,7 @@ use super::image_textures::ImageTextures;
 use super::line_tool::LineTool;
 use super::measure_tool::MeasureTool;
 use super::object_tree::TreeNode;
+use super::route_tool::RouteTool;
 use super::scale_tool::ScaleTool;
 use super::selection::Selection;
 use super::tool_mode::ToolMode;
@@ -31,6 +32,7 @@ pub struct DocumentView {
     pub area_tool: AreaTool,
     pub grid_tool: GridTool,
     pub line_tool: LineTool,
+    pub route_tool: RouteTool,
     pub is_dragging_rotate_handle: bool,
     /// The view rotation field has a rotation typed in that is not yet committed.
     pub is_editing_rotation: bool,
@@ -56,6 +58,7 @@ impl DocumentView {
             area_tool: AreaTool::default(),
             grid_tool: GridTool::default(),
             line_tool: LineTool::default(),
+            route_tool: RouteTool::default(),
             is_dragging_rotate_handle: false,
             is_editing_rotation: false,
             tree_state: TreeViewState::default(),
@@ -102,6 +105,7 @@ impl DocumentView {
         self.measure_tool.cancel();
         self.area_tool.outline.cancel();
         self.line_tool.outline.cancel();
+        self.route_tool.outline.cancel();
         self.selection.cancel_drag();
         self.is_dragging_rotate_handle = false;
         self.is_editing_rotation = false;
@@ -145,23 +149,28 @@ impl DocumentView {
         }
     }
 
-    /// Whether a tool has started placing a new measurement, area or shape.
+    /// Whether a tool has started placing a new measurement, area, shape or route.
     pub fn is_placing_new_object(&self) -> bool {
         self.measure_tool.pending_start().is_some()
             || !self.area_tool.outline.points().is_empty()
             || !self.line_tool.outline.points().is_empty()
+            || !self.route_tool.outline.points().is_empty()
     }
 
-    /// Removes the most recently placed point of the area or line being placed (Backspace).
+    /// Removes the most recently placed point of the area, line or route being placed
+    /// (Backspace).
     pub fn remove_last_point(&mut self) {
         self.area_tool.outline.remove_last_point();
         self.line_tool.outline.remove_last_point();
+        self.route_tool.outline.remove_last_point();
     }
 
-    /// Finishes the line being drawn, leaving it open (Enter): the action that adds it, if
-    /// there is enough of a line to add.
-    pub fn finish_line(&mut self, unit: LengthUnit) -> Option<Action> {
-        self.line_tool.finish_open(unit)
+    /// Finishes the line or route being placed, leaving it open (Enter): the action that adds
+    /// it, if there is enough of one to add. Only the active tool can have points placed.
+    pub fn finish_open(&mut self, unit: LengthUnit) -> Option<Action> {
+        self.line_tool
+            .finish_open(unit)
+            .or_else(|| self.route_tool.finish(unit))
     }
 }
 
@@ -406,7 +415,7 @@ mod tests {
     fn finishing_a_line_needs_two_points_and_backspace_removes_them() {
         let mut view = view();
         view.line_tool.outline.click(Point::new(1.0, 1.0), None);
-        assert_eq!(view.finish_line(LengthUnit::Metre), None);
+        assert_eq!(view.finish_open(LengthUnit::Metre), None);
 
         view.line_tool.outline.click(Point::new(2.0, 2.0), None);
         view.remove_last_point();
@@ -414,7 +423,7 @@ mod tests {
 
         view.line_tool.outline.click(Point::new(3.0, 3.0), None);
         assert!(matches!(
-            view.finish_line(LengthUnit::Metre),
+            view.finish_open(LengthUnit::Metre),
             Some(Action::AddShape(_))
         ));
         assert!(view.line_tool.outline.points().is_empty());

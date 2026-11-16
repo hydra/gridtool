@@ -19,6 +19,8 @@ completely, so loading it re-creates the exact document state (`DOC-1`).
   sizes A and B (both, even for square cells), unit, colour and opacity
 - every drawn shape (`DRAW-8`), in list order, with its object id, points, closed state,
   line style, colour and opacity, and fill style, colour, spacing, unit, angle and opacity
+- every route (`ROUTE-6`), in list order, with its object id, points, unit, and line style,
+  colour and opacity
 - the object id counter (`OBJ-1`), so ids are never reused after loading
 
 **FILE-2 — Not saved.** These are **not** saved:
@@ -118,21 +120,28 @@ versions say, so one of a half turn or more is rejected there (`FILE-7`).
 point set's `method` may also be `TwoPoint`, with two points (`SCALE-1`). A version 6 file is migrated
 to version 7 unchanged. A file of version 6 or earlier with a `TwoPoint` method is rejected (`FILE-7`).
 
-**FILE-6g — Version 8 (current).** Version 8 is version 7 with one more field, after `origin`:
+**FILE-6g — Version 8.** (no longer written; still loaded) Version 8 is version 7 with one more field, after `origin`:
 - `rotation`: a number, the view rotation clockwise in degrees, from 0 up to but not
   including 360 (`DOC-1`)
 
 A version 7 file, and so every earlier one, is migrated to version 8 with a rotation of 0, as
 those versions were always shown unrotated when opened.
 
+**FILE-6h — Version 9 (current).** Version 9 is version 8 with one more field, after `shapes`:
+- `routes`: the list of routes (`ROUTE-6`), each with `id`, `points` (2 or more), `unit`,
+  `line_style`, `line_color` and `line_opacity`, written as for a measurement's line
+
+A version 8 file, and so every earlier one, is migrated to version 9 with no routes, as those
+versions had none.
+
 **FILE-7 — Validation on load.** A loaded description is checked as strictly as actions
 check their inputs (`HIST-2`), so a hand-edited or damaged file cannot produce an invalid
 document. Loading fails when:
 - the size is zero
-- a point (scale point, measurement endpoint, area point, shape point or origin) is
+- a point (scale point, measurement endpoint, area point, shape point, route point or origin) is
   outside the document
-- an area has fewer than 3 points, a closed shape fewer than 3, or an open shape fewer
-  than 2
+- an area has fewer than 3 points, a closed shape fewer than 3, an open shape fewer
+  than 2, or a route fewer than 2
 - an open shape has a fill style other than `None`
 - the number of scale points does not match the method
 - the method is `TwoPoint` in a file of version 6 or earlier

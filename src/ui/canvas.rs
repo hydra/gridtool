@@ -29,6 +29,7 @@ use super::measure_tool::MeasureTool;
 use super::object_drag::Grip;
 use super::pending_outline::{PendingOutline, PointHit};
 use super::rotate_handle;
+use super::route_tool::RouteTool;
 use super::scale_tool::ScaleTool;
 use super::selection::Selection;
 use super::shape_display::{paint_fill, paint_line, paint_shapes};
@@ -167,6 +168,9 @@ fn handle_tool(
                 handle_measure(ui, response, transform, document, &mut view.measure_tool)
             }
             ToolMode::Area => handle_area(ui, response, transform, document, &mut view.area_tool),
+            ToolMode::Route => {
+                handle_route(ui, response, transform, document, &mut view.route_tool)
+            }
             ToolMode::Grid => handle_grid(ui, response, transform, document, view),
             ToolMode::Origin => handle_origin(ui, response, transform, document),
             ToolMode::DrawLine => {
@@ -206,6 +210,7 @@ fn paint(
     paint_grids(painter, transform, document, &view.selection);
     paint_shapes(painter, transform, document, &view.selection);
     paint_areas(painter, transform, document, &view.selection);
+    paint_routes(painter, transform, document, &view.selection);
     paint_measurements(painter, transform, document, &view.selection);
     match mode {
         ToolMode::Scale => {
@@ -221,6 +226,7 @@ fn paint(
         | ToolMode::Rotate
         | ToolMode::Measure
         | ToolMode::Area
+        | ToolMode::Route
         | ToolMode::Origin
         | ToolMode::DrawLine => {}
     }
@@ -254,7 +260,19 @@ fn paint(
                 transform,
                 scale,
                 &view.area_tool.outline,
+                true,
                 view.area_tool.settings.style(calibration_unit),
+                response.hover_pos(),
+            );
+        }
+        ToolMode::Route => {
+            paint_pending_outline(
+                painter,
+                transform,
+                scale,
+                &view.route_tool.outline,
+                false,
+                view.route_tool.settings.style(calibration_unit),
                 response.hover_pos(),
             );
         }
@@ -264,6 +282,7 @@ fn paint(
                 transform,
                 scale,
                 &view.line_tool.outline,
+                true,
                 view.line_tool.settings.style(calibration_unit),
                 response.hover_pos(),
             );
@@ -676,8 +695,26 @@ fn handle_area(
     document: &Document,
     tool: &mut AreaTool,
 ) -> Option<Action> {
-    let (point, hit) = outline_click(ui, response, transform, document, &tool.outline)?;
+    let (point, hit) = outline_click(ui, response, transform, document, &tool.outline, true)?;
     tool.click(point, hit, document.calibration().unit())
+}
+
+/// Each click places the next point of a route; double-clicking the last point finishes it,
+/// and clicking the last point once removes it. A route is never closed.
+fn handle_route(
+    ui: &egui::Ui,
+    response: &Response,
+    transform: DocumentTransform,
+    document: &Document,
+    tool: &mut RouteTool,
+) -> Option<Action> {
+    let (point, hit) = outline_click(ui, response, transform, document, &tool.outline, false)?;
+    tool.click(
+        point,
+        hit,
+        response.double_clicked(),
+        document.calibration().unit(),
+    )
 }
 
 /// Each click places the next point of a line. Clicking the first point joins it up into a
@@ -690,7 +727,7 @@ fn handle_draw_line(
     document: &Document,
     tool: &mut LineTool,
 ) -> Option<Action> {
-    let (point, hit) = outline_click(ui, response, transform, document, &tool.outline)?;
+    let (point, hit) = outline_click(ui, response, transform, document, &tool.outline, true)?;
     tool.click(
         point,
         hit,
@@ -701,19 +738,21 @@ fn handle_draw_line(
 
 /// Updates the cursor for a tool placing the points of `outline`, and returns the image
 /// point of a click this frame that the tool should act on, with the placed point it landed
-/// on, if any. Clicks outside the document count only if they land on a placed point.
+/// on, if any. Clicks outside the document count only if they land on a placed point. Only a
+/// `closable` outline can be finished on its first point.
 fn outline_click(
     ui: &egui::Ui,
     response: &Response,
     transform: DocumentTransform,
     document: &Document,
     outline: &PendingOutline,
+    closable: bool,
 ) -> Option<(Point, Option<PointHit>)> {
     let on_screen = to_screen(transform, outline.points());
     let hit_at = |position| PendingOutline::hit_at(&on_screen, position, POINT_GRAB_RADIUS);
     match response.hover_pos().and_then(hit_at) {
         Some(PointHit::Last) => ui.set_cursor_icon(CursorIcon::PointingHand),
-        Some(PointHit::First) if outline.can_close() => {
+        Some(PointHit::First) if closable && outline.can_close() => {
             ui.set_cursor_icon(CursorIcon::PointingHand)
         }
         _ if response.hovered() => ui.set_cursor_icon(CursorIcon::Crosshair),
@@ -1004,14 +1043,76 @@ fn paint_areas(
     }
 }
 
+/// Draws every route as a line through its points in its line style, with a handle at each
+/// point, each segment's length beside its middle, and the route's number and total length
+/// beyond its end, in its line colour. Without a scale only the number is written.
+fn paint_routes(
+    painter: &egui::Painter,
+    transform: DocumentTransform,
+    document: &Document,
+    selection: &Selection,
+) {
+    for (index, stored) in document.routes().iter().enumerate() {
+        let route = selection.displayed_route(stored.id(), stored);
+        let line = route.line();
+        let color = to_color32(line.color);
+        let on_screen = to_screen(transform, route.points());
+        paint_line(painter, line, &on_screen, false);
+        for &position in &on_screen {
+            paint_point_handle(painter, position, color);
+        }
+        let lengths = route.segment_lengths(document.calibration()).ok();
+        if let Some(lengths) = &lengths {
+            for (pair, length) in on_screen.windows(2).zip(lengths) {
+                paint_line_label(painter, pair[0], pair[1], format_length(*length), color);
+            }
+        }
+        let total = match lengths {
+            Some(lengths) => format!(
+                "{}: {} {}",
+                index + 1,
+                format_length(lengths.iter().sum()),
+                route.unit()
+            ),
+            None => (index + 1).to_string(),
+        };
+        if let [.., before, end] = on_screen[..] {
+            paint_end_label(painter, before, end, total, color);
+        }
+    }
+}
+
+/// Writes `label` just beyond `end`, the end of a line arriving from `before`, so that it
+/// reads on from the line instead of covering it.
+fn paint_end_label(painter: &egui::Painter, before: Pos2, end: Pos2, text: String, color: Color32) {
+    let direction = (end - before).normalized();
+    let align = |component: f32| {
+        if component > 0.4 {
+            egui::Align::Min
+        } else if component < -0.4 {
+            egui::Align::Max
+        } else {
+            egui::Align::Center
+        }
+    };
+    painter.text(
+        end + direction * LABEL_OFFSET,
+        Align2([align(direction.x), align(direction.y)]),
+        text,
+        FontId::proportional(LABEL_FONT_SIZE),
+        color,
+    );
+}
+
 /// Draws an outline being placed: the points so far joined by a line in `style`, and a
-/// dashed line on to the pointer. Over the first point, once the outline can be closed, the
-/// outline is shown closed and filled, as it will be drawn.
+/// dashed line on to the pointer. Over the first point of a `closable` outline, once it can
+/// be closed, the outline is shown closed and filled, as it will be drawn.
 fn paint_pending_outline(
     painter: &egui::Painter,
     transform: DocumentTransform,
     scale: Option<Scale>,
     outline: &PendingOutline,
+    closable: bool,
     style: ObjectStyle,
     pointer: Option<Pos2>,
 ) {
@@ -1021,7 +1122,8 @@ fn paint_pending_outline(
         return;
     };
     let stroke = Stroke::new(PENDING_LINE_WIDTH, to_color32(style.line.color));
-    let closing = outline.can_close()
+    let can_close = closable && outline.can_close();
+    let closing = can_close
         && pointer
             .and_then(|pointer| PendingOutline::hit_at(&on_screen, pointer, POINT_GRAB_RADIUS))
             == Some(PointHit::First);
@@ -1046,7 +1148,7 @@ fn paint_pending_outline(
     for &position in &on_screen {
         paint_point_handle(painter, position, stroke.color);
     }
-    if outline.can_close() {
+    if can_close {
         painter.circle_stroke(first, CLOSE_TARGET_RADIUS, stroke);
     }
 }
@@ -1123,6 +1225,7 @@ mod tests {
     use eframe::egui::{Event, Modifiers, RawInput};
     use gridtool::imaging::DecodedImage;
     use gridtool::measurement::Measurement;
+    use gridtool::route::Route;
     use gridtool::shape::DrawnShape;
     use gridtool::units::LengthUnit;
 
@@ -1650,7 +1753,12 @@ mod tests {
     }
 
     /// Modes in which a click starts placing a new object.
-    const PLACING_MODES: [ToolMode; 3] = [ToolMode::Measure, ToolMode::Area, ToolMode::DrawLine];
+    const PLACING_MODES: [ToolMode; 4] = [
+        ToolMode::Measure,
+        ToolMode::Area,
+        ToolMode::Route,
+        ToolMode::DrawLine,
+    ];
 
     #[test]
     fn clicking_inside_the_selection_box_keeps_it_unless_a_tool_starts_a_new_object() {
@@ -1912,6 +2020,40 @@ mod tests {
         let expected =
             DrawnShape::open(triangle_points()[..2].to_vec(), LengthUnit::Centimetre).unwrap();
         assert_eq!(harness.actions, [Action::AddShape(expected)]);
+    }
+
+    #[test]
+    fn double_clicking_the_last_point_finishes_a_route_and_the_first_point_does_not_close_it() {
+        let mut harness = Harness::new(ToolMode::Route);
+        for corner in TRIANGLE_ON_SCREEN {
+            harness.click(corner);
+            harness.settle();
+        }
+        harness.click(TRIANGLE_ON_SCREEN[0]);
+        assert!(harness.actions.is_empty());
+        assert_eq!(harness.view.route_tool.outline.points().len(), 4);
+
+        harness.click(TRIANGLE_ON_SCREEN[0]);
+
+        let mut points = triangle_points();
+        points.push(points[0]);
+        let expected = Route::new(points, LengthUnit::Centimetre).unwrap();
+        assert_eq!(harness.actions, [Action::AddRoute(expected)]);
+        assert!(harness.view.route_tool.outline.points().is_empty());
+    }
+
+    #[test]
+    fn a_slow_click_on_the_last_point_of_a_route_removes_it() {
+        let mut harness = Harness::new(ToolMode::Route);
+        harness.click(TRIANGLE_ON_SCREEN[0]);
+        harness.settle();
+        harness.click(TRIANGLE_ON_SCREEN[1]);
+        harness.settle();
+
+        harness.click(TRIANGLE_ON_SCREEN[1]);
+
+        assert!(harness.actions.is_empty());
+        assert_eq!(harness.view.route_tool.outline.points().len(), 1);
     }
 
     #[test]

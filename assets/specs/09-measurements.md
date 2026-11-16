@@ -68,7 +68,7 @@ measurement's endpoints can now be dragged again (`OBJ-15`).
 ## Drawing
 
 **MEAS-8 — Visibility.** Measurements are drawn in **every** tool mode, above the image
-and its outline, and above areas (`AREA-9`). Only the active measurement's end markers
+and its outline, and above areas (`AREA-9`) and routes (`ROUTE-9`). Only the active measurement's end markers
 can be dragged (`OBJ-15`).
 
 **MEAS-9 — Appearance.** Everything is drawn in the measurement's line colour (`MEAS-1`):

@@ -28,6 +28,7 @@ must satisfy them.
 | [15-shapes.md](15-shapes.md) | Draw line tool, drawn shapes and their styles, shape properties row | `DRAW` |
 | [16-workspace.md](16-workspace.md) | Dockable panels, the Documents area, multiple documents, the active document | `WORK` |
 | [17-preferences.md](17-preferences.md) | Theme and language, the Settings menu, translation files | `PREF` |
+| [18-routes.md](18-routes.md) | Measure route tool, route measurements, Routes table | `ROUTE` |
 
 ## Conventions
 
@@ -48,7 +49,7 @@ must satisfy them.
 
 | Term | Meaning |
 |---|---|
-| **Document** | The thing being edited: an image-sized rectangle plus its calibration data, measurements, areas, grids, drawn shapes and origin. |
+| **Document** | The thing being edited: an image-sized rectangle plus its calibration data, measurements, areas, routes, grids, drawn shapes and origin. |
 | **Document file** | A `.ron` file describing a document in a versioned format, referring to its image by path (`FILE`). |
 | **Unsaved changes** | An open document differs from the document as last loaded or saved, or it has never been saved. |
 | **Image coordinates** | Pixel coordinates on the un-rotated image. The origin is at the top-left corner, x increases to the right and y increases downwards. Values may be fractional. |
@@ -61,9 +62,10 @@ must satisfy them.
 | **Scale** | The real-world length of one image pixel along the image's X axis and along its Y axis. |
 | **Measurement** | A line on the document, with a start and an end point, whose real-world length is derived from the scale. Called a **point-to-point** measurement in the UI. |
 | **Area** | An area measurement: a closed outline through 3 or more points on the document, whose real-world area is derived from the scale. |
+| **Route** | A route measurement: an open path of straight segments through 2 or more points on the document, whose real-world length, and each segment's, is derived from the scale. |
 | **Drawn shape** | A line through 2 or more points on the document, or a closed outline through 3 or more, with a line and fill style. Nothing is measured from it, though its fill lines are a real-world distance apart. |
-| **Object** | Something the user places on the document and can select: measurements, areas, grids and drawn shapes. Each has a stable object id. |
-| **Active object** | The single selected object. Measurements, areas and drawn shapes show a purple selection box with resize handles, and their points can be dragged. Its controls show in the tool controls row, and its tool is the active tool. It is presentation state, not part of the document. |
+| **Object** | Something the user places on the document and can select: measurements, areas, routes, grids and drawn shapes. Each has a stable object id. |
+| **Active object** | The single selected object. Measurements, areas, routes and drawn shapes show a purple selection box with resize handles, and their points can be dragged. Its controls show in the tool controls row, and its tool is the active tool. It is presentation state, not part of the document. |
 | **Tool controls row** | The row always shown under the tool bar: the controls of the active object or, with none, of the active tool (`SHELL-2a`). |
 | **Grid** | Regularly spaced lines over the whole document, aligned to a scale line or measurement line, with cells sized in real-world units. |
 | **Origin** | A point on the image, stored in the document, that the view rotates about. It defaults to the image centre. |
@@ -121,3 +123,4 @@ must satisfy them.
 | 2026-11-16 | Images larger than the graphics device's biggest texture now open at full resolution, drawn as tiles, instead of crashing the application (`IMG-9`). |
 | 2026-11-16 | The view rotation is now saved with the document, so a loaded document opens turned the way it was saved (`DOC-1`, `VIEW-2`, `VIEW-2a`), in file format version 8 (`FILE-6g`). Each change of rotation is a new **Set view rotation** action (`HIST-2`), committed when an arrow drag ends or the rotation field is left, and undo and redo turn the view (`ARCH-4`, `VIEW-14`, `VIEW-16`, `VIEW-18`). Escape, or switching tool, while choosing a rotation turns the view back (`SHELL-10a`). |
 | 2026-11-02 | Added a Settings menu at the right-hand end of the tool bar, with the theme (System, Light or Dark) and language (`en-US` or `es-ES`), both kept between runs, and translation files holding everything the application says (`17`, `SHELL-5`). Numbers keep the decimal point "." in every language. |
+| 2026-11-16 | Added route measurements (`18`): the Measure route tool after Measure area (`SHELL-5`), placing points and finishing with a double-click on the last point or Enter (`SHELL-10b`, `SHELL-10c`), routes drawn with each segment's length and their total (`GRID-6`, `MEAS-8`), a "`Routes`" tree folder (`OBJ-4`), a Routes panel whose routes open up into editable segment rows (`WORK-1`, `WORK-2`), and seven route actions (`HIST-2`). Routes can be selected, stretched, moved, duplicated and deleted like other objects (`OBJ-5`, `OBJ-8`, `OBJ-9`, `OBJ-12`, `OBJ-13`, `OBJ-15`, `OBJ-16`). Files are now saved as version 9, and earlier versions load with no routes (`FILE-1`, `FILE-6h`, `FILE-7`). A saved panel layout without the Routes panel keeps it closed until it is opened from the Panels menu (`WORK-6`). |

@@ -12,7 +12,7 @@ pub struct ToolKeyPresses {
     pub cancel: bool,
     /// Backspace: remove the last point placed.
     pub remove_last_point: bool,
-    /// Enter: finish a line being drawn, leaving it open.
+    /// Enter: finish a line or route being placed, leaving it open.
     pub finish: bool,
 }
 

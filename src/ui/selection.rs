@@ -10,6 +10,7 @@ use gridtool::geometry::{Bounds, Point};
 use gridtool::grid::Grid;
 use gridtool::measurement::Measurement;
 use gridtool::object::ObjectId;
+use gridtool::route::Route;
 use gridtool::shape::DrawnShape;
 use gridtool::style::{StyleEdit, Styled};
 
@@ -125,6 +126,16 @@ impl Selection {
         self.with_style_preview(id, shown)
     }
 
+    /// How to display the route with `id`: the drag preview if it is being dragged,
+    /// otherwise the route itself, with any style edit being previewed.
+    pub fn displayed_route(&self, id: ObjectId, route: &Route) -> Route {
+        let shown = match self.previewed(id) {
+            Some(Shape::Route(preview)) => preview.clone(),
+            _ => route.clone(),
+        };
+        self.with_style_preview(id, shown)
+    }
+
     /// Shows the active object with `edit` made, until the preview is cleared.
     pub fn preview_style(&mut self, edit: StyleEdit) {
         if self.active.is_some() {
@@ -136,8 +147,8 @@ impl Selection {
         self.style_preview = None;
     }
 
-    /// The active object's shape as currently displayed, if it has one (measurements, areas
-    /// and drawn shapes do; grids do not).
+    /// The active object's shape as currently displayed, if it has one (measurements, areas,
+    /// drawn shapes and routes do; grids do not).
     fn active_shape(&self, document: &Document) -> Option<Shape> {
         let id = self.active?;
         match self.previewed(id) {

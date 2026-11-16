@@ -12,6 +12,7 @@ use crate::geometry::Point;
 use crate::grid::{CellDimension, CellShape, Grid, GridSource};
 use crate::measurement::{Endpoint, Measurement};
 use crate::object::{Identified, ObjectId};
+use crate::route::Route;
 use crate::shape::DrawnShape;
 use crate::style::{InvalidStyle, StyleEdit, Styled};
 use crate::tr;
@@ -23,6 +24,7 @@ pub enum StyleTarget {
     Measurement(usize),
     Area(usize),
     Shape(usize),
+    Route(usize),
 }
 
 impl fmt::Display for StyleTarget {
@@ -31,6 +33,7 @@ impl fmt::Display for StyleTarget {
             Self::Measurement(index) => tr!("target-measurement", { number: index + 1 }),
             Self::Area(index) => tr!("target-area", { number: index + 1 }),
             Self::Shape(index) => tr!("target-shape", { number: index + 1 }),
+            Self::Route(index) => tr!("target-route", { number: index + 1 }),
         })
     }
 }
@@ -138,6 +141,26 @@ pub enum Action {
     DeleteShape { index: usize },
     /// Appends an exact copy of a shape, with a new object id, to the end of the list.
     DuplicateShape { index: usize },
+    /// Appends a route measurement to the end of the list.
+    AddRoute(Route),
+    /// Moves one point of an existing route; the segments either side of it follow.
+    MoveRoutePoint {
+        index: usize,
+        point: usize,
+        to: Point,
+    },
+    /// Replaces every point of a route at once (e.g. after resizing its bounding box). The
+    /// number of points must stay the same.
+    ResizeRoute { index: usize, points: Vec<Point> },
+    /// Replaces every point of a route at once, after moving it as a whole. The number of
+    /// points must stay the same.
+    MoveRoute { index: usize, points: Vec<Point> },
+    /// Changes the unit a route's lengths are reported in.
+    SetRouteUnit { index: usize, unit: LengthUnit },
+    /// Removes a route; later routes move up one place.
+    DeleteRoute { index: usize },
+    /// Appends an exact copy of a route, with a new object id, to the end of the list.
+    DuplicateRoute { index: usize },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -177,6 +200,18 @@ pub enum ActionError {
         count: usize,
     },
     ShapePointCountChanged {
+        expected: usize,
+        actual: usize,
+    },
+    RouteIndexOutOfRange {
+        index: usize,
+        count: usize,
+    },
+    RoutePointIndexOutOfRange {
+        point: usize,
+        count: usize,
+    },
+    RoutePointCountChanged {
         expected: usize,
         actual: usize,
     },
@@ -222,6 +257,15 @@ impl fmt::Display for ActionError {
             }
             Self::ShapePointCountChanged { expected, actual } => {
                 tr!("error-shape-point-count", { expected: expected, actual: actual })
+            }
+            Self::RouteIndexOutOfRange { index, count } => {
+                tr!("error-route-missing", { number: index + 1, count: count })
+            }
+            Self::RoutePointIndexOutOfRange { point, count } => {
+                tr!("error-route-point-missing", { number: point + 1, count: count })
+            }
+            Self::RoutePointCountChanged { expected, actual } => {
+                tr!("error-route-point-count", { expected: expected, actual: actual })
             }
             Self::HasNoFill(target) => tr!("error-no-fill", { target: target }),
             Self::InvalidFillSpacing(spacing) => {
@@ -459,6 +503,9 @@ impl Action {
                     StyleTarget::Shape(index) => {
                         restyle(shape_mut(document, index)?, *edit, *target)?;
                     }
+                    StyleTarget::Route(index) => {
+                        restyle(route_mut(document, index)?, *edit, *target)?;
+                    }
                 }
             }
             Action::DeleteShape { index } => {
@@ -469,6 +516,52 @@ impl Action {
                 let copy = shape_mut(document, *index)?.clone();
                 let id = document.allocate_object_id();
                 document.shapes_mut().push(Identified::new(id, copy));
+            }
+            Action::AddRoute(route) => {
+                for &point in route.points() {
+                    ensure_inside(document, point)?;
+                }
+                route.line().validate()?;
+                let id = document.allocate_object_id();
+                document
+                    .routes_mut()
+                    .push(Identified::new(id, route.clone()));
+            }
+            Action::MoveRoutePoint { index, point, to } => {
+                ensure_inside(document, *to)?;
+                let route = route_mut(document, *index)?;
+                let count = route.points().len();
+                if *point >= count {
+                    return Err(ActionError::RoutePointIndexOutOfRange {
+                        point: *point,
+                        count,
+                    });
+                }
+                *route = route.with_point(*point, *to);
+            }
+            Action::ResizeRoute { index, points } | Action::MoveRoute { index, points } => {
+                for &point in points {
+                    ensure_inside(document, point)?;
+                }
+                let route = route_mut(document, *index)?;
+                let expected = route.points().len();
+                if points.len() != expected {
+                    return Err(ActionError::RoutePointCountChanged {
+                        expected,
+                        actual: points.len(),
+                    });
+                }
+                route.set_points(points.clone());
+            }
+            Action::SetRouteUnit { index, unit } => route_mut(document, *index)?.set_unit(*unit),
+            Action::DeleteRoute { index } => {
+                route_mut(document, *index)?;
+                document.routes_mut().remove(*index);
+            }
+            Action::DuplicateRoute { index } => {
+                let copy = route_mut(document, *index)?.clone();
+                let id = document.allocate_object_id();
+                document.routes_mut().push(Identified::new(id, copy));
             }
         }
         Ok(())
@@ -485,6 +578,9 @@ impl Action {
         }
         if let Some(index) = document.shape_index(id) {
             return Some(Action::DuplicateShape { index });
+        }
+        if let Some(index) = document.route_index(id) {
+            return Some(Action::DuplicateRoute { index });
         }
         document
             .grid_index(id)
@@ -503,6 +599,9 @@ impl Action {
         if let Some(index) = document.shape_index(id) {
             return Some(Action::DeleteShape { index });
         }
+        if let Some(index) = document.route_index(id) {
+            return Some(Action::DeleteRoute { index });
+        }
         document
             .grid_index(id)
             .map(|index| Action::DeleteGrid { index })
@@ -516,10 +615,12 @@ impl Action {
                 | Action::AddArea(_)
                 | Action::AddGrid(_)
                 | Action::AddShape(_)
+                | Action::AddRoute(_)
                 | Action::DuplicateMeasurement { .. }
                 | Action::DuplicateArea { .. }
                 | Action::DuplicateGrid { .. }
                 | Action::DuplicateShape { .. }
+                | Action::DuplicateRoute { .. }
         )
     }
 }
@@ -565,6 +666,15 @@ fn shape_mut(document: &mut Document, index: usize) -> Result<&mut DrawnShape, A
         .get_mut(index)
         .map(|shape| &mut **shape)
         .ok_or(ActionError::ShapeIndexOutOfRange { index, count })
+}
+
+fn route_mut(document: &mut Document, index: usize) -> Result<&mut Route, ActionError> {
+    let routes = document.routes_mut();
+    let count = routes.len();
+    routes
+        .get_mut(index)
+        .map(|route| &mut **route)
+        .ok_or(ActionError::RouteIndexOutOfRange { index, count })
 }
 
 /// Makes `edit` to `object`, which must have what it edits.
@@ -708,6 +818,23 @@ impl fmt::Display for Action {
             Action::DeleteShape { index } => tr!("action-delete-shape", { number: index + 1 }),
             Action::DuplicateShape { index } => {
                 tr!("action-duplicate-shape", { number: index + 1 })
+            }
+            Action::AddRoute(route) => {
+                tr!("action-add-route", { count: route.points().len() })
+            }
+            Action::MoveRoutePoint { index, point, to } => {
+                tr!("action-move-route-point", { number: index + 1, point: point + 1, to: to })
+            }
+            Action::ResizeRoute { index, .. } => {
+                tr!("action-resize-route", { number: index + 1 })
+            }
+            Action::MoveRoute { index, .. } => tr!("action-move-route", { number: index + 1 }),
+            Action::SetRouteUnit { index, unit } => {
+                tr!("action-set-route-unit", { number: index + 1, unit: unit })
+            }
+            Action::DeleteRoute { index } => tr!("action-delete-route", { number: index + 1 }),
+            Action::DuplicateRoute { index } => {
+                tr!("action-duplicate-route", { number: index + 1 })
             }
         })
     }

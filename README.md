@@ -19,6 +19,7 @@ or measurement line. Every change can be undone, and documents can be saved and 
 - **Scale calibration**: from a single line of known length, using 2 points, such as the scale bar on a map, or from two lines of known length, using 3 or 4 points, with separate horizontal and vertical scales.
 - **Point-to-point measurements**: real-world distances, with editable coordinates, per-measurement units (cm or m) and line styles.
 - **Area measurements**: convex or concave outlines with 3 or more points, labelled with their area in cm² or m², with their own line and fill styles.
+- **Route measurements**: paths of straight segments through 2 or more points, labelled with each segment's length and the total, finishing with a double-click or Enter, with a Routes table whose segments can be opened up to edit their coordinates.
 - **Grids**: real-world grids with square or rectangular cells of any size, aligned to a scale or measurement line, with adjustable colour and opacity.
 - **Drawing**: draw lines through any number of points, finishing with a double-click or Enter, or click the first point to join them into an area. Choose thin, thick or dashed lines, fill areas solid or with lines or crosshatching at any real-world distance and angle, and set the colour and opacity of each.
 - **Tool controls**: a row under the tool bar for the active object, or for the next object a tool adds: units, line and fill styles, colours and opacity.

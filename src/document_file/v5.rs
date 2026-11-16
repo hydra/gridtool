@@ -408,6 +408,7 @@ impl DocumentV5 {
                 areas,
                 grids,
                 shapes,
+                routes: Vec::new(),
             },
             inside(self.origin)?,
             self.next_object_id,
@@ -415,7 +416,7 @@ impl DocumentV5 {
     }
 }
 
-fn stored_line(
+pub(super) fn stored_line(
     style: LineStyleV3,
     color: ColorV1,
     opacity: f32,

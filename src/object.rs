@@ -1,5 +1,5 @@
-//! Identity for objects placed on a document (currently only measurements; grids and
-//! area measurements will follow).
+//! Identity for objects placed on a document: measurements, areas, grids, drawn shapes and
+//! routes.
 
 use std::fmt;
 use std::ops::{Deref, DerefMut};
@@ -32,6 +32,7 @@ pub enum ObjectKind {
     Area,
     Grid,
     Shape,
+    Route,
 }
 
 /// An object stored in a document, paired with its [`ObjectId`]. Dereferences to the

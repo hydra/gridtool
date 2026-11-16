@@ -95,12 +95,13 @@ opacity applied as alpha (`round(opacity × 255)`). They are drawn in **every** 
 2. **grids**
 3. drawn shapes (`DRAW-11`)
 4. areas (`AREA-9`)
-5. measurement lines (`MEAS-9`)
-6. scale lines and markers, when shown (`SCALE-11`, `GRID-8`, `GRID-13`)
-7. the grid tool's hover highlight (`GRID-9`)
-8. other tool overlays: the rotate arrow, the pending measurement, and the area or drawn
-   shape being placed
-9. the selection box (`OBJ-8`)
+5. routes (`ROUTE-9`)
+6. measurement lines (`MEAS-9`)
+7. scale lines and markers, when shown (`SCALE-11`, `GRID-8`, `GRID-13`)
+8. the grid tool's hover highlight (`GRID-9`)
+9. other tool overlays: the rotate arrow, the pending measurement, and the area, route or
+   drawn shape being placed
+10. the selection box (`OBJ-8`)
 
 ## Grid tool
 

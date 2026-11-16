@@ -6,7 +6,7 @@ documents have their tabs.
 
 ## Panels
 
-**WORK-1 — Panels.** There are four panels, each showing information about the active document
+**WORK-1 — Panels.** There are five panels, each showing information about the active document
 (`WORK-10`):
 
 | Panel | Contents |
@@ -14,13 +14,14 @@ documents have their tabs.
 | Objects | the object tree (`OBJ-3`) |
 | Point-to-point | the distance measurements table (`MEAS-10`) |
 | Areas | the area measurements table (`AREA-12`) |
+| Routes | the route measurements table (`ROUTE-12`) |
 | History | the history list (`HIST-10`) |
 
 A panel's title is on its tab, so the panel's content has no heading of its own. Each panel
 scrolls independently.
 
 **WORK-2 — Default layout.** From left to right: Objects, the Documents area, then a column
-holding Point-to-point, Areas and History, from top to bottom, in equal shares of its height.
+holding Point-to-point, Areas, Routes and History, from top to bottom, in equal shares of its height.
 The three columns start with widths in the proportion 220 : 600 : 460.
 
 **WORK-3 — Arranging panels.** The user can:
@@ -49,7 +50,8 @@ checkbox showing whether it is open:
 exits, and restored the next time it starts. Nothing else is restored: no documents are reopened,
 and the window has its initial size (`SHELL-1`). A saved arrangement that cannot be read, or that
 the user could not have made (`WORK-4`, or a panel appearing twice), is ignored in favour of the
-default layout.
+default layout. A panel missing from a saved arrangement, such as one added in a later release,
+stays closed until the user opens it from the Panels menu or resets the layout (`WORK-5`).
 
 ## Documents
 

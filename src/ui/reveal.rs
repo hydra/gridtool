@@ -1,10 +1,11 @@
 //! Bringing an object picked in the object tree into view: the view is left alone while
 //! any part of the object is on screen; otherwise it pans to the object, and zooms out if
-//! the object still does not fit.
+//! the object still does not fit. Part of an object, such as one segment of a route, can be
+//! brought wholly into view instead.
 
 use eframe::egui::{Pos2, Rect, Vec2};
 use gridtool::document::Outline;
-use gridtool::geometry::Point;
+use gridtool::geometry::{Bounds, Point};
 
 use super::viewport::{Viewport, fit_room};
 
@@ -18,20 +19,52 @@ pub fn reveal(
     document_size: Vec2,
     view: Rect,
 ) {
-    let on_screen = |viewport: &Viewport| -> Vec<Pos2> {
-        let transform = viewport.transform(view.center(), document_size);
-        outline
-            .points
-            .iter()
-            .map(|point| transform.image_to_screen(*point))
-            .collect()
-    };
-    if is_visible(&on_screen(viewport), outline.closed, view) {
+    if is_visible(
+        &on_screen(viewport, &outline.points, document_size, view),
+        outline.closed,
+        view,
+    ) {
         return;
     }
+    center_and_fit(viewport, &outline.points, focus, document_size, view);
+}
+
+/// Makes every one of `points` visible in the canvas `view` (a screen rect) unless they all
+/// already are: pans so that their middle is at the centre, then zooms out about the centre
+/// until they fit. Rotation is never changed.
+pub fn reveal_fully(viewport: &mut Viewport, points: &[Point], document_size: Vec2, view: Rect) {
+    let Some(bounds) = Bounds::enclosing(points.iter().copied()) else {
+        return;
+    };
+    let shown = on_screen(viewport, points, document_size, view);
+    if shown.iter().all(|point| view.contains(*point)) {
+        return;
+    }
+    center_and_fit(viewport, points, bounds.center(), document_size, view);
+}
+
+/// Where `points` are drawn in the canvas `view` by `viewport`.
+fn on_screen(viewport: &Viewport, points: &[Point], document_size: Vec2, view: Rect) -> Vec<Pos2> {
+    let transform = viewport.transform(view.center(), document_size);
+    points
+        .iter()
+        .map(|point| transform.image_to_screen(*point))
+        .collect()
+}
+
+/// Pans so that `focus` is at the centre of `view`, then zooms out about the centre until
+/// `points` fit inside it, with room to spare.
+fn center_and_fit(
+    viewport: &mut Viewport,
+    points: &[Point],
+    focus: Point,
+    document_size: Vec2,
+    view: Rect,
+) {
     viewport.center_on(focus, document_size);
     let room = fit_room(view);
-    let factor = fit_factor(&on_screen(viewport), room.center(), room.size() * 0.5);
+    let shown = on_screen(viewport, points, document_size, view);
+    let factor = fit_factor(&shown, room.center(), room.size() * 0.5);
     if factor < 1.0 {
         viewport.zoom_about(view.center(), view.center(), factor);
     }
@@ -153,6 +186,31 @@ mod tests {
             .unwrap()
             .center();
         reveal(viewport, outline, focus, DOCUMENT_SIZE, VIEW);
+    }
+
+    #[test]
+    fn a_segment_wholly_on_screen_does_not_move_the_view() {
+        let mut viewport = Viewport::default();
+        let points = [Point::new(1700.0, 1300.0), Point::new(2300.0, 1700.0)];
+
+        reveal_fully(&mut viewport, &points, DOCUMENT_SIZE, VIEW);
+
+        assert_eq!(viewport, Viewport::default());
+    }
+
+    #[test]
+    fn a_segment_partly_on_screen_is_centred_and_fitted() {
+        let mut viewport = Viewport::default();
+        // One end on screen, 2000 px long, centred at (2900, 1500).
+        let segment = line((1900.0, 1500.0), (3900.0, 1500.0));
+
+        reveal_fully(&mut viewport, &segment.points, DOCUMENT_SIZE, VIEW);
+
+        let expected_zoom = (800.0 - 2.0 * FIT_MARGIN) / 2000.0;
+        assert!((viewport.zoom() - expected_zoom).abs() < 1e-5);
+        let points = screen(&segment, &viewport);
+        assert!((points[0].x - FIT_MARGIN).abs() < 1e-2);
+        assert!((points[1].x - (800.0 - FIT_MARGIN)).abs() < 1e-2);
     }
 
     #[test]

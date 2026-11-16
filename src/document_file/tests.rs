@@ -5,6 +5,7 @@ use crate::calibration::{CalibrationMethod, Line, ScalePoints};
 use crate::color::Rgb;
 use crate::grid::{CellDimension, CellShape, Grid, GridSource};
 use crate::measurement::Measurement;
+use crate::route::Route;
 use crate::shape::DrawnShape;
 use crate::style::{FillStyle, LineStyle, StyleEdit, Styled};
 use crate::units::LengthUnit;
@@ -12,7 +13,7 @@ use crate::units::LengthUnit;
 /// A document using every feature: calibration, measurements with a gap in their ids and
 /// a changed colour, areas with every property changed, grids with every property
 /// changed (one aligned to a deleted measurement), drawn shapes (a styled line and a
-/// closed shape with every property changed), a moved origin and a rotated view.
+/// closed shape with every property changed), a moved origin, a rotated view and a styled route.
 fn rich_document() -> Document {
     let mut document = Document::new(200, 100);
     let measurement = |x: f64| {
@@ -45,6 +46,21 @@ fn rich_document() -> Document {
         },
         Action::SetUnit(LengthUnit::Metre),
         Action::SetRotation(247.25),
+        Action::AddRoute(
+            Route::new(
+                vec![
+                    Point::new(5.0, 5.0),
+                    Point::new(60.0, 5.0),
+                    Point::new(60.0, 95.5),
+                ],
+                LengthUnit::Metre,
+            )
+            .unwrap(),
+        ),
+        Action::SetStyle {
+            target: StyleTarget::Route(0),
+            edit: StyleEdit::LineColor(Rgb::new(9, 8, 7)),
+        },
         measurement(10.0),
         measurement(50.0),
         measurement(90.0),
@@ -239,7 +255,7 @@ fn files_are_tagged_with_their_format_version() {
         .to_ron()
         .unwrap();
 
-    assert!(text.starts_with("V8("), "{text}");
+    assert!(text.starts_with("V9("), "{text}");
 }
 
 /// A version 1 file exactly as the first release writes it. It must always load.
@@ -1087,4 +1103,105 @@ fn a_rotation_outside_one_turn_is_rejected() {
             "{rotation}: {result:?}"
         );
     }
+}
+
+/// A version 9 file exactly as the release that added routes writes it. It must always load.
+const VERSION_9_SAMPLE: &str = r#"V9((
+    image: "photo.png",
+    width: 200,
+    height: 100,
+    origin: (x: 100.0, y: 50.0),
+    rotation: 0.0,
+    calibration: (
+        points: None,
+        distance_a: None,
+        distance_b: None,
+        unit: Centimetre,
+    ),
+    measurements: [],
+    areas: [],
+    grids: [],
+    shapes: [],
+    routes: [(
+        id: 2,
+        points: [(x: 10.0, y: 10.0), (x: 50.0, y: 10.0), (x: 50.0, y: 40.0)],
+        unit: Metre,
+        line_style: Dashed,
+        line_color: (r: 1, g: 2, b: 3),
+        line_opacity: 0.5,
+    )],
+    next_object_id: 3,
+))"#;
+
+#[test]
+fn version_9_files_load_with_their_routes() {
+    let document = DocumentFile::from_ron(VERSION_9_SAMPLE)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    let [route] = document.routes() else {
+        panic!("expected one route");
+    };
+    assert_eq!(route.points().len(), 3);
+    assert_eq!(route.points()[1], Point::new(50.0, 10.0));
+    assert_eq!(route.unit(), LengthUnit::Metre);
+    let line = route.line();
+    assert_eq!(line.style, LineStyle::Dashed);
+    assert_eq!(line.color, Rgb::new(1, 2, 3));
+    assert_eq!(line.opacity, 0.5);
+    assert_eq!(document.newest_object(), Some(route.id()));
+}
+
+#[test]
+fn files_from_before_version_9_load_without_routes() {
+    let document = DocumentFile::from_ron(VERSION_8_SAMPLE)
+        .unwrap()
+        .to_document()
+        .unwrap();
+
+    assert!(document.routes().is_empty());
+}
+
+#[test]
+fn invalid_routes_are_rejected() {
+    let cases = [
+        (
+            "points: [(x: 10.0, y: 10.0), (x: 50.0, y: 10.0), (x: 50.0, y: 40.0)]",
+            "points: [(x: 10.0, y: 10.0)]",
+            InvalidDocument::TooFewRoutePoints(1),
+        ),
+        (
+            "(x: 50.0, y: 40.0)",
+            "(x: 50.0, y: 140.0)",
+            InvalidDocument::PointOutside(Point::new(50.0, 140.0)),
+        ),
+        ("id: 2", "id: 3", InvalidDocument::BadObjectId(3)),
+        ("id: 2", "id: 0", InvalidDocument::BadObjectId(0)),
+        (
+            "line_opacity: 0.5",
+            "line_opacity: 1.5",
+            InvalidDocument::BadOpacity(1.5),
+        ),
+    ];
+    for (from, to, expected) in cases {
+        let text = VERSION_9_SAMPLE.replacen(from, to, 1);
+        let result = DocumentFile::from_ron(&text).unwrap().to_document();
+
+        assert_eq!(result, Err(expected), "{to}");
+    }
+}
+
+#[test]
+fn a_route_cannot_reuse_the_id_of_another_object() {
+    let text = VERSION_9_SAMPLE.replacen(
+        "measurements: [],",
+        "measurements: [(id: 2, start: (x: 1.0, y: 2.0), end: (x: 3.0, y: 4.0), unit: Metre, line_style: Thick, line_color: (r: 0, g: 0, b: 255), line_opacity: 1.0)],",
+        1,
+    );
+
+    assert_eq!(
+        DocumentFile::from_ron(&text).unwrap().to_document(),
+        Err(InvalidDocument::BadObjectId(2))
+    );
 }

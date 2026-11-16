@@ -4,6 +4,7 @@
 
 use gridtool::area;
 use gridtool::measurement;
+use gridtool::route;
 use gridtool::shape;
 use gridtool::style::{FillAngles, FillStyle, ObjectStyle, StyleEdit, Styled};
 use gridtool::units::LengthUnit;
@@ -39,6 +40,14 @@ impl NewObjectSettings {
         Self::following_calibration(ObjectStyle {
             line: area::DEFAULT_LINE,
             fill: Some(area::default_fill(LengthUnit::default())),
+        })
+    }
+
+    /// The settings a new route starts from.
+    pub fn for_routes() -> Self {
+        Self::following_calibration(ObjectStyle {
+            line: route::DEFAULT_LINE,
+            fill: None,
         })
     }
 

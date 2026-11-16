@@ -127,8 +127,8 @@ impl GridToolApp {
     }
 
     /// Escape abandons what the tool was part-way through, and switching tool mode leaves it
-    /// altogether. Backspace removes the last point placed; Enter finishes a line being drawn, returning
-    /// the action that adds it.
+    /// altogether. Backspace removes the last point placed; Enter finishes a line or route being
+    /// placed, returning the action that adds it.
     fn apply_tool_keys(&mut self, keys: ToolKeyPresses, mode_changed: bool) -> Option<Action> {
         let open = self.session.document_mut()?;
         if mode_changed {
@@ -140,7 +140,7 @@ impl GridToolApp {
             open.view.remove_last_point();
         }
         let unit = open.editor.document().calibration().unit();
-        keys.finish.then(|| open.view.finish_line(unit)).flatten()
+        keys.finish.then(|| open.view.finish_open(unit)).flatten()
     }
 
     /// Keeps the window open while the session asks about unsaved changes.
@@ -199,6 +199,9 @@ impl GridToolApp {
             let pick = output.tree_pick.or(output.table_pick.map(TreePick::Object));
             if let Some(pick) = pick {
                 open.pick(pick);
+            }
+            if let Some(segment) = output.segment_pick {
+                open.pick_segment(segment);
             }
         }
         if let Some(id) = self.activating.take() {
