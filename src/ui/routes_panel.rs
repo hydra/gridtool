@@ -105,10 +105,13 @@ impl RoutesPanel {
             .auto_shrink(false)
             .show(ui, |ui| {
                 let field_width = self.columns.field_width(ui);
+                // Taken once here: the grid's cells are laid out in a `Ui` of their own,
+                // whose id differs.
+                let open_routes = OpenRoutes::in_ui(ui);
                 let open: Vec<bool> = document
                     .routes()
                     .iter()
-                    .map(|route| is_open(ui, route.id()))
+                    .map(|route| open_routes.is_open(ui.ctx(), route.id()))
                     .collect();
                 let selected_row = active.and_then(|id| route_row_index(document, &open, id));
                 let mut rows = TableRows::default();
@@ -128,7 +131,7 @@ impl RoutesPanel {
                             // Show a drag in progress live.
                             let route = selection.displayed_route(id, stored);
                             let row_action = rows.row(ui, RouteRow::Route(id), |ui| {
-                                route_row(ui, document, (index, id), &route, open[index])
+                                route_row(ui, document, (index, id), &route, open_routes)
                             });
                             action = action.or(row_action);
                             if !open[index] {
@@ -209,8 +212,9 @@ fn route_row(
     document: &Document,
     (index, id): (usize, ObjectId),
     route: &Route,
-    open: bool,
+    open_routes: OpenRoutes,
 ) -> Option<Action> {
+    let open = open_routes.is_open(ui.ctx(), id);
     // Every cell must be drawn each frame, so collect actions eagerly.
     let mut actions = Vec::new();
 
@@ -221,7 +225,7 @@ fn route_row(
     };
     let toggle = egui::Button::new(format!("{} {}", icon.codepoint, index + 1)).frame(false);
     if ui.add(toggle).on_hover_text(tooltip).clicked() {
-        set_open(ui, id, !open);
+        open_routes.set_open(ui.ctx(), id, !open);
     }
 
     actions.extend(
@@ -282,19 +286,25 @@ fn show_length(ui: &mut egui::Ui, length: Option<f64>, document: &Document) {
     }
 }
 
-fn open_id(ui: &egui::Ui, route: ObjectId) -> egui::Id {
-    ui.make_persistent_id(("route_open", route))
-}
+/// Which routes' folder rows are open, remembered from frame to frame under one scope. It is
+/// taken from the panel's `Ui`, which is scoped by document, so each document keeps its own.
+#[derive(Debug, Clone, Copy)]
+struct OpenRoutes(egui::Id);
 
-/// Whether the route's folder row is open. Routes start closed.
-fn is_open(ui: &egui::Ui, route: ObjectId) -> bool {
-    let id = open_id(ui, route);
-    ui.data(|data| data.get_temp(id)).unwrap_or(false)
-}
+impl OpenRoutes {
+    fn in_ui(ui: &egui::Ui) -> Self {
+        Self(ui.make_persistent_id("route_open"))
+    }
 
-fn set_open(ui: &egui::Ui, route: ObjectId, open: bool) {
-    let id = open_id(ui, route);
-    ui.data_mut(|data| data.insert_temp(id, open));
+    /// Whether the route's folder row is open. Routes start closed.
+    fn is_open(self, ctx: &egui::Context, route: ObjectId) -> bool {
+        ctx.data(|data| data.get_temp(self.0.with(route)))
+            .unwrap_or(false)
+    }
+
+    fn set_open(self, ctx: &egui::Context, route: ObjectId, open: bool) {
+        ctx.data_mut(|data| data.insert_temp(self.0.with(route), open));
+    }
 }
 
 /// The index, among the rows after the header, of the folder row of route `id`, given which
@@ -456,21 +466,88 @@ mod tests {
         assert_eq!(output.table.action, Some(Action::DeleteRoute { index: 0 }));
     }
 
-    #[test]
-    fn routes_start_closed_and_remember_being_opened() {
-        let ctx = egui::Context::default();
-        let id = document().routes()[0].id();
-        let mut states = Vec::new();
-        for open in [None, Some(true), None] {
-            let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
-                if let Some(open) = open {
-                    set_open(ui, id, open);
+    /// Draws the panel for [`document`] once with `events`, returning every piece of text
+    /// drawn, with where it was drawn.
+    fn frame(
+        ctx: &egui::Context,
+        panel: &mut RoutesPanel,
+        events: Vec<egui::Event>,
+    ) -> Vec<(String, egui::Rect)> {
+        let document = document();
+        let selection = Selection::default();
+        let input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(900.0, 400.0),
+            )),
+            events,
+            ..Default::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| {
+            panel.show(ui, &document, &selection, false);
+        });
+        output.textures_delta.clear();
+        output
+            .shapes
+            .iter()
+            .filter_map(|clipped| match &clipped.shape {
+                egui::Shape::Text(text) => {
+                    Some((text.galley.job.text.clone(), text.visual_bounding_rect()))
                 }
-                states.push(is_open(ui, id));
-            });
-            output.textures_delta.clear();
-        }
+                _ => None,
+            })
+            .collect()
+    }
 
-        assert_eq!(states, [false, true, true]);
+    fn click(ctx: &egui::Context, panel: &mut RoutesPanel, at: egui::Pos2) {
+        let button = |pressed| egui::Event::PointerButton {
+            pos: at,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        };
+        frame(ctx, panel, vec![egui::Event::PointerMoved(at)]);
+        frame(ctx, panel, vec![button(true)]);
+        frame(ctx, panel, vec![button(false)]);
+    }
+
+    fn toggle_of_first_route(texts: &[(String, egui::Rect)], icon: MaterialIcon) -> egui::Pos2 {
+        let label = format!("{} 1", icon.codepoint);
+        texts
+            .iter()
+            .find(|(text, _)| *text == label)
+            .map(|(_, rect)| rect.center())
+            .unwrap_or_else(|| panic!("no {label:?} in {texts:?}"))
+    }
+
+    fn shows_segment_rows(texts: &[(String, egui::Rect)]) -> bool {
+        texts.iter().any(|(text, _)| text == "1.1")
+    }
+
+    #[test]
+    fn clicking_a_routes_toggle_opens_and_closes_its_segment_rows() {
+        let ctx = egui::Context::default();
+        egui_material_icons::initialize(&ctx);
+        let mut panel = RoutesPanel::default();
+        let texts = frame(&ctx, &mut panel, Vec::new());
+        assert!(!shows_segment_rows(&texts), "routes start closed");
+
+        click(
+            &ctx,
+            &mut panel,
+            toggle_of_first_route(&texts, icons::EXPAND),
+        );
+        let texts = frame(&ctx, &mut panel, Vec::new());
+        assert!(shows_segment_rows(&texts), "{texts:?}");
+        assert!(texts.iter().any(|(text, _)| text == "1.2"));
+        assert!(!texts.iter().any(|(text, _)| text == "2.1"));
+
+        click(
+            &ctx,
+            &mut panel,
+            toggle_of_first_route(&texts, icons::COLLAPSE),
+        );
+        let texts = frame(&ctx, &mut panel, Vec::new());
+        assert!(!shows_segment_rows(&texts), "{texts:?}");
     }
 }
